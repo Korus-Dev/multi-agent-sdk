@@ -1968,6 +1968,9 @@ function claudeTurnParams(
 ): ClaudeTurnParams {
   const claudeOptions = options.backendOptions?.kind === 'claude' ? options.backendOptions : undefined;
   const defaults = agent.backendDefaults?.kind === 'claude' ? agent.backendDefaults : undefined;
+  const restored = agent.backendSession?.kind === 'claude' ? agent.backendSession : undefined;
+  const model = options.selection?.model ?? defaults?.model ?? restored?.model ?? null;
+  const restoredEffort = model === restored?.model ? restored?.reasoningEffort : undefined;
   const tier = options.selection?.serviceTier !== undefined ? options.selection?.serviceTier : defaults?.serviceTier;
   if (tier != null && !['normal', 'default', 'fast'].includes(tier)) throw new Error('Unsupported Claude service tier.');
   const mcpServerUrl = configuration.mcpServerUrl ?? null;
@@ -1977,8 +1980,8 @@ function claudeTurnParams(
     prompt: configuration.formatPrompt?.(prompt, options.content) ?? (options.content === undefined ? prompt : promptContentDispatchText(options.content, prompt)),
     sessionId: existingSessionId ?? undefined,
     title: configuration.title ?? agent.name?.trim() ?? 'Claude',
-    model: options.selection?.model ?? defaults?.model ?? null,
-    effort: claudeEffort(options.selection?.reasoningEffort ?? defaults?.reasoningEffort),
+    model,
+    effort: claudeEffort(options.selection?.reasoningEffort ?? defaults?.reasoningEffort ?? restoredEffort),
     fastMode: tier === 'fast',
     permissionMode: options.planMode ? 'plan' : claudeOptions?.permissionMode ?? defaults?.permissionMode ?? null,
     appendSystemPrompt: configuration.appendSystemPrompt,

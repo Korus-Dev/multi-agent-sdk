@@ -33,6 +33,22 @@ export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriv
     return binding;
   };
   const changed = (session: Session) => emit({ type: 'session.changed', session, state: structuredClone(get(session).state) });
+  const adoptSession = (session: Session, data: BackendSession, preserveRuntimeSelection = false) => {
+    const binding = get(session);
+    const previousSession = binding.context.backendSession;
+    binding.context.backendSession = structuredClone(data);
+    if (data.kind === 'claude') {
+      const runtime = preserveRuntimeSelection && previousSession?.kind === 'claude' && previousSession.sessionId === data.sessionId
+        ? binding.state.selection : undefined;
+      binding.state.selection = {
+        ...runtime,
+        ...(data.model !== undefined && data.model !== runtime?.model ? { reasoningEffort: undefined, serviceTier: undefined } : {}),
+        ...(data.model === undefined ? {} : { model: data.model }),
+        ...(data.reasoningEffort === undefined ? {} : { reasoningEffort: data.reasoningEffort }),
+      };
+      changed(session);
+    }
+  };
   const unsubscribe = native.onEvent(event => {
     const session = event.agentId ? byId.get(event.agentId) : undefined;
     if (!session) return;
@@ -62,6 +78,24 @@ export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriv
     } else if (event.type === 'agentRequest.resolved') {
       b.state.requests = b.state.requests.filter(r => r.id !== event.payload.id);
       emit({ type: 'request.resolved', session, ...event.payload }); changed(session);
+    } else if (event.type === 'conversation.modeUpdated' && event.payload.permissionMode !== undefined) {
+      b.state.permission = event.payload.permissionMode;
+      changed(session);
+    } else if (event.type === 'conversation.settingsUpdated') {
+      const { model, reasoningEffort, serviceTier, permissionMode, approvalPreset } = event.payload.settings;
+      const permission = approvalPreset ?? permissionMode;
+      if (permission !== undefined) b.state.permission = permission;
+      if (model !== undefined || reasoningEffort !== undefined || serviceTier !== undefined) {
+        const previous = b.state.selection;
+        b.state.selection = {
+          ...previous,
+          ...(model === undefined ? {} : { model }),
+          ...(model !== undefined && model !== previous?.model ? { reasoningEffort: undefined, serviceTier: undefined } : {}),
+          ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
+          ...(serviceTier === undefined ? {} : { serviceTier }),
+        };
+      }
+      if (model !== undefined || reasoningEffort !== undefined || serviceTier !== undefined || permission !== undefined) changed(session);
     } else if (event.type === 'agent.updated') { b.state.title = event.payload.conversationTitle ?? b.state.title; changed(session); }
     else if (event.type === 'conversation.goalUpdated') { b.state.goal = structuredClone(event.payload.goal); changed(session); }
     else if (event.type === 'conversation.goalCleared') { b.state.goal = null; changed(session); }
@@ -71,7 +105,7 @@ export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriv
   const offUsage = native.onUsage?.(observation => emit({ type: 'usage.observed', observation }));
   const offRequests = native.onRequestUsage?.(observation => emit({ type: 'requestUsage.observed', observation }));
   const admitted = (session: Session, result: import('./driver').HarnessSendResult): Admission => {
-    get(session).context.backendSession = structuredClone(result.backendSession);
+    adoptSession(session, result.backendSession, true);
     return { session, ...(result.turnId ? { turnId: result.turnId } : {}), ...(result.messageId ? { messageId: result.messageId } : {}) };
   };
   const capabilities = (session: Session): HarnessCapabilities => {
@@ -86,10 +120,13 @@ export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriv
       const result = await native.setApprovalPreset(b.context, id as import('./contracts').ApprovalPreset);
       b.context.backendSession = result.backendSession;
       b.context.backendDefaults = { ...b.context.backendDefaults, kind: 'codex', approvalPreset: result.approvalPreset };
+      b.state.permission = result.approvalPreset;
     } else {
       if (!native.setPermissionMode) throw new Error('Permission updates are unavailable.');
       b.context.backendDefaults = (await native.setPermissionMode(b.context, id)).backendDefaults;
+      b.state.permission = 'permissionMode' in b.context.backendDefaults ? b.context.backendDefaults.permissionMode : undefined;
     }
+    changed(session);
   };
   const hydrate = async <T>(session: Session, action: (binding: Binding) => Promise<T>): Promise<T> => {
     const binding = interactive(session);
@@ -202,7 +239,7 @@ export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriv
       if (!native.loadConversation) throw new Error('Conversation loading is unavailable.');
       return hydrate(session, async binding => {
         const result = await native.loadConversation!(binding.context);
-        if (result) binding.context.backendSession = result;
+        if (result) adoptSession(session, result);
         return result !== null;
       });
     },
@@ -220,7 +257,7 @@ export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriv
     async resumeConversation(session, target) {
       const ref = refs.get(target.ref); if (!ref) throw new Error('Conversation reference does not belong to this driver.');
       if (!native.resumeConversation) throw new Error('Conversation resume is unavailable.');
-      const result = await native.resumeConversation(main(session).context, { ...target, ref }); main(session).context.backendSession = result.backendSession;
+      const result = await native.resumeConversation(main(session).context, { ...target, ref }); adoptSession(session, result.backendSession);
     },
     async executeScopedPrompt(session, input) {
       const parent = main(session);

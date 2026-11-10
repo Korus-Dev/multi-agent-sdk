@@ -36,6 +36,9 @@ export function createConsumerProjection() {
       const s = codex.getSnapshot();
       return { messages: surfaceMessages(s.messages, event.agentId!), busy: s.busy, activeTurnId: s.activeTurnId, turns: s.turns satisfies Turn[], answeredClientRequestIds: s.answeredClientRequestIds, historyLoading: s.historyLoading, historyState: s.historyState,
         requests: [...s.approvals.map(approvalAgentRequest), ...s.clientRequests.map(request => requestFromClientRequest(request, { conversationId: s.activeConversationId, turnId: request.turnId ?? undefined }))],
+        selection: { model: s.models.find(model => model.id === s.selectedModelId)?.model ?? s.selectedModelId,
+          reasoningEffort: s.selectedReasoningEffort, serviceTier: s.selectedServiceTier },
+        permission: s.approvalPreset,
         error: s.error, contextUsage: s.contextUsage, goal: s.goal,
         plan: s.executionPlan ? { threadId: s.activeConversationId, turnId: s.executionPlan.turnId, kind: 'execution',
           status: s.turns.find(t => t.id === s.executionPlan!.turnId)?.status ?? 'inProgress',

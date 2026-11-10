@@ -41,7 +41,12 @@ export type HistoryState = {
   loadingStrategy?: 'lazy' | 'eager';
   fullyLoaded?: boolean;
 };
+/** Provider-reported execution settings. Missing fields remain unknown. */
+export type SessionSelection = { model?: string | null; reasoningEffort?: string | null; serviceTier?: string | null };
 export type SessionState = {
+  selection?: SessionSelection;
+  /** Provider-confirmed permission ID; absent or null means unknown. */
+  permission?: string | null;
   messages: Message[]; busy: boolean; activeTurnId: string | null;
   turns: Turn[];
   /** Undefined until the native provider supplies evidence. */

@@ -308,6 +308,21 @@ describe('ClaudeBackendDriver', () => {
     expect(events.filter((event) => event.type === 'context.compactionCompleted')).toHaveLength(1);
   });
 
+  it.each([
+    { selection: undefined, model: 'opus', effort: 'high' },
+    { selection: { model: 'sonnet' }, model: 'sonnet', effort: null },
+    { selection: { model: 'sonnet', reasoningEffort: 'medium' }, model: 'sonnet', effort: 'medium' },
+  ])('continues with provider-restored selection or explicit overrides: $model / $effort', async ({ selection, model, effort }) => {
+    const transport = createFakeTransport();
+    const driver = new ClaudeBackendDriver(transport);
+    const restored: Agent = { ...agent, backendSession: { kind: 'claude', sessionId: 'claude-session-existing', transport: 'stdio', model: 'opus', reasoningEffort: 'high' } };
+    try {
+      await driver.sendPrompt(restored, 'Continue', { selection });
+      expect(transport.startTurn.mock.calls[0]?.[0]).toMatchObject({ model, effort });
+      await driver.interrupt(restored);
+    } finally { await driver.close(); }
+  });
+
   it('resumes persisted Claude sessions and interrupts active turns', async () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);

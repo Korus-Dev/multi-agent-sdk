@@ -54,3 +54,65 @@ for (const frame of frames) it(`${frame.backend}: preserves native turn, answere
     }
   } finally { await driver.close(); }
 });
+
+it('Codex exposes restored native execution selection without consumer persistence', async () => {
+  let deliver!: (event: NativeEvent) => void;
+  const native = { onEvent: (listener: typeof deliver) => { deliver = listener; return () => {}; }, close: vi.fn() } as unknown as NativeDriver<HarnessContext, NativeEvent>;
+  const driver = adaptHarnessDriver('codex', native);
+  const session = driver.open({ id: 'tax', folder: '/ledger' });
+  const snapshot = sdkSnapshot('native', { models: [{ id: 'catalog-terra', model: 'gpt-6.1-terra', displayName: 'Terra',
+    supportedReasoningEfforts: [], defaultReasoningEffort: 'high', isDefault: false }],
+    selectedModelId: 'catalog-terra', selectedReasoningEffort: 'low', selectedServiceTier: 'default', approvalPreset: 'full-access' });
+  deliver({ type: 'codex.conversationSnapshotChanged', backend: 'codex', agentId: 'tax', threadId: 'native', payload: { revision: 1, snapshot } });
+  expect(driver.readSession(session).selection).toEqual({ model: 'gpt-6.1-terra', reasoningEffort: 'low', serviceTier: 'default' });
+  expect(driver.readSession(session).permission).toBe('full-access');
+  deliver({ type: 'codex.conversationSnapshotChanged', backend: 'codex', agentId: 'tax', threadId: 'native', payload: { revision: 2, snapshot: sdkSnapshot('native') } });
+  expect(driver.readSession(session).selection).toEqual({ model: null, reasoningEffort: null, serviceTier: null });
+  expect(driver.readSession(session).permission).toBeNull();
+  await driver.close();
+});
+
+it('Claude publishes model settings recovered from provider history and later native settings events', async () => {
+  let deliver!: (event: NativeEvent) => void;
+  const saved = { kind: 'claude' as const, sessionId: 'native', transport: 'stdio' as const, model: 'claude-opus', reasoningEffort: 'high' };
+  const native = { onEvent: (listener: typeof deliver) => { deliver = listener; return () => {}; }, close: vi.fn(),
+    resumeConversation: async () => ({ backendSession: saved }), loadConversation: async () => ({ ...saved, reasoningEffort: undefined }),
+    sendPrompt: async () => ({ backendSession: saved }),
+  } as unknown as NativeDriver<HarnessContext, NativeEvent>;
+  const driver = adaptHarnessDriver('claude', native);
+  const session = driver.open({ id: 'tax', folder: '/ledger' });
+  const ref = driver.restoreRef({ provider: 'claude', data: { backend: 'claude', folder: '/ledger', sessionId: 'native' } });
+  await driver.resumeConversation(session, { ref, storageState: 'active' });
+  expect(driver.readSession(session).selection).toEqual({ model: 'claude-opus', reasoningEffort: 'high' });
+  await driver.loadConversation(session);
+  expect(driver.readSession(session).selection).toEqual({ model: 'claude-opus' });
+  deliver({ type: 'conversation.settingsUpdated', backend: 'claude', agentId: 'tax', payload: { settings: { model: 'claude-sonnet', reasoningEffort: 'medium' } } });
+  expect(driver.readSession(session).selection).toEqual({ model: 'claude-sonnet', reasoningEffort: 'medium' });
+  deliver({ type: 'conversation.settingsUpdated', backend: 'claude', agentId: 'tax', payload: { settings: { model: 'claude-opus', reasoningEffort: 'high', serviceTier: 'fast' } } });
+  deliver({ type: 'conversation.modeUpdated', backend: 'claude', agentId: 'tax', payload: { mode: 'default', permissionMode: 'dontAsk' } });
+  expect(driver.readSession(session).permission).toBe('dontAsk');
+  await driver.sendPrompt(session, 'Continue');
+  expect(driver.readSession(session).selection).toEqual({ model: 'claude-opus', reasoningEffort: 'high', serviceTier: 'fast' });
+  await driver.close();
+});
+
+
+it.each(['codex', 'claude'] as const)('%s publishes accepted permission changes and keeps the last confirmed mode on failure', async provider => {
+  const mode = provider === 'codex' ? 'full-access' : 'dontAsk';
+  const update = vi.fn().mockResolvedValue(provider === 'codex'
+    ? { backendSession: { kind: 'codex', threadId: 'native' }, approvalPreset: mode }
+    : { backendDefaults: { kind: 'claude', permissionMode: mode } });
+  const native = { onEvent: () => () => {}, close: vi.fn(),
+    getCapabilities: () => provider === 'codex' ? { approvalPresets: [mode] } : { permissionModes: [{ id: mode }] },
+    setApprovalPreset: update, setPermissionMode: update,
+  } as unknown as NativeDriver<HarnessContext, NativeEvent>;
+  const driver = adaptHarnessDriver(provider, native);
+  const session = driver.open({ id: 'tax', folder: '/ledger' });
+  expect(driver.readSession(session).permission).toBeUndefined();
+  await driver.setPermission(session, mode);
+  expect(driver.readSession(session).permission).toBe(mode);
+  update.mockRejectedValueOnce(new Error('Permission update failed'));
+  await expect(driver.setPermission(session, mode)).rejects.toThrow('Permission update failed');
+  expect(driver.readSession(session).permission).toBe(mode);
+  await driver.close();
+});
