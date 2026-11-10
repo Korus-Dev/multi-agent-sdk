@@ -1,3 +1,4 @@
+import { notifyListeners } from 'codex-sdk';
 import { readTurnItems } from './codex-surface-conversations-controller';
 import type { CodexOriginalHistoryImages } from './codex-original-history-images';
 import type { CodexAppServerClient, v2 } from 'codex-sdk';
@@ -81,7 +82,7 @@ export class CodexSurfaceLifecycleController {
 
   constructor(
     private readonly client: CodexAppServerClient,
-    private readonly options: Pick<CodexSurfaceOptions, 'conversationDefaults' | 'cwd' | 'loadingStrategy' | 'historyItemsView'>,
+    private readonly options: Pick<CodexSurfaceOptions, 'conversationDefaults' | 'cwd' | 'loadingStrategy' | 'historyItemsView' | 'onDiagnostic' | 'onListenerError'>,
     private readonly catalog: CodexSurfaceCatalogController,
     private readonly extensions: CodexSurfaceExtensionsController,
     private readonly settings: CodexSurfaceConversationSettingsController,
@@ -322,8 +323,8 @@ export class CodexSurfaceLifecycleController {
     let timingPrevious = timingStarted;
     const markTiming = (stage: string) => {
       const now = performance.now();
-      if (process.env.CODEX_APP_SDK_TRACE_CONVERSATION_LOAD === '1') console.warn('[conversation-load] ' + JSON.stringify({ layer: 'codex-sdk', stage,
-        threadId: conversationId, at: performance.timeOrigin + now, stageMs: now - timingPrevious, elapsedMs: now - timingStarted }));
+      notifyListeners(this.options.onDiagnostic ? [this.options.onDiagnostic] : [], { layer: 'codex-sdk', stage,
+        threadId: conversationId, at: performance.timeOrigin + now, stageMs: now - timingPrevious, elapsedMs: now - timingStarted }, this.options.onListenerError);
       timingPrevious = now;
     };
     markTiming('resume.begin');

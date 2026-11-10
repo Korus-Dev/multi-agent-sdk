@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CodexSurfaceModel, CodexSurfaceSnapshot } from 'multi-agents-sdk/surface';
+import type { HarnessDiagnostic } from '../../src/diagnostics';
 import type { v2 } from '../../../codex-sdk/src/protocol';
 import {
   CodexSurfaceLifecycleController,
@@ -159,7 +160,8 @@ describe('CodexSurfaceLifecycleController', () => {
   });
 
   it('shares an in-flight hydration and permits retry after it rejects', async () => {
-    const setup = setupLifecycle();
+    const diagnostics: HarnessDiagnostic[] = [];
+    const setup = setupLifecycle({ onDiagnostic: (record: HarnessDiagnostic) => diagnostics.push(record) });
     const firstResume = deferred<unknown>();
     setup.client.request.mockImplementation(async (method: string, params?: unknown) => {
       if (method === 'thread/resume') return firstResume.promise;
@@ -177,11 +179,28 @@ describe('CodexSurfaceLifecycleController', () => {
       historyLoading: false, error: 'resume failed',
     });
 
+    expect(diagnostics).toContainEqual(expect.objectContaining({
+      layer: 'codex-sdk', stage: 'resume.failed', threadId: 'shared', stageMs: expect.any(Number), elapsedMs: expect.any(Number),
+    }));
     setup.client.request.mockImplementation(async (method: string, params?: unknown) => responseFor(method, params));
     await expect(setup.controller.ensureReady('shared')).resolves.toMatchObject({
       threadId: 'shared', hydrated: true,
     });
     expect(setup.client.request.mock.calls.filter(([method]) => method === 'thread/resume')).toHaveLength(2);
+  });
+
+  it('isolates diagnostic observers and error handlers from successful and failed resumes', async () => {
+    const observerError = new Error('diagnostic sink failed');
+    const onListenerError = vi.fn(() => { throw new Error('error sink failed'); });
+    const setup = setupLifecycle({ onDiagnostic: () => { throw observerError; }, onListenerError });
+    await expect(setup.controller.ensureReady('healthy')).resolves.toMatchObject({ hydrated: true });
+    expect(onListenerError).toHaveBeenCalledWith(observerError);
+    setup.client.request.mockImplementation(async (method: string, params?: unknown) => {
+      if (method === 'thread/resume') throw new Error('native resume failed');
+      return responseFor(method, params);
+    });
+    await expect(setup.controller.ensureReady('failed')).rejects.toThrow('native resume failed');
+    expect(setup.host.patchRuntime).toHaveBeenCalledWith('failed', { historyLoading: false, error: 'native resume failed' });
   });
 
   it('keeps a live compaction marker in persisted history order during hydration', async () => {

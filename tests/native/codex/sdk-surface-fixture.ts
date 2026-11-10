@@ -4,7 +4,7 @@ import type { HarnessEvent } from 'multi-agents-sdk/driver';
 import type { CodexConversation, CodexSurface } from 'multi-agents-sdk/codex';
 import type { CodexConversationEvent, CodexConversationSnapshot, CodexConversationSummary, CodexSurfaceEvent } from 'multi-agents-sdk/surface';
 import { CodexBackendDriver } from '../../../src/providers/codex/driver';
-import { CodexSurfaceAgentAdapter } from '../../../src/providers/codex/host';
+import { CodexSurfaceAgentAdapter, type CodexHostOptions } from '../../../src/providers/codex/host';
 
 export function sdkSnapshot(id = 'conversation-a', overrides: Partial<CodexConversationSnapshot> = {}): CodexConversationSnapshot {
   return {
@@ -76,7 +76,7 @@ function conversationFixture(id: string) {
   };
 }
 
-export function codexSdkFixture(closeRuntime?: () => Promise<void>) {
+export function codexSdkFixture(closeRuntime?: () => Promise<void>, options: CodexHostOptions = {}) {
   const conversations = new Map<string, ReturnType<typeof conversationFixture>>();
   const listeners = new Set<(event: CodexSurfaceEvent) => void>();
   const conversation = (id: string) => {
@@ -118,7 +118,7 @@ export function codexSdkFixture(closeRuntime?: () => Promise<void>) {
     respondToClientRequest: vi.fn<CodexSurface['respondToClientRequest']>(),
   } satisfies Partial<CodexSurface>;
   // SDK classes have private members; each implemented public member is checked above.
-  const adapter = new CodexSurfaceAgentAdapter(surface as unknown as CodexSurface, closeRuntime);
+  const adapter = new CodexSurfaceAgentAdapter(surface as unknown as CodexSurface, closeRuntime, options);
   const driver = new CodexBackendDriver(adapter);
   const events: HarnessEvent[] = [];
   driver.onEvent((event) => events.push(event));

@@ -1,7 +1,12 @@
+import { notifyListeners } from 'codex-sdk';
+import type { HarnessDiagnostic } from '../../diagnostics';
 import { CodexImageGeneration } from './image-generation';
 import { promptContentDispatchText } from '../../core/surface';
 import type { HarnessPromptScope } from '../../driver';
 export type CodexHostOptions<Context extends Agent = Agent> = {
+  /** Structured measurements; no application environment flags or log formatting. */
+  onDiagnostic?: (record: HarnessDiagnostic) => void;
+  onListenerError?: (error: unknown) => void;
   defaultModel?: { model: string; reasoningEffort?: string };
   extensionContext?: (context: Context, scope?: HarnessPromptScope) => unknown;
   conversationConfiguration?: (context: Context, scope?: HarnessPromptScope) => import('./codex-surface-contracts').CodexConversationLoadOptions;
@@ -882,8 +887,8 @@ export class CodexSurfaceAgentAdapter<Context extends Agent = Agent> {
     if (!threadId) return null;
     const started = performance.now();
     const mark = (stage: string) => {
-      if (process.env.CODEX_APP_SDK_TRACE_CONVERSATION_LOAD === '1') console.warn('[conversation-load] ' + JSON.stringify({ layer: 'harness-adapter', stage,
-        agentId: agent.id, threadId, at: performance.timeOrigin + performance.now(), elapsedMs: performance.now() - started }));
+      this.diagnostic({ layer: 'harness-adapter', stage,
+        agentId: agent.id, threadId, at: performance.timeOrigin + performance.now(), elapsedMs: performance.now() - started });
     };
     mark('load.begin');
     const pending = this.sessionInitializations.get(agent.id);
@@ -1177,8 +1182,8 @@ export class CodexSurfaceAgentAdapter<Context extends Agent = Agent> {
     let previous = started;
     const mark = (stage: string) => {
       const now = performance.now();
-      if (process.env.CODEX_APP_SDK_TRACE_CONVERSATION_LOAD === '1') console.warn('[conversation-load] ' + JSON.stringify({ layer: 'harness-adapter', stage,
-        agentId: agent.id, threadId, at: performance.timeOrigin + now, stageMs: now - previous, elapsedMs: now - started }));
+      this.diagnostic({ layer: 'harness-adapter', stage,
+        agentId: agent.id, threadId, at: performance.timeOrigin + now, stageMs: now - previous, elapsedMs: now - started });
       previous = now;
     };
     const existing = this.sessionsByAgentId.get(agent.id);
@@ -1223,6 +1228,7 @@ export class CodexSurfaceAgentAdapter<Context extends Agent = Agent> {
       session.suppressEvents = false;
       return session;
     } catch (error) {
+      mark('bind.failed');
       if (this.sessionsByAgentId.get(agent.id) === session) this.releaseConversation(agent.id);
       throw error;
     }
@@ -1318,6 +1324,10 @@ export class CodexSurfaceAgentAdapter<Context extends Agent = Agent> {
     else this.reconcilePending(session, snapshot);
   }
 
+  private diagnostic(record: HarnessDiagnostic): void {
+    notifyListeners(this.options.onDiagnostic ? [this.options.onDiagnostic] : [], record, this.options.onListenerError);
+  }
+
   private publishConversationSnapshot(
     session: AgentConversation<Context>,
     snapshot: CodexConversationSnapshot,
@@ -1336,9 +1346,9 @@ export class CodexSurfaceAgentAdapter<Context extends Agent = Agent> {
         snapshot: projected,
       },
     });
-    if (process.env.CODEX_APP_SDK_TRACE_CONVERSATION_LOAD === '1') console.warn('[conversation-load] ' + JSON.stringify({ layer: 'harness-adapter', stage: 'frame.projected-and-emitted',
+    this.diagnostic({ layer: 'harness-adapter', stage: 'frame.projected-and-emitted',
       agentId: session.agent.id, threadId: session.handle.id, revision, messages: snapshot.messages.length,
-      startAt: performance.timeOrigin + started, at: performance.timeOrigin + performance.now(), projectMs: projectedAt - started, emitMs: performance.now() - projectedAt }));
+      startAt: performance.timeOrigin + started, at: performance.timeOrigin + performance.now(), projectMs: projectedAt - started, emitMs: performance.now() - projectedAt });
   }
 
   private reconcilePending(

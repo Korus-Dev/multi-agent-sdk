@@ -25,9 +25,40 @@ export type HarnessCapabilities = Omit<BackendCapabilities, 'approvalPresets' | 
 export type PromptOptions = Omit<SendPromptOptions, 'backendOptions' | 'recordUserMessage'>;
 export type Admission = { session: Session; turnId?: string; messageId?: string };
 export type ConversationSummary = Omit<NativeSummary, 'ref'> & { ref: ConversationRef };
+/** Full native lifecycle evidence, shared structurally by all supported providers.
+ * Native error detail and execution usage remain lossless compatibility DTOs.
+ */
+export type TurnError = import('./core/surface').CodexSurfaceTurnError;
+export type TurnExecutionUsage = import('./core/surface').CodexSurfaceExecutionUsage;
+export type Turn = {
+  id: string;
+  status: 'inProgress' | 'completed' | 'interrupted' | 'failed';
+  error: TurnError | null;
+  /** Native evidence; never defaulted by the consumer projection. */
+  willRetry: boolean;
+  startedAt: string | null;
+  completedAt: string | null;
+  durationMs: number | null;
+  itemsView?: 'full' | 'summary';
+  detailsLoading?: boolean;
+  detailsError?: string | null;
+  executionUsage?: TurnExecutionUsage | null;
+};
+export type HistoryState = {
+  hasOlder: boolean;
+  loadingOlder: boolean;
+  /** Optional provider-supported paging detail; absence is unknown. */
+  itemsView?: 'full' | 'summary';
+  loadingStrategy?: 'lazy' | 'eager';
+  fullyLoaded?: boolean;
+};
 export type SessionState = {
   messages: Message[]; busy: boolean; activeTurnId: string | null;
-  turns: { id: string; status: 'inProgress' | 'completed' | 'interrupted' | 'failed' }[];
+  turns: Turn[];
+  /** Undefined until the native provider supplies evidence. */
+  answeredClientRequestIds?: string[];
+  historyLoading?: boolean;
+  historyState?: HistoryState;
   requests: AgentRequest[]; error: string | null;
   title: string | null; goal: import('./contracts').ThreadGoal | null;
   contextUsage: import('./contracts').AgentContextUsage | null;

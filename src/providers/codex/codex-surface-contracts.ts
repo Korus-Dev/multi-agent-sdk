@@ -241,6 +241,8 @@ export type CodexSurfaceOptions = {
    * change or silences other subscribers. Defaults to a process warning.
    */
   onListenerError?: (error: unknown) => void;
+  /** Structured lifecycle measurements; collection and output policy belong to the host. */
+  onDiagnostic?: (record: import('../../diagnostics').HarnessDiagnostic) => void;
   onRequestSettled?: import('codex-sdk').CodexAppServerClientOptions['onRequestSettled'];
   permissionMode?: CodexSurfacePermissionMode;
   /** Defaults to a spawned stdio child; use `{ type: 'unixSocket' }` to reuse an existing local daemon. */
