@@ -31,6 +31,7 @@ import { normalizePromptContent } from '${manifest.name}/prompt.js';
 import { createCodexSurface } from '${manifest.name}/codex.js';
 import { codexBackendCapabilities, claudeBackendCapabilities, cursorBackendCapabilities, antigravityBackendCapabilities, withInferredWorkPhases, withInferredTurnWorkPhases, createCodexConversationReplica, projectSessionSelection, projectCodexConversation, projectClaudeConversation, projectCursorConversation, projectAntigravityConversation } from '${manifest.name}/renderer.js';
 import { AcpRuntime, AcpSession, installAcpRuntime, AntigravityHost, ClaudeConversationHost, ClaudeAgentSdkTransport, listClaudeSkills, claudeToolPart, loadClaudeTranscriptHistory, claudeTranscriptToRendererMessages, resolveClaudeLaunch, getLocalClaudeAuthentication, logoutLocalClaude, CursorHost, sessionMcpServer } from '${manifest.name}/native.js';
+import { AcpConnection, AcpError, record } from '${manifest.name}/native.js';
 const driver: HarnessDriver = createHarnessDriver('codex', { client: { name: 'pack-check' } });
 const session: Session = driver.open({ id: 'test', folder: null });
 const state: SessionState = driver.readSession(session);
@@ -41,6 +42,7 @@ const nativeTypes: [CodexConversationSnapshot?, CodexSurface?, NativeHarnessEven
 void [text, nativeTypes, normalizePromptContent, createCodexSurface];
 void [codexBackendCapabilities, claudeBackendCapabilities, cursorBackendCapabilities, antigravityBackendCapabilities, withInferredWorkPhases, withInferredTurnWorkPhases, createCodexConversationReplica, projectSessionSelection, projectCodexConversation, projectClaudeConversation, projectCursorConversation, projectAntigravityConversation];
 void [AcpRuntime, AcpSession, installAcpRuntime, AntigravityHost, ClaudeConversationHost, ClaudeAgentSdkTransport, listClaudeSkills, claudeToolPart, loadClaudeTranscriptHistory, claudeTranscriptToRendererMessages, resolveClaudeLaunch, getLocalClaudeAuthentication, logoutLocalClaude, CursorHost, sessionMcpServer];
+void [AcpConnection, AcpError, record];
 `);
   fs.writeFileSync(path.join(temporary, 'tsconfig.json'), JSON.stringify({ compilerOptions: {
     strict: true, noEmit: true, target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler',

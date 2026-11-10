@@ -9,3 +9,4 @@ export * from './providers/cursor';
 export * from './providers/antigravity';
 export * from './runtime/discovery';
 export { sessionMcpServer } from './acp/mcp-bridge';
+export { AcpConnection, AcpError, record } from './acp/acp-connection';

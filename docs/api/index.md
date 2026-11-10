@@ -31,6 +31,7 @@ Node integrations use `/native.js` for `ClaudeConversationHost`,
 `ClaudeAgentSdkTransport`, `CursorHost`, `AntigravityHost`, `AcpRuntime`, `AcpSession`,
 `installAcpRuntime` and `sessionMcpServer`. Claude skills, transcript, launch and
 local authentication helpers are exported there with their option types.
+The ACP wire helpers `AcpConnection`, `AcpError` and `record` are available there too.
 
 ## Factory
 
