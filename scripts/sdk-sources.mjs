@@ -41,25 +41,13 @@ export function sdkSources(projectRoot, environment = process.env, requested) {
   const aliases = [], paths = {}, typePaths = {};
   for (const [name, directory] of selected) {
     const metadata = readJson(path.join(directory, 'package.json'));
-    const entries = [{ specifier: name, target: metadata.main, types: metadata.types }];
-    // Optional entries are static published forwarding files, independent of export maps.
-    const publicFiles = (metadata.files ?? []).flatMap(entry => {
-      if (entry.endsWith('.js') && !entry.includes('*')) return [entry];
-      const location = path.join(directory, entry);
-      if (!entry.includes('*') && entry !== 'dist' && fs.existsSync(location) && fs.statSync(location).isDirectory()) {
-        return fs.readdirSync(location, { recursive: true }).filter(file => file.endsWith('.js')).map(file => path.join(entry, file));
-      }
-      return [];
-    });
-    for (const file of publicFiles) {
-      const text = fs.readFileSync(path.join(directory, file), 'utf8');
-      const match = /export \* from ['"]([^'"]+)['"]/.exec(text);
-      if (!match) continue;
-      const target = './' + path.relative(directory, path.resolve(directory, path.dirname(file), match[1]));
-      entries.push({ specifier: name + '/' + file, target, types: './' + file.replace(/\.js$/, '.d.ts') });
-    }
-    for (const { specifier, target, types } of entries) {
-      if (!target?.startsWith('./dist/')) continue;
+    // Legacy root fallback lets independently published siblings migrate in order.
+    const entries = metadata.exports ?? { '.': { types: metadata.types, default: metadata.main } };
+    for (const [entry, value] of Object.entries(entries)) {
+      const target = typeof value === 'string' ? value : value.default;
+      const types = typeof value === 'string' ? undefined : value.types;
+      if (!target?.startsWith('./dist/') || !target.endsWith('.js')) continue;
+      const specifier = name + (entry === '.' ? '' : entry.slice(1));
       let source = target.replace(/^\.\/dist\//, 'src/').replace(/\.(d\.ts|js)$/, '');
       if (name === '@korus-dev/agent-ui-sdk' && source === 'src/vue/index') source = 'src/vue/entry';
       const base = path.resolve(directory, source);

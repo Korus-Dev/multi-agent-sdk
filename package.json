@@ -28,21 +28,38 @@
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./prompt": {
+      "types": "./dist/prompt.d.ts",
+      "default": "./dist/prompt.js"
+    },
+    "./renderer": {
+      "types": "./dist/renderer.d.ts",
+      "default": "./dist/renderer.js"
+    },
+    "./native": {
+      "types": "./dist/native.d.ts",
+      "default": "./dist/native.js"
+    },
+    "./codex": {
+      "types": "./dist/providers/codex/index.d.ts",
+      "default": "./dist/providers/codex/index.js"
+    },
+    "./surface-bridge": {
+      "types": "./dist/core/surface-bridge.d.ts",
+      "default": "./dist/core/surface-bridge.js"
+    },
+    "./package.json": "./package.json"
+  },
   "files": [
     "dist",
     "README.md",
     "LICENSE",
-    "CHANGELOG.md",
-    "prompt.js",
-    "prompt.d.ts",
-    "renderer.js",
-    "renderer.d.ts",
-    "surface-bridge.js",
-    "surface-bridge.d.ts",
-    "native.js",
-    "native.d.ts",
-    "codex.js",
-    "codex.d.ts"
+    "CHANGELOG.md"
   ],
   "scripts": {
     "build": "vite build && node scripts/typecheck.mjs plain -p tsconfig.build.json",

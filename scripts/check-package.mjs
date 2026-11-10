@@ -16,22 +16,25 @@ try {
     assert(file.startsWith('dist/') || allowed.has(file), `Unexpected package file: ${file}`);
     assert(!/(^|\/)(\.env[^/]*|node_modules|src|tests)(\/|$)|\.tgz$/.test(file), `Private package file: ${file}`);
   }
-  const publicFiles = manifest.files.filter(file => file.endsWith('.js'));
-  for (const file of ['README.md', 'LICENSE', 'CHANGELOG.md', manifest.main.slice(2), manifest.types.slice(2), ...publicFiles, ...publicFiles.map(file => file.replace(/\.js$/, '.d.ts'))]) {
+  const exported = Object.entries(manifest.exports);
+  const targets = exported.flatMap(([, value]) => typeof value === 'string' ? [value] : Object.values(value));
+  for (const file of ['README.md', 'LICENSE', 'CHANGELOG.md', manifest.main, manifest.types, ...targets].map(file => file.replace(/^\.\//, ''))) {
     assert(files.has(file), `Missing package entry: ${file}`);
   }
-  const entries = [manifest.name, ...publicFiles.map(file => `${manifest.name}/${file}`)];
+  const entries = exported.filter(([, value]) => typeof value !== 'string' && value.default?.endsWith('.js'))
+    .map(([entry]) => manifest.name + (entry === '.' ? '' : entry.slice(1)));
   fs.writeFileSync(path.join(temporary, 'package.json'), JSON.stringify({ private: true, type: 'module' }));
   npm(['install', '--ignore-scripts', '--no-audit', '--no-fund', '--package-lock=false', path.join(temporary, archive.filename)]);
   fs.writeFileSync(path.join(temporary, 'imports.mjs'), entries.map(entry => `await import(${JSON.stringify(entry)});`).join('\n'));
   execFileSync(process.execPath, ['imports.mjs'], { cwd: temporary, stdio: 'inherit' });
+  execFileSync(process.execPath, ['--input-type=commonjs', '-e', entries.map(entry => `require(${JSON.stringify(entry)});`).join('\n')], { cwd: temporary, stdio: 'inherit' });
   fs.writeFileSync(path.join(temporary, 'consumer.ts'), entries.map((entry, index) => `import type * as Public${index} from '${entry}';`).join('\n') + `
 import { createHarnessDriver, TypedEventBus, type HarnessDriver, type Session, type SessionState, type CodexConversationSnapshot, type CodexSurface, type NativeHarnessEvent, type NativeHarnessDriver } from '${manifest.name}';
-import { normalizePromptContent } from '${manifest.name}/prompt.js';
-import { createCodexSurface } from '${manifest.name}/codex.js';
-import { codexBackendCapabilities, claudeBackendCapabilities, cursorBackendCapabilities, antigravityBackendCapabilities, withInferredWorkPhases, withInferredTurnWorkPhases, createCodexConversationReplica, projectSessionSelection, projectCodexConversation, projectClaudeConversation, projectCursorConversation, projectAntigravityConversation } from '${manifest.name}/renderer.js';
-import { AcpRuntime, AcpSession, installAcpRuntime, AntigravityHost, ClaudeConversationHost, ClaudeAgentSdkTransport, listClaudeSkills, claudeToolPart, loadClaudeTranscriptHistory, claudeTranscriptToRendererMessages, resolveClaudeLaunch, getLocalClaudeAuthentication, logoutLocalClaude, CursorHost, sessionMcpServer } from '${manifest.name}/native.js';
-import { AcpConnection, AcpError, record } from '${manifest.name}/native.js';
+import { normalizePromptContent } from '${manifest.name}/prompt';
+import { createCodexSurface } from '${manifest.name}/codex';
+import { codexBackendCapabilities, claudeBackendCapabilities, cursorBackendCapabilities, antigravityBackendCapabilities, withInferredWorkPhases, withInferredTurnWorkPhases, createCodexConversationReplica, projectSessionSelection, projectCodexConversation, projectClaudeConversation, projectCursorConversation, projectAntigravityConversation } from '${manifest.name}/renderer';
+import { AcpRuntime, AcpSession, installAcpRuntime, AntigravityHost, ClaudeConversationHost, ClaudeAgentSdkTransport, listClaudeSkills, claudeToolPart, loadClaudeTranscriptHistory, claudeTranscriptToRendererMessages, resolveClaudeLaunch, getLocalClaudeAuthentication, logoutLocalClaude, CursorHost, sessionMcpServer } from '${manifest.name}/native';
+import { AcpConnection, AcpError, record } from '${manifest.name}/native';
 const driver: HarnessDriver = createHarnessDriver('codex', { client: { name: 'pack-check' } });
 const session: Session = driver.open({ id: 'test', folder: null });
 const state: SessionState = driver.readSession(session);

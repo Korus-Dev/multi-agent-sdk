@@ -6,7 +6,7 @@ Install in a Node.js 22.19+ application:
 npm install @korus-dev/multi-agent-sdk
 ```
 
-The package is ESM-only. Use `"type": "module"` in your application and configure TypeScript with `module: "ESNext"` and `moduleResolution: "Bundler"`. Browser renderers should receive a host-controlled bridge or UI data rather than importing the Node harness root.
+The package is ESM-only. Use `"type": "module"` in your application and configure TypeScript with `module: "ESNext"` and `moduleResolution: "Bundler"`. Use extensionless package subpaths, such as `@korus-dev/multi-agent-sdk/codex`. The legacy `node10` resolution mode cannot resolve these exports. Browser renderers should receive a host-controlled bridge or UI data rather than importing the Node harness root.
 
 ## Provider runtimes
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Public subpaths use extensionless imports such as `@korus-dev/multi-agent-sdk/codex`, resolved through an explicit exports map. Replace previous `.js` subpath imports; root forwarding files are removed.
+
 ## 0.25.1 (2026-11-10)
 
 - Browser-safe renderer entry for conversation replicas, presentation, capabilities, requests and work phases.

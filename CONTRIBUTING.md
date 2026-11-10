@@ -15,7 +15,7 @@ and examples when changing the public contract. Avoid credentials and private pr
 history in issues, fixtures, logs, and screenshots.
 
 The package is ESM-only. TypeScript uses ES2022 output syntax, ESNext modules and
-Bundler resolution; Vite emits JavaScript and the declaration build uses
+Bundler resolution. Public root and extensionless subpaths are declared in `package.json` exports; Vite emits JavaScript and the declaration build uses
 `tsconfig.build.json`. Package validation checks a real installed tarball in plain
 Node ESM and a strict TypeScript consumer. Release workflows publish a tarball
 from the checked tree without running build scripts again.

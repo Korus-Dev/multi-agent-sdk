@@ -5,29 +5,29 @@
 | Import | Contract |
 | --- | --- |
 | `@korus-dev/multi-agent-sdk` | Neutral factory and `TypedEventBus`; consumer/UI/native surface types, generation types, diagnostic types, and distinct `NativeHarnessEvent` / `NativeHarnessDriver` / `NativeHarnessContext` types. |
-| `/prompt.js` | Pure prompt authoring helpers for browser consumers. |
-| `/renderer.js` | Browser-safe capability constants, work-phase helpers, Codex conversation replica, and provider presentation projections. |
-| `/surface-bridge.js` | Codex bridge operations and snapshot subscription helpers. |
-| `/native.js` | `createNativeHarnessDriver`, Claude/Cursor/Antigravity hosts and native helpers, `sessionMcpServer`, and provider-native integration contracts. |
-| `/codex.js` | Native Codex surface/backend and runtime compatibility. |
+| `/prompt` | Pure prompt authoring helpers for browser consumers. |
+| `/renderer` | Browser-safe capability constants, work-phase helpers, Codex conversation replica, and provider presentation projections. |
+| `/surface-bridge` | Codex bridge operations and snapshot subscription helpers. |
+| `/native` | `createNativeHarnessDriver`, Claude/Cursor/Antigravity hosts and native helpers, `sessionMcpServer`, and provider-native integration contracts. |
+| `/codex` | Native Codex surface/backend and runtime compatibility. |
 
-Paths in this table are appended to `@korus-dev/multi-agent-sdk`. The package root resolves through `main` and `types`; optional modules have small static forwarding files. Application imports do not reference build directories. Use root `import type` declarations for public types. Import optional values from the named modules to preserve browser/Node separation.
+Paths in this table are appended to `@korus-dev/multi-agent-sdk`. An explicit exports map resolves the root and extensionless subpaths directly into the published build. `main` and `types` remain root fallbacks. Use root `import type` declarations for public types. Import optional values from the named modules to preserve browser/Node separation. Package metadata is available through `/package.json`.
 
 ```ts
 import { createHarnessDriver } from '@korus-dev/multi-agent-sdk';
 import type { CodexConversationSnapshot, HarnessEvent, NativeHarnessEvent } from '@korus-dev/multi-agent-sdk';
-import { normalizePromptContent } from '@korus-dev/multi-agent-sdk/prompt.js';
+import { normalizePromptContent } from '@korus-dev/multi-agent-sdk/prompt';
 ```
 
 `HarnessEvent` is the neutral session event contract. `NativeHarnessEvent` retains provider-specific event envelopes; they are intentionally distinct types.
 
 Renderer integrations import `createCodexConversationReplica`, `projectSessionSelection`,
 the four `project*Conversation` helpers, capability constants and
-`withInferredWorkPhases` / `withInferredTurnWorkPhases` from `/renderer.js`.
+`withInferredWorkPhases` / `withInferredTurnWorkPhases` from `/renderer`.
 Its `CodexConversationReplica`, `ConversationPresentation` and `WorkPhasePart`
 types are also available there. This entry loads no native hosts or Node modules.
 
-Node integrations use `/native.js` for `ClaudeConversationHost`,
+Node integrations use `/native` for `ClaudeConversationHost`,
 `ClaudeAgentSdkTransport`, `CursorHost`, `AntigravityHost`, `AcpRuntime`, `AcpSession`,
 `installAcpRuntime` and `sessionMcpServer`. Claude skills, transcript, launch and
 local authentication helpers are exported there with their option types.

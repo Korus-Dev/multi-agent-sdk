@@ -1,6 +1,6 @@
 # Native Codex surface
 
-Import `createCodexSurface` or `CodexAppBackend` from `@korus-dev/multi-agent-sdk/codex.js` when your host needs Codex-specific functionality. Public surface types, including `CodexConversationSnapshot`, can be imported type-only from the package root.
+Import `createCodexSurface` or `CodexAppBackend` from `@korus-dev/multi-agent-sdk/codex` when your host needs Codex-specific functionality. Public surface types, including `CodexConversationSnapshot`, can be imported type-only from the package root.
 
 The surface supports conversation handles and snapshots, message sends, history paging, forks, settings, approvals, model/skill/plugin catalogs, goals, usage, dynamic tools, MCP, realtime sessions, review operations, and remote-control pairing. These are native contracts; they are not portable promises for other providers.
 

@@ -23,19 +23,19 @@
       "@korus-dev/multi-agent-sdk": [
         "./src/index.ts"
       ],
-      "@korus-dev/multi-agent-sdk/prompt.js": [
+      "@korus-dev/multi-agent-sdk/prompt": [
         "./src/prompt.ts"
       ],
-      "@korus-dev/multi-agent-sdk/renderer.js": [
+      "@korus-dev/multi-agent-sdk/renderer": [
         "./src/renderer.ts"
       ],
-      "@korus-dev/multi-agent-sdk/native.js": [
+      "@korus-dev/multi-agent-sdk/native": [
         "./src/native.ts"
       ],
-      "@korus-dev/multi-agent-sdk/codex.js": [
+      "@korus-dev/multi-agent-sdk/codex": [
         "./src/providers/codex/index.ts"
       ],
-      "@korus-dev/multi-agent-sdk/surface-bridge.js": [
+      "@korus-dev/multi-agent-sdk/surface-bridge": [
         "./src/core/surface-bridge.ts"
       ]
     }

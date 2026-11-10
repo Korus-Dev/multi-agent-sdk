@@ -12,7 +12,7 @@ npm run build:docs
 
 `npm run check` is the final handoff gate and runs the full suite with coverage. Use `test:ai` for quiet unit-test iteration. Use Node 26.12.1 for development; CI covers Node 22.19.0, 24 and 26. Coverage requires at least 85% statements across `src/**/*.ts`. Tests use two workers so process-backed fixtures stay within their deadlines on shared machines. Native authenticated model calls are not part of the default suite.
 
-Vite builds ESM JavaScript and TypeScript emits declarations unchanged. The package uses `main` and `types`, with ESNext modules and Bundler resolution. Static public forwarding files keep optional browser and native modules separate. Package validation creates and installs an actual npm tarball into a temporary consumer, imports public runtime entries in plain Node, and typechecks consumer code. It does not start a provider or execute a model turn.
+Vite builds ESM JavaScript and TypeScript emits declarations unchanged. The package uses an explicit exports map with extensionless public subpaths, ESNext modules and Bundler resolution. The map is also the source of truth for local-source aliases and package checks. `main` and `types` remain legacy root fallbacks. Package validation creates and installs an actual npm tarball into a temporary consumer, imports public runtime entries in plain Node, and typechecks consumer code. It does not start a provider or execute a model turn.
 
 ## Dependency maintenance
 

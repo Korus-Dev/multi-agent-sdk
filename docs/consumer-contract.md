@@ -54,13 +54,13 @@ Each provider's existing replica owns transcript changes. The facade only dispat
 | Import | Contract |
 | --- | --- |
 | `@korus-dev/multi-agent-sdk` | Neutral factory, `TypedEventBus`, and public neutral/UI/native type declarations |
-| `@korus-dev/multi-agent-sdk/prompt.js` | Pure prompt authoring helpers |
-| `@korus-dev/multi-agent-sdk/renderer.js` | Pure capabilities, work phases, Codex replica and provider presentation projections |
-| `@korus-dev/multi-agent-sdk/surface-bridge.js` | Native bridge operations and state subscriptions |
-| `@korus-dev/multi-agent-sdk/native.js` | Native driver, Claude/Cursor/Antigravity hosts and helpers, MCP session bridge and native contracts |
-| `@korus-dev/multi-agent-sdk/codex.js` | Codex surface/runtime adapter |
+| `@korus-dev/multi-agent-sdk/prompt` | Pure prompt authoring helpers |
+| `@korus-dev/multi-agent-sdk/renderer` | Pure capabilities, work phases, Codex replica and provider presentation projections |
+| `@korus-dev/multi-agent-sdk/surface-bridge` | Native bridge operations and state subscriptions |
+| `@korus-dev/multi-agent-sdk/native` | Native driver, Claude/Cursor/Antigravity hosts and helpers, MCP session bridge and native contracts |
+| `@korus-dev/multi-agent-sdk/codex` | Codex surface/runtime adapter |
 
-Native wire consumers can import `NativeHarnessDriver`, `NativeHarnessContext`, and `NativeHarnessEvent` type-only from the root. Ordinary neutral `HarnessDriver` and `HarnessEvent` remain different contracts. Optional native values use `/native.js` and surface construction uses `/codex.js`. Native events retain provider prefixes and reducers retain their original wire contracts. The native factory is named `createNativeHarnessDriver` to distinguish it from the neutral root factory. Application imports never need build-directory paths.
+Native wire consumers can import `NativeHarnessDriver`, `NativeHarnessContext`, and `NativeHarnessEvent` type-only from the root. Ordinary neutral `HarnessDriver` and `HarnessEvent` remain different contracts. Optional native values use `/native` and surface construction uses `/codex`. Native events retain provider prefixes and reducers retain their original wire contracts. The native factory is named `createNativeHarnessDriver` to distinguish it from the neutral root factory. Application imports never need build-directory paths.
 
 ## Public name map
 
@@ -85,7 +85,7 @@ Vendor dependencies remain mandatory because provider construction is statically
 
 ## Diagnostics
 
-`CodexSurfaceOptions.onDiagnostic` and `CodexHostOptions.onDiagnostic` accept the same `(record: HarnessDiagnostic) => void` observer. Import `HarnessDiagnostic` from `/diagnostics` or as a type from root. Records preserve native layer/stage identifiers and thread identity, epoch `at`, optional `startAt`, monotonic `stageMs`/`elapsedMs`, and optional projection counters (`revision`, `messages`, `projectMs`, `emitMs`). Host-adapter records also include `agentId`. Resume failures retain their `resume.failed` stage; failed native binding emits `bind.failed` before propagating the original error.
+`CodexSurfaceOptions.onDiagnostic` and `CodexHostOptions.onDiagnostic` accept the same `(record: HarnessDiagnostic) => void` observer. Import `HarnessDiagnostic` type-only from the package root. Records preserve native layer/stage identifiers and thread identity, epoch `at`, optional `startAt`, monotonic `stageMs`/`elapsedMs`, and optional projection counters (`revision`, `messages`, `projectMs`, `emitMs`). Host-adapter records also include `agentId`. Resume failures retain their `resume.failed` stage; failed native binding emits `bind.failed` before propagating the original error.
 
 The caller owns enablement, filtering, storage and log formatting. The SDK does not read application trace flags. Supply a sink separately to the surface and adapter to collect both layers. Observer exceptions are isolated and reported through each options object's `onListenerError`; an error handler that throws is also isolated. Without an error handler, the shared listener utility reports a process warning. Diagnostic observers never change native operation success or failure.
 
@@ -93,11 +93,11 @@ Low-level RPC settlement is separate: `CodexSurfaceOptions.onRequestSettled` for
 
 ## Portable contracts and native detail
 
-`Turn`, `TurnError`, `TurnExecutionUsage`, `TokenUsage`, `RequestUsage`, `SafetyFindings` and `JsonValue` are underlying neutral definitions in `contracts/turn.ts`; old Codex surface names re-export them for native compatibility. Internal code uses canonical `Message`, `MessagePart`, `ToolPart`, `ClientApi` and `PromptPart` vocabulary. Deprecated Renderer and Codex prompt aliases remain only for existing imports. Use the neutral root factory or explicit `/native.js` factory according to the intended contract. Public types are available from the root; optional runtime entries preserve browser/host separation.
+`Turn`, `TurnError`, `TurnExecutionUsage`, `TokenUsage`, `RequestUsage`, `SafetyFindings` and `JsonValue` are underlying neutral definitions in `contracts/turn.ts`; old Codex surface names re-export them for native compatibility. Internal code uses canonical `Message`, `MessagePart`, `ToolPart`, `ClientApi` and `PromptPart` vocabulary. Deprecated Renderer and Codex prompt aliases remain only for existing imports. Use the neutral root factory or explicit `/native` factory according to the intended contract. Public types are available from the root; optional runtime entries preserve browser/host separation.
 
 Portable consumers must not interpret `Authentication.native`, `SessionStatus.native`, `TurnError.codexErrorInfo`, arbitrary catalog `providerMetadata`, or other provider-specific escape data. Those fields preserve native evidence for integrations that deliberately accept provider coupling. Generic errors use `message` and `additionalDetails`; native details are retained without being reinterpreted. Catalog IDs/model values are selection identities. Display names, descriptions and icons are optional provider-authored metadata, not required portable behavior. Applications supply labels for SDK-default permission IDs.
 
-The pure `/ui-types` entry exports shared definitions from `contracts/ui.ts`, `contracts/turn.ts` and `contracts/prompt.ts`, below the native surface. Common message contracts import those modules directly. Native surface names re-export compatibility aliases; portable DTOs have no dependency on the native surface. The entry names the shared DTOs without provider prefixes. `SurfaceMessage` remains distinct from the facade's `Message`, which also carries an agent identity. Legacy client request envelopes are compatibility DTOs for controlled presentation; generic request actions use `AgentRequest`. `/prompt` contains only prompt authoring helpers and neutral `PromptPart`/`PromptMention` types. Provider hosts, reducers and transports remain under explicit provider/native entries.
+The package root type-exports shared UI definitions from `contracts/ui.ts`, `contracts/turn.ts` and `contracts/prompt.ts`, below the native surface. Common message contracts import those modules directly. Native surface names re-export compatibility aliases; portable DTOs have no dependency on the native surface. Shared DTO names have no provider prefixes. `SurfaceMessage` remains distinct from the facade's `Message`, which also carries an agent identity. Legacy client request envelopes are compatibility DTOs for controlled presentation; generic request actions use `AgentRequest`. `/prompt` contains only prompt authoring helpers and neutral `PromptPart`/`PromptMention` types. Provider hosts, reducers and transports remain under explicit provider/native entries.
 
 ## Claude embedding identity
 
