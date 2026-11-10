@@ -5,7 +5,7 @@ import type {
   CodexSurfaceChatGptLogin,
   CodexSurfaceEventOrigin,
   CodexSurfaceSnapshot,
-} from 'multi-agents-sdk/surface';
+} from '../../core/surface';
 import {
   normalizedLoginId,
   safeLoginUrl,

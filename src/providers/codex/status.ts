@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import type { ProviderSafetyReview } from '../../contracts/safety-review';
 import { providerSafetyBlockMessage } from '../../contracts/safety-review';
-import type { AgentStatus } from 'multi-agents-sdk/contracts';
-import type { CodexConversationSnapshot } from 'multi-agents-sdk/surface';
+import type { AgentStatus } from '../../contracts/index';
+import type { CodexConversationSnapshot } from '../../core/surface';
 
 /**
  * What a person should see for the conversation. An error with a turn still running is a retry in progress, not a failure:

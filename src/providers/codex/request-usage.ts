@@ -1,8 +1,8 @@
-import type { CodexConversationEvent } from "multi-agents-sdk/surface";
+import type { CodexConversationEvent } from "../../core/surface";
 import type {
   ExecutionObservation,
   RequestCoverageReason,
-} from "multi-agents-sdk/contracts/usage";
+} from "../../contracts/usage";
 
 const fields = [
   "requestIdentity",

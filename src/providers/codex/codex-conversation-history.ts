@@ -1,4 +1,4 @@
-import { normalizePromptContent, promptContentText } from 'multi-agents-sdk/surface';
+import { normalizePromptContent, promptContentText } from '../../core/surface';
 import type { Thread } from 'codex-sdk/protocol/generated/v2/Thread';
 import type { ThreadItem } from 'codex-sdk/protocol/generated/v2/ThreadItem';
 import type { Turn } from 'codex-sdk/protocol/generated/v2/Turn';
@@ -12,7 +12,7 @@ import type {
   SurfaceMessageMediaPart,
   SurfaceMessagePart,
   SurfaceMessageQuestionPart,
-} from 'multi-agents-sdk/surface';
+} from '../../core/surface';
 import { codexThreadItemToToolPart } from './codex-tool-part-adapter';
 import {
   extractProposedPlanDocument,

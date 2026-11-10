@@ -3,7 +3,7 @@ import { open, stat } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
 import type { FileHandle } from 'node:fs/promises';
 import type { CodexAppServerClient } from 'codex-sdk';
-import type { SurfaceMessage, SurfaceMessageMediaPart } from 'multi-agents-sdk/surface';
+import type { SurfaceMessage, SurfaceMessageMediaPart } from '../../core/surface';
 import { codexImageDataUrl } from './codex-conversation-history';
 import { imageDimensions } from './conversation-content-transport';
 

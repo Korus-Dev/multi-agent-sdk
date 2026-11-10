@@ -5,7 +5,7 @@ import { createClaudeHistorySource, type ClaudeHistorySource, type ClaudeTurnRan
 import { access, readFile, readdir, realpath, stat } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type { Agent, BackendSession, ClaudeConversationTurn, ConversationSummary, RendererMessage, RendererMessagePart, RendererToolPart, ThreadGoal } from 'multi-agents-sdk/contracts';
+import type { Agent, BackendSession, ClaudeConversationTurn, ConversationSummary, RendererMessage, RendererMessagePart, RendererToolPart, ThreadGoal } from '../../contracts/index';
 import { claudeWorkingDirectory } from './working-directory';
 import { claudeConfigDirectory } from './config-directory';
 import { claudeToolPart, completedClaudeToolPart, type ClaudeToolPartOptions } from './claude-tool-part-adapter';

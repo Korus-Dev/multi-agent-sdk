@@ -4,7 +4,7 @@ import type {
   CodexSurfaceEventOrigin,
   CodexSurfaceSnapshot,
   SurfaceMessage,
-} from 'multi-agents-sdk/surface';
+} from '../../core/surface';
 import { upsertSurfaceTurn } from './codex-surface-events';
 import { CodexSurfaceApprovalsController } from './codex-surface-approvals-controller';
 import { CodexSurfaceClientRequestsController } from './codex-surface-client-requests-controller';

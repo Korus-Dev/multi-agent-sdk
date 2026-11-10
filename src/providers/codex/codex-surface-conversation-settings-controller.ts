@@ -7,7 +7,7 @@ import type {
   CodexSurfaceSnapshot,
   CreateCodexConversationOptions,
   UpdateCodexConversationSettings,
-} from 'multi-agents-sdk/surface';
+} from '../../core/surface';
 import type { SurfaceEventInput } from './codex-surface-events';
 import { sameValue } from './codex-surface-events';
 import {

@@ -1,6 +1,6 @@
 import { normalizeMcpServers, mcpServerConfig } from './codex-surface-mcp';
 import type { CodexAppServerClient, ServerNotification, v2 } from 'codex-sdk';
-import type { CodexSurfaceSnapshot } from 'multi-agents-sdk/surface';
+import type { CodexSurfaceSnapshot } from '../../core/surface';
 import type {
   CodexGeneratedText,
   GenerateCodexTextOptions,

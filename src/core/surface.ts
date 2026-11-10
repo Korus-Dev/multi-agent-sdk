@@ -269,9 +269,9 @@ export type CodexSurfaceSkill = {
   description?: string;
   shortDescription?: string;
   displayName?: string;
-  /** Renderer-safe bounded image data URL. Local filesystem paths are never exposed. */
+  /** Bounded image data URL; no local paths exposed. */
   iconSmall?: string;
-  /** Renderer-safe bounded image data URL. Local filesystem paths are never exposed. */
+  /** Bounded image data URL; no local paths exposed. */
   iconLarge?: string;
   brandColor?: string;
   defaultPrompt?: string;
@@ -288,9 +288,9 @@ export type CodexSurfacePlugin = {
   shortDescription?: string;
   longDescription?: string;
   brandColor?: string;
-  /** Renderer-safe remote URL or bounded image data URL. Local filesystem paths are never exposed. */
+  /** Remote URL or bounded image data URL; no local paths exposed. */
   iconUrl?: string;
-  /** Renderer-safe dark-mode icon with the same guarantees as `iconUrl`. */
+  /** Dark-mode icon with the same guarantees as `iconUrl`. */
   iconUrlDark?: string;
   enabled: boolean;
 };
@@ -1037,7 +1037,7 @@ export type CreateCodexConversationOptions = {
   threadSource?: string;
 };
 
-export type CreateCodexRendererConversationOptions = Pick<
+export type CreateCodexClientConversationOptions = Pick<
   CreateCodexConversationOptions,
   'approvalPreset' | 'model' | 'reasoningEffort' | 'serviceTier'
 >;
@@ -1054,7 +1054,7 @@ export type SendCodexMessageOptions = {
   outputSchema?: CodexSurfaceJsonValue;
 };
 
-export type CodexRendererAttachment =
+export type CodexClientAttachment =
   | {
     type: 'image';
     reference: string;
@@ -1065,8 +1065,8 @@ export type CodexRendererAttachment =
     reference: string;
   };
 
-export type CodexRendererSendMessageOptions = Omit<SendCodexMessageOptions, 'attachments'> & {
-  attachments?: readonly CodexRendererAttachment[];
+export type CodexClientSendMessageOptions = Omit<SendCodexMessageOptions, 'attachments'> & {
+  attachments?: readonly CodexClientAttachment[];
 };
 
 export type CodexSurfaceAttachment =
@@ -1196,14 +1196,23 @@ export type CodexSurfaceStatePatch = {
   changes: CodexSurfaceStateChange[];
 };
 
-export type CodexSurfaceRendererApi = Omit<
+export type CodexSurfaceClientApi = Omit<
   CodexSurfaceApi,
   'createConversation' | 'sendMessage' | 'steerMessage' | 'updateQueuedPrompt' | 'steerQueuedPrompt' | 'editTurn'
 > & {
-  editTurn(turnId: string, content: string, options?: CodexRendererSendMessageOptions): Promise<CodexSurfaceSnapshot>;
-  updateQueuedPrompt(promptId: string, prompt: string, options?: CodexRendererSendMessageOptions): Promise<CodexSurfaceSnapshot>;
-  steerQueuedPrompt(promptId: string, prompt?: string, options?: CodexRendererSendMessageOptions): Promise<CodexSurfaceSnapshot>;
-  createConversation(options?: CreateCodexRendererConversationOptions): Promise<CodexSurfaceSnapshot>;
-  sendMessage(prompt: string, options?: CodexRendererSendMessageOptions): Promise<CodexSurfaceSnapshot>;
-  steerMessage(prompt: string, options?: CodexRendererSendMessageOptions): Promise<CodexSurfaceSnapshot>;
+  editTurn(turnId: string, content: string, options?: CodexClientSendMessageOptions): Promise<CodexSurfaceSnapshot>;
+  updateQueuedPrompt(promptId: string, prompt: string, options?: CodexClientSendMessageOptions): Promise<CodexSurfaceSnapshot>;
+  steerQueuedPrompt(promptId: string, prompt?: string, options?: CodexClientSendMessageOptions): Promise<CodexSurfaceSnapshot>;
+  createConversation(options?: CreateCodexClientConversationOptions): Promise<CodexSurfaceSnapshot>;
+  sendMessage(prompt: string, options?: CodexClientSendMessageOptions): Promise<CodexSurfaceSnapshot>;
+  steerMessage(prompt: string, options?: CodexClientSendMessageOptions): Promise<CodexSurfaceSnapshot>;
 };
+
+/** @deprecated Use CreateCodexClientConversationOptions. */
+export type CreateCodexRendererConversationOptions = CreateCodexClientConversationOptions;
+/** @deprecated Use CodexClientAttachment. */
+export type CodexRendererAttachment = CodexClientAttachment;
+/** @deprecated Use CodexClientSendMessageOptions. */
+export type CodexRendererSendMessageOptions = CodexClientSendMessageOptions;
+/** @deprecated Use CodexSurfaceClientApi. */
+export type CodexSurfaceRendererApi = CodexSurfaceClientApi;

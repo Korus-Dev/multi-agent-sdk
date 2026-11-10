@@ -1,4 +1,4 @@
-import type { Consumption } from 'multi-agents-sdk/contracts/usage';
+import type { Consumption } from '../../contracts/usage';
 import { record } from '../../acp/acp-connection';
 
 const count = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 && value <= 1e9;
@@ -6,7 +6,7 @@ const count = (value: unknown): value is number => typeof value === 'number' && 
 /**
  * ACP `PromptResponse.usage` reports input inclusive of cached reads (checked against
  * the conversation database: uncached + cached = inputTokens) and leaves thoughts out
- * of output. Korus stores reasoning as a subset of output. Cache writes are not billed
+ * of output. The accounting contract stores reasoning as a subset of output. Cache writes are not billed
  * separately by Gemini's implicit cache; a non-zero value is unmodeled, so the turn
  * stays unmeasured.
  */

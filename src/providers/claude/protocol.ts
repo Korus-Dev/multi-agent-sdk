@@ -68,7 +68,7 @@ export type ClaudeSdkMessage =
     error?: unknown;
     executionModel?: string | null;
     executionRequestCoverage?: 'complete' | 'partial';
-    executionConsumption?: import('multi-agents-sdk/contracts/usage').Consumption | null;
+    executionConsumption?: import('../../contracts/usage').Consumption | null;
     usage?: unknown;
     total_cost_usd?: number;
     duration_ms?: number;

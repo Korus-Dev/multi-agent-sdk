@@ -14,18 +14,18 @@ export type AntigravityHostOptions<Context extends HarnessContext = HarnessConte
 };
 const sameScope = (left?: HarnessPromptScope, right?: HarnessPromptScope) => JSON.stringify(left) === JSON.stringify(right);
 
-import { normalizePromptContent, promptContentText, promptContentDispatchText } from 'multi-agents-sdk/surface';
+import { normalizePromptContent, promptContentText, promptContentDispatchText } from '../../core/surface';
 
 
-import type { ExecutionObservation } from 'multi-agents-sdk/contracts/usage';
+import type { ExecutionObservation } from '../../contracts/usage';
 import { mkdir, realpath } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
-import type { AccountRateLimits, BackendConversationRef, BackendModelOption, BackendRuntimeStatus, BackendSession, ConversationListInput, ConversationSummary, ConversationResumeTarget, SendPromptOptions } from 'multi-agents-sdk/contracts';
+import type { AccountRateLimits, BackendConversationRef, BackendModelOption, BackendRuntimeStatus, BackendSession, ConversationListInput, ConversationSummary, ConversationResumeTarget, SendPromptOptions } from '../../contracts/index';
 
-import { requestFromClientRequest, type AgentRequestResponse } from 'multi-agents-sdk/conversations/agent-request';
-import type { ProviderAuthentication, ProviderAuthenticationAction } from 'multi-agents-sdk/contracts/authentication';
-import type { AntigravityConversationEvent } from 'multi-agents-sdk/contracts/antigravity-conversation';
+import { requestFromClientRequest, type AgentRequestResponse } from '../../conversations/agent-request';
+import type { ProviderAuthentication, ProviderAuthenticationAction } from '../../contracts/authentication';
+import type { AntigravityConversationEvent } from '../../contracts/antigravity-conversation';
 import { antigravityBackendCapabilities } from '../../capabilities';
 
 

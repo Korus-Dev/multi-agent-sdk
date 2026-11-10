@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { platform, userInfo } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import type { AccountRateLimits, AccountRateLimitWindow } from 'multi-agents-sdk/contracts';
+import type { AccountRateLimits, AccountRateLimitWindow } from '../../contracts/index';
 import { claudeConfigDirectory, claudeConfigDirectoryOverride } from './config-directory';
 
 const run = promisify(execFile);

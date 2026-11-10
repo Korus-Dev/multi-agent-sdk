@@ -7,7 +7,7 @@ import type {
   BackendModelOption,
   BackendRuntimeStatus,
   BackendSkillSummary,
-} from 'multi-agents-sdk/contracts';
+} from '../../contracts/index';
 import { claudeModelOptions, claudeModelOptionsFromSdk } from './models';
 import { listClaudeSkills } from './skills';
 import type { ClaudeAvailableModel, ClaudeTurnTransport } from './transport';

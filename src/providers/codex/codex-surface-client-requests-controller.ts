@@ -7,7 +7,7 @@ import type {
   CodexSurfaceClientRequestResponse,
   SurfaceMessage,
   SurfaceMessageToolPart,
-} from 'multi-agents-sdk/surface';
+} from '../../core/surface';
 import {
   argumentsPreview,
   findPendingMcpToolPart,

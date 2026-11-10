@@ -1,5 +1,5 @@
-import type { ContinueCodexSafetyReviewOptions } from 'multi-agents-sdk/surface';
-import { promptContentDispatchText, promptContentText } from 'multi-agents-sdk/surface';
+import type { ContinueCodexSafetyReviewOptions } from '../../core/surface';
+import { promptContentDispatchText, promptContentText } from '../../core/surface';
 import type { CodexAppServerClient, v2 } from 'codex-sdk';
 import type {
   CodexConversationSummary,
@@ -10,7 +10,7 @@ import type {
   StartCodexReviewOptions,
   SurfaceMessage,
   UpdateCodexConversationSettings,
-} from 'multi-agents-sdk/surface';
+} from '../../core/surface';
 import {
   attachmentInput,
   surfaceAttachmentPart,

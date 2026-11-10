@@ -3,12 +3,12 @@ import {
   isCodexSurfaceBridgeOperation,
   type CodexSurfaceBridgeAttachmentResolver,
   type CodexSurfaceBridgeTarget,
-} from 'multi-agents-sdk/surface-bridge';
-import type { CodexSurfaceStatePatch } from 'multi-agents-sdk/surface';
+} from '../core/surface-bridge';
+import type { CodexSurfaceStatePatch } from '../core/surface';
 import {
   isCodexSurfaceStatePatchSource,
   type CodexSurfaceStatePatchSource,
-} from 'multi-agents-sdk/surface-bridge';
+} from '../core/surface-bridge';
 import {
   codexWebSocketProtocolVersion,
   encodeCodexWebSocketMessage,

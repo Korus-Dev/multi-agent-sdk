@@ -1,5 +1,5 @@
 import type { HarnessEvent } from '../../driver';
-import type { SubagentStatus } from 'multi-agents-sdk/contracts';
+import type { SubagentStatus } from '../../contracts/index';
 import { claudeMessageContentBlocks, parseClaudeSdkMessage, type ClaudeSdkMessage } from './protocol';
 
 type Child = {

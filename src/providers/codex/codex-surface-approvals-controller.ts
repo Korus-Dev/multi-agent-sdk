@@ -4,7 +4,7 @@ import type {
   CodexSurfaceApprovalScope,
   CodexSurfaceEventOrigin,
   CodexSurfaceSnapshot,
-} from 'multi-agents-sdk/surface';
+} from '../../core/surface';
 import { registerCodexApprovalHandlers, type PendingCodexApproval } from './codex-approvals';
 import type { SurfaceEventInput } from './codex-surface-events';
 import type { ThreadRuntimePatch, ThreadRuntimeState } from './codex-surface-runtime';

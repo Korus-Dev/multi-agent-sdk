@@ -7,7 +7,7 @@ import type {
   SurfaceMessageTextPart,
   SurfaceMessageToolPart,
   SurfaceMessageToolPartUpdate,
-} from 'multi-agents-sdk/surface';
+} from '../../core/surface';
 import { isRecord } from './codex-surface-prompts';
 
 export function activeTurnId(turns: v2.Turn[]): string | null {

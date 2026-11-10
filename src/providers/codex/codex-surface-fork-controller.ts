@@ -4,7 +4,7 @@ import type { CodexAppServerClient, v2 } from 'codex-sdk';
 import type {
   CodexConversationSummary,
   CodexSurfaceSnapshot,
-} from 'multi-agents-sdk/surface';
+} from '../../core/surface';
 import { codexThreadToSurfaceMessages } from './codex-conversation-history';
 import { CodexSurfaceCatalogController } from './codex-surface-catalog-controller';
 import { CodexSurfaceExtensionsController } from './codex-surface-extensions-controller';

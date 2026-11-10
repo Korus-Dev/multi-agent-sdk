@@ -1,5 +1,5 @@
-import { BANKED_RESET_DETAIL_LIMIT, isBankedResets, type BankedResets } from 'multi-agents-sdk/contracts/banked-resets';
-import type { CodexSurfaceRateLimits } from 'multi-agents-sdk/surface';
+import { BANKED_RESET_DETAIL_LIMIT, isBankedResets, type BankedResets } from '../../contracts/banked-resets';
+import type { CodexSurfaceRateLimits } from '../../core/surface';
 
 /** Keep IDs/provider metadata out of the app DTO; validate exact counts and timestamps. */
 export function bankedResetsFromSurface(limits: CodexSurfaceRateLimits, redemptionToken?: (id: string) => string): BankedResets {

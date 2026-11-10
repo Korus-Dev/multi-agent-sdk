@@ -1,6 +1,6 @@
 import { homedir } from 'node:os';
 import { spawn } from 'node:child_process';
-import type { ProviderAuthentication, ProviderAuthenticationAction } from 'multi-agents-sdk/contracts/authentication';
+import type { ProviderAuthentication, ProviderAuthenticationAction } from '../../contracts/authentication';
 import { cursorEnvironment, cursorRuntime, type CursorRuntime, cursorMinimumVersion, cursorVersion, resolveCursorExecutable } from './runtime';
 
 type Authentication = Extract<ProviderAuthentication, { kind: 'cursor' }>;

@@ -4,7 +4,7 @@ import type {
   CodexSurfaceFileActivityStatus,
   SurfaceMessageToolPart as RendererToolPart,
   SurfaceMessageToolPartUpdate as RendererToolPartUpdate,
-} from 'multi-agents-sdk/surface';
+} from '../../core/surface';
 import { toolOutputText } from './tool-output';
 
 const structuredToolResultNotice = 'Result returned in structuredContent.';

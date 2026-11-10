@@ -1,8 +1,8 @@
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { RendererMessage, RendererMessagePart, RendererToolPart } from 'multi-agents-sdk/contracts';
-import type { CursorConversationEvent } from 'multi-agents-sdk/contracts/cursor-conversation';
-import { createCursorConversationReplica, emptyCursorSnapshot } from 'multi-agents-sdk/conversations/cursor-conversation-replica';
+import type { RendererMessage, RendererMessagePart, RendererToolPart } from '../../contracts/index';
+import type { CursorConversationEvent } from '../../contracts/cursor-conversation';
+import { createCursorConversationReplica, emptyCursorSnapshot } from '../../conversations/cursor-conversation-replica';
 import { cursorContent, cursorToolContent } from './content';
 import { record } from '../../acp/acp-connection';
 
@@ -100,8 +100,8 @@ export class CursorTranscript {
     if (index === -1) message.parts.push(part); else message.parts[index]=part;
     this.event({type:'message.upsert',payload:{message}});
   }
-  request(request: import('multi-agents-sdk/contracts').ClientRequest): void { this.event({ type: 'request.created', payload: { request } }); }
-  resolved(response: import('multi-agents-sdk/conversations/agent-request').AgentRequestResponse): void { this.event({ type: 'request.resolved', payload: response }); }
+  request(request: import('../../contracts/index').ClientRequest): void { this.event({ type: 'request.created', payload: { request } }); }
+  resolved(response: import('../../conversations/agent-request').AgentRequestResponse): void { this.event({ type: 'request.resolved', payload: response }); }
   plan(params: Record<string, unknown>): void {
     this.tool({ toolCallId: params.toolCallId, title: typeof params.name === 'string' ? params.name : 'Review plan', kind: 'plan', status: 'pending', rawInput: params, rawOutput: params.plan });
     const part = this.message?.parts.find(part => part.type === 'tool' && part.id === params.toolCallId);

@@ -1,4 +1,4 @@
-import { normalizePromptContent, type CodexPromptPart } from 'multi-agents-sdk/surface';
+import { normalizePromptContent, type CodexPromptPart } from '../../core/surface';
 import type { v2 } from 'codex-sdk';
 import type {
   CodexSurfaceReviewTarget,
@@ -6,7 +6,7 @@ import type {
   CodexSurfaceSkillInput,
   SurfaceMessage,
   SurfaceMessageToolPart,
-} from 'multi-agents-sdk/surface';
+} from '../../core/surface';
 
 export type GoalSlashCommand =
   | { action: 'clear' }

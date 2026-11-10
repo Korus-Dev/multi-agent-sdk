@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import path from 'node:path';
 import fs from 'node:fs';
-import { sourceAliases } from '../source-aliases.ts';
+import { sourceAliases } from './source-aliases.ts';
 import metadata from './package.json' with { type: 'json' };
 const sourceDirectory = path.join(import.meta.dirname, 'src');
 const conversationEntries = Object.fromEntries(fs.readdirSync(sourceDirectory, { recursive: true })

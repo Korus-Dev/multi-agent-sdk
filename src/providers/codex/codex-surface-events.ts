@@ -4,7 +4,7 @@ import type {
   CodexSurfaceJsonValue,
   CodexSurfaceTurn,
   CodexSurfaceTurnError,
-} from 'multi-agents-sdk/surface';
+} from '../../core/surface';
 
 export type SurfaceEventInput = CodexSurfaceEvent extends infer Event
   ? Event extends CodexSurfaceEvent

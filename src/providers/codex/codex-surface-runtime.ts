@@ -8,7 +8,7 @@ import type {
   CodexSurfaceThreadStatus,
   CodexSurfaceTurn,
   SurfaceMessage,
-} from 'multi-agents-sdk/surface';
+} from '../../core/surface';
 import type { ThreadHistoryMode } from 'codex-sdk/protocol/generated/v2/ThreadHistoryMode';
 
 export type ThreadRuntimeState = {

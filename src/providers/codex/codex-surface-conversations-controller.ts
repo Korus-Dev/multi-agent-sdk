@@ -7,7 +7,7 @@ import type {
   ListCodexConversationsOptions,
   SurfaceMessage,
   CodexSurfaceHistoryReason,
-} from 'multi-agents-sdk/surface';
+} from '../../core/surface';
 import {
   codexTurnToSurfaceMessages,
   preserveHistoricalMessagePresentation,

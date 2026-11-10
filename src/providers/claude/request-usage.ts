@@ -1,5 +1,5 @@
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
-import type { RequestObservation } from "multi-agents-sdk/contracts/usage";
+import type { RequestObservation } from "../../contracts/usage";
 
 export type ClaudeRequestUsage = Omit<
   RequestObservation,

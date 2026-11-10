@@ -5,7 +5,7 @@ import type {
   CodexSurfaceEventOrigin,
   CodexSurfaceJsonValue,
   CodexSurfaceSnapshot,
-} from 'multi-agents-sdk/surface';
+} from '../../core/surface';
 import {
   commandOutputDeltaToToolPartUpdate,
   fileChangePatchToToolPartUpdate,

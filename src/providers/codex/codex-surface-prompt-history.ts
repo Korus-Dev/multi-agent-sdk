@@ -1,5 +1,5 @@
 import type { CodexAppServerClient, v2 } from 'codex-sdk';
-import type { CodexConversationPromptHistory } from 'multi-agents-sdk/surface';
+import type { CodexConversationPromptHistory } from '../../core/surface';
 import { normalizedConversationId } from './codex-surface-prompts';
 
 export const CODEX_PROMPT_HISTORY_TURN_LIMIT = 100;

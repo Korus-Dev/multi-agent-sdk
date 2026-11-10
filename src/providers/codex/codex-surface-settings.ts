@@ -5,7 +5,7 @@ import type {
   CodexSurfaceSnapshot,
   SendCodexMessageOptions,
   UpdateCodexConversationSettings,
-} from 'multi-agents-sdk/surface';
+} from '../../core/surface';
 
 export type SurfaceSelection = Pick<
   CodexSurfaceSnapshot,

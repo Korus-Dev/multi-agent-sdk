@@ -23,7 +23,7 @@ function scopedConfiguration(scope: HarnessPromptScope): ClaudeScopedTurnConfigu
     ...(scope.developerInstructions === undefined ? {} : { appendSystemPrompt: scope.developerInstructions }),
   };
 }
-import { validConsumption, type Consumption, type ExecutionObservation, type RequestObservation } from 'multi-agents-sdk/contracts/usage';
+import { validConsumption, type Consumption, type ExecutionObservation, type RequestObservation } from '../../contracts/usage';
 
 import path from 'node:path';
 import { cp, rm } from 'node:fs/promises';
@@ -35,7 +35,7 @@ import { promptContentDirectory, restorePromptContent, savePromptContent } from 
 import { randomUUID } from 'node:crypto';
 import { getLocalClaudeAuthentication, logoutLocalClaude } from './authentication';
 import { getClaudeAccountUsage } from './account-usage';
-import { requestFromClientRequest, clientResponseFromAgentResponse, type AgentRequestResponse } from 'multi-agents-sdk/conversations/agent-request';
+import { requestFromClientRequest, clientResponseFromAgentResponse, type AgentRequestResponse } from '../../conversations/agent-request';
 import type {
   AccountRateLimits,
   Agent,
@@ -53,12 +53,12 @@ import type {
   RendererToolPart,
   SendPromptOptions,
   ThreadGoal,
-} from 'multi-agents-sdk/contracts';
+} from '../../contracts/index';
 import {
   createClaudeConversationReplica,
   type ClaudeConversationReplica,
-} from 'multi-agents-sdk/conversations/claude-conversation-replica';
-import { createUserMessage } from 'multi-agents-sdk/conversations/claude-conversation-transcript';
+} from '../../conversations/claude-conversation-replica';
+import { createUserMessage } from '../../conversations/claude-conversation-transcript';
 import { type HarnessDriver, type HarnessScopedPromptInput, type HarnessScopedPromptResult, type HarnessConversationResumeResult, type HarnessEvent, type HarnessPermissionModeResult, type HarnessSendResult } from '../../driver';
 import { claudeWorkingDirectory } from './working-directory';
 import { claudeConfigDirectory, claudeConfigDirectoryOverride } from './config-directory';
@@ -134,7 +134,7 @@ type ActiveClaudeTurn = {
   startResolved: boolean;
   error: Error | null;
   authenticationFailed?: boolean;
-  rateLimit?: import('multi-agents-sdk/contracts/rate-limit').RateLimitDetails;
+  rateLimit?: import('../../contracts/rate-limit').RateLimitDetails;
   rateLimitMessage?: string;
 };
 
@@ -149,7 +149,7 @@ export type ClaudeHistoryLoader<Context extends Agent = Agent> = (agent: Context
 type ClaudeScopedTurnConfiguration = { mcpServerUrl?: string | null; mcpServerName?: string; hostedMcpServerUrls?: Record<string, string>; allowedTools: string[]; appendSystemPrompt?: string };
 
 export class ClaudeConversationHost<Context extends Agent = Agent> implements HarnessDriver<Context, HarnessEvent, Extract<HarnessEvent, { type: 'claude.conversationEventReceived' }>> {
-  async authenticate(request: import('multi-agents-sdk/contracts/authentication').ProviderAuthenticationAction): Promise<import('multi-agents-sdk/contracts/authentication').ProviderAuthentication> {
+  async authenticate(request: import('../../contracts/authentication').ProviderAuthenticationAction): Promise<import('../../contracts/authentication').ProviderAuthentication> {
     if (request.action === 'cancel') throw new Error('Manage Claude authentication through its CLI.');
     const state = await (request.action === 'logout' ? (this.driverOptions.authentication?.logout ?? logoutLocalClaude)() : (this.driverOptions.authentication?.check ?? getLocalClaudeAuthentication)());
     return { kind: 'claude', connected: state.loggedIn, state };
@@ -747,7 +747,7 @@ export class ClaudeConversationHost<Context extends Agent = Agent> implements Ha
     finally { if (this.pendingTurnHistory.get(key)?.promise === promise) this.pendingTurnHistory.delete(key); }
   }
 
-  async readConversationContent(agent: Context, input: import('multi-agents-sdk/contracts/conversation').ConversationContentInput): Promise<import('multi-agents-sdk/contracts/conversation').ConversationContentChunk> {
+  async readConversationContent(agent: Context, input: import('../../contracts/conversation').ConversationContentInput): Promise<import('../../contracts/conversation').ConversationContentChunk> {
     const window = this.historyWindows.get(agent.id);
     if (!window || input.sessionId !== claudeSessionId(agent)) throw new Error('Conversation content is no longer available.');
     return window.read(input);
@@ -1802,7 +1802,7 @@ export class ClaudeConversationHost<Context extends Agent = Agent> implements Ha
     }
   }
 
-  private emitConversation(input: UnsequencedClaudeConversationEvent, resolution?: import('multi-agents-sdk/conversations/agent-request').AgentRequestOutcome): NonNullable<ClaudeHistoryLoadResult['frame']> {
+  private emitConversation(input: UnsequencedClaudeConversationEvent, resolution?: import('../../conversations/agent-request').AgentRequestOutcome): NonNullable<ClaudeHistoryLoadResult['frame']> {
     const revision = this.nextConversationRevision(input.agentId);
     const event = {
       ...input,

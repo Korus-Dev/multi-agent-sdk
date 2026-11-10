@@ -1,7 +1,7 @@
 import { open } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type { PromptAttachment } from 'multi-agents-sdk/contracts';
+import type { PromptAttachment } from '../../contracts/index';
 
 /** Input is resolved by the desktop's trusted registry, never a renderer path. */
 export async function acpAttachments(attachments: readonly PromptAttachment[]): Promise<unknown[]> {

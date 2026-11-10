@@ -7,7 +7,7 @@ import type {
   SurfaceMessageTextPart,
   SurfaceMessageToolPart,
   SurfaceMessageToolPartUpdate,
-} from 'multi-agents-sdk/surface';
+} from '../../core/surface';
 import {
   codexItemToMediaParts,
   codexItemToQuestionPart,

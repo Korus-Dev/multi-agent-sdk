@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import type { RendererToolPart, RendererToolPartUpdate } from 'multi-agents-sdk/contracts';
+import type { RendererToolPart, RendererToolPartUpdate } from '../../contracts/index';
 import { classifyShellCommand, type ClassifiedShellCommand } from './claude-command-classifier';
 import { claudeToolSemantics } from './claude-tool-semantics';
 import { claudeConfigDirectory } from './config-directory';

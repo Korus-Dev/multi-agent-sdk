@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { homedir, platform } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import type { AccountRateLimits, AccountRateLimitWindow } from 'multi-agents-sdk/contracts';
+import type { AccountRateLimits, AccountRateLimitWindow } from '../../contracts/index';
 import { cursorRuntime, type CursorRuntime } from './runtime';
 import { record } from '../../acp/acp-connection';
 

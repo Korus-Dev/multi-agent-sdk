@@ -2,7 +2,7 @@ import type { v2 } from 'codex-sdk';
 import type {
   CodexSurfaceSubagentState,
   CodexSurfaceSubagentToolCall,
-} from 'multi-agents-sdk/surface';
+} from '../../core/surface';
 
 export function surfaceSubagentToolCall(
   item: Extract<v2.ThreadItem, { type: 'collabAgentToolCall' }>,

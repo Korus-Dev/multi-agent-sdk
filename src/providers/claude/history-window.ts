@@ -1,8 +1,8 @@
 import type { ClaudeHistorySource, ClaudeHistoryState } from './history-source';
 import { withInferredTurnWorkPhases } from '../../conversations/work-phases';
 import { createHash } from 'node:crypto';
-import type { ClaudeConversationTurn, RendererMessage, RendererMessagePart } from 'multi-agents-sdk/contracts';
-import type { ConversationContentChunk, ConversationContentInput } from 'multi-agents-sdk/contracts/conversation';
+import type { ClaudeConversationTurn, RendererMessage, RendererMessagePart } from '../../contracts/index';
+import type { ConversationContentChunk, ConversationContentInput } from '../../contracts/conversation';
 
 // Leave room for routing envelopes and snapshot state under the 4 MiB event limit.
 const pageBytes = 1024 * 1024;

@@ -1,4 +1,4 @@
-import type { RendererMessagePart } from 'multi-agents-sdk/contracts';
+import type { RendererMessagePart } from '../../contracts/index';
 import { record } from '../../acp/acp-connection';
 
 type Media = Extract<RendererMessagePart, {type:'media'}>;

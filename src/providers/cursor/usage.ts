@@ -1,4 +1,4 @@
-import { validConsumption, type Consumption } from 'multi-agents-sdk/contracts/usage';
+import { validConsumption, type Consumption } from '../../contracts/usage';
 import { record } from '../../acp/acp-connection';
 
 /** ACP's disjoint input/cache buckets become the ledger's inclusive input count. */

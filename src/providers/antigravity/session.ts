@@ -1,6 +1,6 @@
 import path from 'node:path';
-import type { AgentRequestResponse } from 'multi-agents-sdk/conversations/agent-request';
-import type { AntigravityConversationEvent, AntigravityConversationSnapshot } from 'multi-agents-sdk/contracts/antigravity-conversation';
+import type { AgentRequestResponse } from '../../conversations/agent-request';
+import type { AntigravityConversationEvent, AntigravityConversationSnapshot } from '../../contracts/antigravity-conversation';
 import { AcpRuntime } from './acp-runtime';
 import { record } from '../../acp/acp-connection';
 import { antigravityHome } from './runtime';
@@ -10,8 +10,8 @@ import { handleAcpFileRequest } from './filesystem';
 import { validateAcpSession } from './catalog';
 import { AcpPromptJournal } from './prompt-journal';
 import { acpConsumption, selectedModel } from './consumption';
-import type { RendererMessagePart } from 'multi-agents-sdk/contracts';
-import type { ExecutionObservation } from 'multi-agents-sdk/contracts/usage';
+import type { RendererMessagePart } from '../../contracts/index';
+import type { ExecutionObservation } from '../../contracts/usage';
 import { hasGitSafeguards, nativeTargetsInside, readOnlyGitCommand } from '../../tools/read-only-workspace';
 
 type SessionOptions = {
@@ -89,7 +89,7 @@ export class AcpSession {
   get cwd(): string { return this.options.cwd; }
   get writtenPlan(): string | undefined { return this.planMarkdown; }
 
-  prompt(text: string, content: unknown[] = [{ type: 'text', text }], parts: RendererMessagePart[] = [], metadata?: import('multi-agents-sdk/contracts').RendererMessage['metadata']): { turnId: string; completion: Promise<void> } {
+  prompt(text: string, content: unknown[] = [{ type: 'text', text }], parts: RendererMessagePart[] = [], metadata?: import('../../contracts/index').RendererMessage['metadata']): { turnId: string; completion: Promise<void> } {
     if (this.disposed) throw new Error('Antigravity session is closed.');
     if (this.active) throw new Error('Antigravity is still finishing the previous turn. Queue the next prompt.');
     this.interrupted = false;

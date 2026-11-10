@@ -1,4 +1,4 @@
-import type { BackendModelOption } from 'multi-agents-sdk/contracts';
+import type { BackendModelOption } from '../../contracts/index';
 import { record } from '../../acp/acp-connection';
 
 type ThoughtControl = {id:string;currentValue:string;options:{value:string;name:string}[]};

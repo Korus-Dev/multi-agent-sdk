@@ -39,8 +39,8 @@ import type {
   UpdateCodexConversationSettings,
   CodexSurfaceStatePatch,
   CodexVersionedSurfaceSnapshot,
-} from 'multi-agents-sdk/surface';
-import { diffCodexSurfaceState } from 'multi-agents-sdk/surface-bridge';
+} from '../../core/surface';
+import { diffCodexSurfaceState } from '../../core/surface-bridge';
 import {
   CodexAppServerStdioTransport,
 } from 'codex-sdk';
@@ -200,7 +200,7 @@ export class CodexSurface {
       isUnixSocketTransportOptions(transportOptions)
         ? new CodexAppServerUnixSocketTransport(transportOptions)
         : new CodexAppServerStdioTransport(transportOptions),
-      options.onListenerError ? { onListenerError: options.onListenerError } : {},
+      { onListenerError: options.onListenerError, onRequestSettled: options.onRequestSettled },
     );
     this.originalImages = options.originalHistoryImages ? new CodexOriginalHistoryImages(this.client) : undefined;
     this.originalUsage = options.originalHistoryUsage ? new CodexOriginalHistoryUsage(this.client) : undefined;

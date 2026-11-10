@@ -1,4 +1,4 @@
-import type { ContinueCodexSafetyReviewOptions } from 'multi-agents-sdk/surface';
+import type { ContinueCodexSafetyReviewOptions } from '../../core/surface';
 import type {
   CodexConversationEvent,
   CodexConversationHistory,
@@ -12,7 +12,7 @@ import type {
   StartCodexRealtimeOptions,
   StartCodexReviewOptions,
   UpdateCodexConversationSettings,
-} from 'multi-agents-sdk/surface';
+} from '../../core/surface';
 import type {
   CodexConversation,
   CodexConversationForkResult,

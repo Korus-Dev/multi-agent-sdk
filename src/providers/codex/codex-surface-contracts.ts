@@ -1,4 +1,4 @@
-import type { ContinueCodexSafetyReviewOptions } from 'multi-agents-sdk/surface';
+import type { ContinueCodexSafetyReviewOptions } from '../../core/surface';
 import type { CodexAppServerClient, v2 } from 'codex-sdk';
 import type {
   CodexConversationEvent,
@@ -22,7 +22,7 @@ import type {
   StartCodexRealtimeOptions,
   StartCodexReviewOptions,
   UpdateCodexConversationSettings,
-} from 'multi-agents-sdk/surface';
+} from '../../core/surface';
 import type { CodexMcpServerDefinition } from './codex-surface-mcp';
 import type { CodexAppServerStdioTransportOptions } from 'codex-sdk';
 import type { CodexAppServerUnixSocketTransportOptions } from 'codex-sdk';
@@ -112,7 +112,7 @@ export type CodexConversationForkResult = {
   readonly snapshot: CodexConversationSnapshot;
 };
 
-export type { ListCodexSkillsOptions } from 'multi-agents-sdk/surface';
+export type { ListCodexSkillsOptions } from '../../core/surface';
 
 /** State returned by the app-server remote-control connection. */
 export type CodexSurfaceRemoteControlStatus = v2.RemoteControlStatusReadResponse;
@@ -241,6 +241,7 @@ export type CodexSurfaceOptions = {
    * change or silences other subscribers. Defaults to a process warning.
    */
   onListenerError?: (error: unknown) => void;
+  onRequestSettled?: import('codex-sdk').CodexAppServerClientOptions['onRequestSettled'];
   permissionMode?: CodexSurfacePermissionMode;
   /** Defaults to a spawned stdio child; use `{ type: 'unixSocket' }` to reuse an existing local daemon. */
   transport?: CodexAppServerTransportOptions;

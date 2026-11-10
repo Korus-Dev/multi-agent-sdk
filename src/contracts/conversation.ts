@@ -1,5 +1,5 @@
 import type { ExecutionSelectionOverrides } from './execution';
-import type { CodexPromptPart, SurfaceMessageQuestionPart } from 'multi-agents-sdk/surface';
+import type { CodexPromptPart, SurfaceMessageQuestionPart } from '../core/surface';
 
 export type ThreadGoalStatus = 'active' | 'paused' | 'blocked' | 'usageLimited' | 'budgetLimited' | 'complete';
 
@@ -220,7 +220,7 @@ export type PromptAttachment =
     mimeType?: string;
   };
 
-export type RendererPromptAttachment =
+export type PromptReferenceAttachment =
   | {
     type: 'image';
     reference: string;
@@ -243,8 +243,8 @@ export type SendPromptOptions = {
   backendOptions?: BackendPromptOptions;
 };
 
-export type RendererSendPromptOptions = Omit<SendPromptOptions, 'attachments' | 'recordUserMessage'> & {
-  attachments?: readonly RendererPromptAttachment[];
+export type ReferenceSendPromptOptions = Omit<SendPromptOptions, 'attachments' | 'recordUserMessage'> & {
+  attachments?: readonly PromptReferenceAttachment[];
 };
 
 export type PromptContentOptions = Pick<SendPromptOptions, 'content'>;
@@ -262,7 +262,7 @@ export type BackendPromptOptions =
     permissionMode?: string | null;
   };
 
-export type RendererMessageAttachment = {
+export type MessageAttachment = {
   width?: number;
   height?: number;
   kind: 'file' | 'image';
@@ -272,7 +272,7 @@ export type RendererMessageAttachment = {
   mimeType?: string;
 };
 
-export type RendererMessageMedia = {
+export type MessageMedia = {
   width?: number;
   height?: number;
   url: string;
@@ -282,9 +282,9 @@ export type RendererMessageMedia = {
   title?: string;
 };
 
-export type RendererMessagePart =
-  | { type: 'attachment'; attachment: RendererMessageAttachment }
-  | { type: 'media'; media: RendererMessageMedia; itemId?: string }
+export type MessagePart =
+  | { type: 'attachment'; attachment: MessageAttachment }
+  | { type: 'media'; media: MessageMedia; itemId?: string }
   | SurfaceMessageQuestionPart
   | { type: 'reasoning'; summary: string; itemId: string; summaryIndex: number }
   | { type: 'text'; text: string; itemId?: string; phase?: 'commentary' | 'partial_answer' | 'final_answer' }
@@ -302,12 +302,12 @@ export type RendererMessagePart =
   }
   | { type: 'status'; text: string };
 
-export type RendererToolPart = Extract<RendererMessagePart, { type: 'tool' }>;
+export type ToolPart = Extract<MessagePart, { type: 'tool' }>;
 
-export type RendererToolPartUpdate = {
+export type ToolPartUpdate = {
   itemId: string;
   title?: string;
-  status?: RendererToolPart['status'];
+  status?: ToolPart['status'];
   statusText?: string | null;
   body?: string;
   bodyDelta?: string;
@@ -315,10 +315,10 @@ export type RendererToolPartUpdate = {
   input?: unknown;
   output?: unknown;
   metadata?: Record<string, unknown>;
-  fallbackToolPart?: RendererToolPart;
+  fallbackToolPart?: ToolPart;
 };
 
-export type RendererMessage = {
+export type Message = {
   metadata?: { promptContent?: readonly CodexPromptPart[] };
   id: string;
   agentId: string;
@@ -326,7 +326,7 @@ export type RendererMessage = {
   role: 'user' | 'assistant' | 'system';
   status: 'complete' | 'streaming' | 'error';
   turnId?: string;
-  parts: RendererMessagePart[];
+  parts: MessagePart[];
   createdAt: string;
   /** Lossless JSON of this message, retrieved in bounded chunks from its owning session. */
   deferredContent?: { contentId: string; byteLength: number };
@@ -446,3 +446,20 @@ export type ClientRequestResponse = {
     decision?: ToolConfirmationDecision | null;
   };
 };
+
+/** @deprecated Use PromptReferenceAttachment. */
+export type RendererPromptAttachment = PromptReferenceAttachment;
+/** @deprecated Use ReferenceSendPromptOptions. */
+export type RendererSendPromptOptions = ReferenceSendPromptOptions;
+/** @deprecated Use MessageAttachment. */
+export type RendererMessageAttachment = MessageAttachment;
+/** @deprecated Use MessageMedia. */
+export type RendererMessageMedia = MessageMedia;
+/** @deprecated Use MessagePart. */
+export type RendererMessagePart = MessagePart;
+/** @deprecated Use ToolPart. */
+export type RendererToolPart = ToolPart;
+/** @deprecated Use ToolPartUpdate. */
+export type RendererToolPartUpdate = ToolPartUpdate;
+/** @deprecated Use Message. */
+export type RendererMessage = Message;

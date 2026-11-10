@@ -1,4 +1,4 @@
-import { validConsumption, type Consumption } from "multi-agents-sdk/contracts/usage";
+import { validConsumption, type Consumption } from "../../contracts/usage";
 /** Optional SDK-owner contract; older packages expose no execution projection. No raw notifications/history parsing. */
 export function codexExecutionConsumption(
   event: unknown,

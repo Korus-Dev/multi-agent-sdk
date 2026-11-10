@@ -1,4 +1,4 @@
-import { normalizePromptContent, promptContentText, type CodexPromptPart } from 'multi-agents-sdk/surface';
+import { normalizePromptContent, promptContentText, type CodexPromptPart } from '../core/surface';
 import type {
   ClaudeConversationSnapshot,
   PromptAttachment,

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import type { RendererMessage, RendererMessagePart, RendererToolPart } from 'multi-agents-sdk/contracts';
-import type { AntigravityConversationEvent } from 'multi-agents-sdk/contracts/antigravity-conversation';
-import { createAntigravityConversationReplica, emptyAntigravitySnapshot } from 'multi-agents-sdk/conversations/antigravity-conversation-replica';
+import type { RendererMessage, RendererMessagePart, RendererToolPart } from '../../contracts/index';
+import type { AntigravityConversationEvent } from '../../contracts/antigravity-conversation';
+import { createAntigravityConversationReplica, emptyAntigravitySnapshot } from '../../conversations/antigravity-conversation-replica';
 import { record } from '../../acp/acp-connection';
 
 type Change = AntigravityConversationEvent extends infer Event ? Event extends AntigravityConversationEvent ? Omit<Event, 'agentId' | 'sessionId' | 'turnId' | 'occurredAt'> : never : never;

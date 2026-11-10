@@ -15,19 +15,19 @@ export type CursorHostOptions<Context extends HarnessContext = HarnessContext> =
   mcpServers?: (context: Context) => unknown[];
 };
 const sameScope = (left?: HarnessPromptScope, right?: HarnessPromptScope) => JSON.stringify(left) === JSON.stringify(right);
-import { requestFromClientRequest, type AgentRequestResponse } from 'multi-agents-sdk/conversations/agent-request';
+import { requestFromClientRequest, type AgentRequestResponse } from '../../conversations/agent-request';
 
 
 import { randomUUID } from 'node:crypto';
 
 import { mkdir, realpath } from 'node:fs/promises';
 import path from 'node:path';
-import { normalizePromptContent, promptContentText, promptContentDispatchText } from 'multi-agents-sdk/surface';
-import type { BackendSession, SendPromptOptions, ConversationListInput, ConversationSummary, ConversationResumeTarget, BackendConversationRef, RendererMessage } from 'multi-agents-sdk/contracts';
+import { normalizePromptContent, promptContentText, promptContentDispatchText } from '../../core/surface';
+import type { BackendSession, SendPromptOptions, ConversationListInput, ConversationSummary, ConversationResumeTarget, BackendConversationRef, RendererMessage } from '../../contracts/index';
 
 import { cursorBackendCapabilities } from '../../capabilities';
-import type { CursorConversationEvent } from 'multi-agents-sdk/contracts/cursor-conversation';
-import type { Consumption, ExecutionObservation } from 'multi-agents-sdk/contracts/usage';
+import type { CursorConversationEvent } from '../../contracts/cursor-conversation';
+import type { Consumption, ExecutionObservation } from '../../contracts/usage';
 
 
 

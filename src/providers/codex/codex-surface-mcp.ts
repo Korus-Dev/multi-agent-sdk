@@ -1,5 +1,5 @@
 import { isAbsolute } from 'node:path';
-import type { CodexSurfaceJsonValue } from 'multi-agents-sdk/surface';
+import type { CodexSurfaceJsonValue } from '../../core/surface';
 
 export type CodexMcpServerToolApprovalMode = 'auto' | 'prompt' | 'writes' | 'approve';
 

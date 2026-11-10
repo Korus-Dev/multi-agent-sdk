@@ -52,7 +52,7 @@ export type {
   CodexConversationHistoryPage,
   CodexConversationLoadingStrategy,
   CodexConversationRenderStrategy,
-} from 'multi-agents-sdk/surface';
+} from '../../core/surface';
 export {
   CodexAppBackend,
   createCodexAppBackend,

@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import type { AgentRequestResponse } from 'multi-agents-sdk/conversations/agent-request';
+import type { AgentRequestResponse } from '../../conversations/agent-request';
 import path from 'node:path';
 import { realpath } from 'node:fs/promises';
-import type { RendererMessage, RendererMessagePart } from 'multi-agents-sdk/contracts';
-import type { CursorConversationEvent } from 'multi-agents-sdk/contracts/cursor-conversation';
+import type { RendererMessage, RendererMessagePart } from '../../contracts/index';
+import type { CursorConversationEvent } from '../../contracts/cursor-conversation';
 import { AcpConnection, AcpError, record } from '../../acp/acp-connection';
 import { cursorEnvironment, resolveCursorExecutable, type CursorRuntime, cursorRuntime } from './runtime';
 import { cursorImageFile } from './image-file';
@@ -12,7 +12,7 @@ import { CursorPromptJournal } from './prompt-journal';
 import { cursorModelCatalog, cursorModels, cursorThoughtControl, type CursorCatalogModel } from './catalog';
 import { CursorTranscript } from './transcript';
 import { CursorUsageCounter } from './usage';
-import type { Consumption } from 'multi-agents-sdk/contracts/usage';
+import type { Consumption } from '../../contracts/usage';
 import { cursorRpcErrorMessage, isCursorAuthenticationFailure, isCursorQuotaFailure } from './rpc-errors';
 export { isCursorAuthenticationFailure } from './rpc-errors';
 

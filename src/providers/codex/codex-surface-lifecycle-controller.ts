@@ -8,7 +8,7 @@ import type {
   CodexSurfaceEventOrigin,
   CodexSurfaceSnapshot,
   CreateCodexConversationOptions,
-} from 'multi-agents-sdk/surface';
+} from '../../core/surface';
 import {
   codexTurnToSurfaceMessages,
   preserveHistoricalMessagePresentation,

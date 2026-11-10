@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { normalizePromptContent, promptContentText, type CodexPromptPart } from 'multi-agents-sdk/surface';
-import type { RendererMessage } from 'multi-agents-sdk/contracts';
+import { normalizePromptContent, promptContentText, type CodexPromptPart } from '../../core/surface';
+import type { RendererMessage } from '../../contracts/index';
 
 export function promptContentDirectory(home: string, sessionId: string): string {
   return path.join(home, 'prompt-content', createHash('sha256').update(sessionId).digest('hex'));

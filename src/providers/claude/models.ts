@@ -1,4 +1,4 @@
-import type { BackendModelOption } from 'multi-agents-sdk/contracts';
+import type { BackendModelOption } from '../../contracts/index';
 import type { ClaudeAvailableModel } from './transport';
 
 export const claudeModelOptions: BackendModelOption[] = [

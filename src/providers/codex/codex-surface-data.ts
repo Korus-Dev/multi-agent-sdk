@@ -14,7 +14,7 @@ import type {
   SendCodexMessageOptions,
   SurfaceMessage,
   SurfaceMessageAttachmentPart,
-} from 'multi-agents-sdk/surface';
+} from '../../core/surface';
 import {
   requireCatalogModel,
   selectedModel,
@@ -170,7 +170,7 @@ export function surfaceMessageAttachments(message: SurfaceMessage): CodexSurface
   });
 }
 
-export function surfaceTokenUsage(usage: v2.TokenUsageBreakdown): import('multi-agents-sdk/surface').CodexSurfaceTokenUsage {
+export function surfaceTokenUsage(usage: v2.TokenUsageBreakdown): import('../../core/surface').CodexSurfaceTokenUsage {
   return {
     totalTokens: usage.totalTokens, inputTokens: usage.inputTokens,
     cachedInputTokens: usage.cachedInputTokens, cacheWriteInputTokens: usage.cacheWriteInputTokens ?? null,
@@ -232,7 +232,7 @@ export function nonnegativeDecimal(value: unknown): string {
   throw new Error('Invalid account count: expected an exact nonnegative integer');
 }
 
-export function surfaceAccountUsage(response: v2.GetAccountTokenUsageResponse): import('multi-agents-sdk/surface').CodexSurfaceAccountUsage {
+export function surfaceAccountUsage(response: v2.GetAccountTokenUsageResponse): import('../../core/surface').CodexSurfaceAccountUsage {
   const decimal = (value: bigint | null) => value === null ? null : nonnegativeDecimal(value);
   return {
     summary: {

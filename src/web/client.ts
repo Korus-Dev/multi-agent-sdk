@@ -3,14 +3,14 @@ import {
   type CodexSurfaceBridgeOperation,
   type CodexSurfaceBridgeOperationArguments,
   type CodexSurfaceBridgeOperationResult,
-} from 'multi-agents-sdk/surface-bridge';
+} from '../core/surface-bridge';
 import type {
   CodexSurfaceEvent,
   CodexSurfaceRendererApi,
   CodexSurfaceSnapshot,
   CodexSurfaceStatePatch,
-} from 'multi-agents-sdk/surface';
-import { createCodexSurfaceStateMirror } from 'multi-agents-sdk/surface-bridge';
+} from '../core/surface';
+import { createCodexSurfaceStateMirror } from '../core/surface-bridge';
 import {
   codexWebSocketProtocolVersion,
   encodeCodexWebSocketMessage,

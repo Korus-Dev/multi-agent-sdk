@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import type { AgentRequestResponse } from 'multi-agents-sdk/conversations/agent-request';
-import type { ClientRequest } from 'multi-agents-sdk/contracts';
+import type { AgentRequestResponse } from '../../conversations/agent-request';
+import type { ClientRequest } from '../../contracts/index';
 import { record } from '../../acp/acp-connection';
 
 type Option = { optionId: string; name: string; kind: string };

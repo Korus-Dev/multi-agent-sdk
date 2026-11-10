@@ -1,4 +1,4 @@
-import { normalizePromptContent } from 'multi-agents-sdk/surface';
+import { normalizePromptContent } from '../../core/surface';
 import type { CodexAppServerClient } from 'codex-sdk';
 import type {
   CodexConversationSummary,
@@ -6,7 +6,7 @@ import type {
   SendCodexMessageOptions,
   StartCodexReviewOptions,
   SurfaceMessage,
-} from 'multi-agents-sdk/surface';
+} from '../../core/surface';
 import { codexTurnToSurfaceMessages } from './codex-conversation-history';
 import {
   messageTurnIdOrNull,

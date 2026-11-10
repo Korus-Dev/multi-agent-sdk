@@ -7,7 +7,7 @@ import type {
   CodexSurfaceChatGptLogin,
   CodexSurfaceEventOrigin,
   CodexSurfaceSnapshot,
-} from 'multi-agents-sdk/surface';
+} from '../../core/surface';
 import { CodexSurfaceApprovalsController } from './codex-surface-approvals-controller';
 import { surfaceAuthenticationKey } from './codex-surface-authentication';
 import { CodexSurfaceAuthenticationController } from './codex-surface-authentication-controller';

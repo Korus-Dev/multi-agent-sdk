@@ -1,7 +1,7 @@
 import { open } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type { PromptAttachment } from 'multi-agents-sdk/contracts';
+import type { PromptAttachment } from '../../contracts/index';
 
 /** Desktop has already resolved these paths through its trusted attachment registry. */
 export async function cursorAttachments(attachments: readonly PromptAttachment[]): Promise<unknown[]> {

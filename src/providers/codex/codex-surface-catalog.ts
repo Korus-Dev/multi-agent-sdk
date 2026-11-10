@@ -1,6 +1,6 @@
 import { extname } from 'node:path';
 import type { v2 } from 'codex-sdk';
-import type { CodexSurfaceModel, CodexSurfacePlugin, CodexSurfaceSkill } from 'multi-agents-sdk/surface';
+import type { CodexSurfaceModel, CodexSurfacePlugin, CodexSurfaceSkill } from '../../core/surface';
 
 const MAX_CATALOG_ICON_BYTES = 256 * 1024;
 

@@ -4,7 +4,7 @@ import type {
   CodexSurfaceApprovalDecision,
   CodexSurfaceApprovalScope,
   CodexSurfaceRequestedPermission,
-} from 'multi-agents-sdk/surface';
+} from '../../core/surface';
 
 export type PendingCodexApproval = {
   approval: CodexSurfaceApproval;

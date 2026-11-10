@@ -24,19 +24,19 @@ function nativeApprovalPreset(defaults: import('../../contracts').BackendDefault
 }
 import { providerSafetyBlockMessage, type ProviderSafetyReviewTarget } from '../../contracts/safety-review';
 
-import { ConversationContentTransport } from 'multi-agents-sdk/codex';
+import { ConversationContentTransport } from './index';
 
 
-import { normalizePromptContent } from 'multi-agents-sdk/surface';
-import type { ExecutionObservation } from 'multi-agents-sdk/contracts/usage';
+import { normalizePromptContent } from '../../core/surface';
+import type { ExecutionObservation } from '../../contracts/usage';
 import { codexExecutionConsumption } from './execution-usage';
 import { codexRequestCoverage } from './request-usage';
 import { bankedResetsFromSurface } from './banked-resets';
 import { randomUUID } from 'node:crypto';
-import { isBankedResetResult, isUseBankedResetInput, type BankedResetResult, type UseBankedResetInput } from 'multi-agents-sdk/contracts/banked-resets';
+import { isBankedResetResult, isUseBankedResetInput, type BankedResetResult, type UseBankedResetInput } from '../../contracts/banked-resets';
 
 import os from 'node:os';
-import { approvalAgentRequest, approvalOutcome, requestFromClientRequest, agentResponseFromClientResponse } from 'multi-agents-sdk/conversations/agent-request';
+import { approvalAgentRequest, approvalOutcome, requestFromClientRequest, agentResponseFromClientResponse } from '../../conversations/agent-request';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type {
@@ -63,7 +63,7 @@ import type {
   SubagentIdentityChange,
   SubagentOperationChange,
   SubagentStatusChange
-} from 'multi-agents-sdk/contracts';
+} from '../../contracts/index';
 import type { HarnessScopedPromptInput, HarnessScopedPromptResult, HarnessEvent } from '../../driver';
 import type { HarnessTextGenerationInput, HarnessTextGenerationResult } from '../../generation';
 import { codexBackendCapabilities } from '../../capabilities';
@@ -71,7 +71,7 @@ import { codexBackendCapabilities } from '../../capabilities';
 
 
 
-import type { CodexConversation, CodexSurface } from 'multi-agents-sdk/codex';
+import type { CodexConversation, CodexSurface } from './index';
 
 
 import { safetyReviewFromSnapshot, statusFromSnapshot } from './status';
@@ -91,11 +91,11 @@ import type {
   SurfaceMessage,
   SurfaceMessagePart,
   SurfaceMessageToolPart,
-} from 'multi-agents-sdk/surface';
+} from '../../core/surface';
 import {
   invokeCodexConversationBridgeOperation,
   subscribeCodexConversationReplicaBridge,
-} from 'multi-agents-sdk/surface-bridge';
+} from '../../core/surface-bridge';
 
 type AdapterListener = (event: HarnessEvent) => void;
 type ThreadBackendEvent<Event extends HarnessEvent = HarnessEvent> = Event extends HarnessEvent
@@ -181,7 +181,7 @@ export class CodexSurfaceAgentAdapter<Context extends Agent = Agent> {
     await this.surface.connect();
   }
 
-  async getBankedResets(): Promise<import('multi-agents-sdk/contracts/banked-resets').BankedResets> {
+  async getBankedResets(): Promise<import('../../contracts/banked-resets').BankedResets> {
     // Feature-detect the narrow public seam for older published SDKs.
     const surface = this.surface as CodexSurface & {
       readRateLimits?: (options: { excludeResetCreditDetails: boolean }) => Promise<CodexSurfaceRateLimits>;
@@ -479,7 +479,7 @@ export class CodexSurfaceAgentAdapter<Context extends Agent = Agent> {
   async sendPrompt(agent: Context, prompt: string, options: SendPromptOptions = {}) {
     const session = await this.ensureSession(agent);
     return this.serializeSubmission(session, async () => {
-      // Korus's mode selection persists through follow-ups and hydration. The
+      // The caller's mode selection persists through follow-ups and hydration. The
       // SDK send option alone is a per-turn override and does not publish it.
       if (typeof options.planMode === 'boolean' && options.planMode !== session.handle.getSnapshot().planMode) {
         await session.handle.updateSettings({ planMode: options.planMode });
@@ -1145,7 +1145,7 @@ export class CodexSurfaceAgentAdapter<Context extends Agent = Agent> {
     );
   }
 
-  async readConversationContent(agent: Context, input: import('multi-agents-sdk/contracts/conversation').ConversationContentInput): Promise<import('multi-agents-sdk/contracts/conversation').ConversationContentChunk> {
+  async readConversationContent(agent: Context, input: import('../../contracts/conversation').ConversationContentInput): Promise<import('../../contracts/conversation').ConversationContentChunk> {
     const session = this.sessionsByAgentId.get(agent.id);
     if (!session || agent.backendSession?.kind !== 'codex' || agent.backendSession.threadId !== input.sessionId || session.handle.id !== input.sessionId) throw new Error('Conversation image is no longer available.');
     const chunk = await session.handle.readContent(input.contentId, input.offset);
@@ -2044,7 +2044,7 @@ function scopedPromptOptions(agent: Agent): SendCodexMessageOptions | undefined 
   };
 }
 
-function surfaceMessages(
+export function surfaceMessages(
   messages: readonly SurfaceMessage[],
   agentId: string,
   completeStreaming = false,

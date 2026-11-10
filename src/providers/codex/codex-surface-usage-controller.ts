@@ -1,6 +1,6 @@
 import type {
   CodexSurfaceEvent, CodexSurfaceEventOrigin, CodexSurfaceExecutionUsage, CodexSurfaceRequestUsage, CodexSurfaceTokenUsage,
-} from 'multi-agents-sdk/surface';
+} from '../../core/surface';
 
 type EventInput = CodexSurfaceEvent extends infer Event
   ? Event extends CodexSurfaceEvent ? Omit<Event, 'seq' | 'occurredAt' | 'origin'> : never

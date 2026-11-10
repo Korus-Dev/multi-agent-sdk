@@ -1,6 +1,6 @@
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { Agent, BackendSkillSummary } from 'multi-agents-sdk/contracts';
+import type { Agent, BackendSkillSummary } from '../../contracts/index';
 const agentFolder = (agent: { folder: string | null }) => agent.folder?.trim() || undefined;
 import { claudeConfigDirectory } from './config-directory';
 

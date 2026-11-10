@@ -1,5 +1,5 @@
-import type { CodexConversation, CodexSurface } from 'multi-agents-sdk/codex';
-import type { CodexSurfaceTurnStatus } from 'multi-agents-sdk/surface';
+import type { CodexConversation, CodexSurface } from './index';
+import type { CodexSurfaceTurnStatus } from '../../core/surface';
 import type { HarnessImageGenerationInput, HarnessImageGenerationResult } from '../../generation';
 import { fileURLToPath } from 'node:url';
 export type CodexImageGenerationOptions = {

@@ -1,4 +1,4 @@
-import type { RendererToolPart, ThreadPlan, ThreadPlanStepStatus } from 'multi-agents-sdk/contracts';
+import type { RendererToolPart, ThreadPlan, ThreadPlanStepStatus } from '../../contracts/index';
 
 /** `doneIn` is the turn ordinal in which the task was first seen completed. */
 type Task = { subject: string; status: ThreadPlanStepStatus; activeForm?: string; doneIn?: number };

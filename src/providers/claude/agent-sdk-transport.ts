@@ -1,6 +1,6 @@
 import { ClaudeRequestUsageObserver, type ClaudeRequestUsage, type ClaudeRequestUsageOwner } from './request-usage';
 import { ClaudeModelObserver } from './claude-model-observer';
-import { validConsumption, type Consumption } from 'multi-agents-sdk/contracts/usage';
+import { validConsumption, type Consumption } from '../../contracts/usage';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import os from 'node:os';
@@ -320,7 +320,7 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
     }
   }
 
-  async generateText(input: import('multi-agents-sdk/generation').HarnessTextGenerationInput, selection: Pick<ClaudeTurnParams, 'model' | 'effort'> = {}): Promise<{ text: string }> {
+  async generateText(input: import('../../generation').HarnessTextGenerationInput, selection: Pick<ClaudeTurnParams, 'model' | 'effort'> = {}): Promise<{ text: string }> {
     if (this.closing) throw new Error('Claude transport is closed.');
     input.signal?.throwIfAborted();
     const prompt = new AsyncPushQueue<SDKUserMessage>();
@@ -948,7 +948,7 @@ function permissionResult(pending: PendingPermission, response: ClaudePermission
   };
 }
 
-function askUserQuestions(input: Record<string, unknown>): import('multi-agents-sdk/contracts').AskUserQuestion[] {
+function askUserQuestions(input: Record<string, unknown>): import('../../contracts/index').AskUserQuestion[] {
   if (!Array.isArray(input.questions)) return [];
   return input.questions.flatMap((value, index) => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
@@ -982,7 +982,7 @@ function askUserQuestions(input: Record<string, unknown>): import('multi-agents-
 }
 
 function claudeAskUserAnswers(
-  answers: import('multi-agents-sdk/contracts').AskUserAnswers,
+  answers: import('../../contracts/index').AskUserAnswers,
 ): Record<string, string> {
   return Object.fromEntries(Object.entries(answers).map(([question, value]) => [
     question,

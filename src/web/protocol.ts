@@ -1,12 +1,12 @@
 import type {
   CodexSurfaceBridgeOperation,
   CodexSurfaceBridgeOperationResult,
-} from 'multi-agents-sdk/surface-bridge';
+} from '../core/surface-bridge';
 import type {
   CodexSurfaceEvent,
   CodexSurfaceSnapshot,
   CodexSurfaceStatePatch,
-} from 'multi-agents-sdk/surface';
+} from '../core/surface';
 
 export const codexWebSocketProtocolVersion = 1 as const;
 

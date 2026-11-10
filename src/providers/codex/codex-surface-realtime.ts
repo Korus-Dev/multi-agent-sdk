@@ -1,5 +1,5 @@
 import type { v2 } from 'codex-sdk';
-import type { CodexRealtimeInputAudioChunk } from 'multi-agents-sdk/surface';
+import type { CodexRealtimeInputAudioChunk } from '../../core/surface';
 
 export function normalizedOptionalRealtimeString(
   value: string | undefined,

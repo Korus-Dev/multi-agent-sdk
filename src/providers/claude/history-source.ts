@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { open, stat } from 'node:fs/promises';
 import type { Stats } from 'node:fs';
-import type { ClaudeConversationTurn, RendererMessage, ThreadGoal } from 'multi-agents-sdk/contracts';
+import type { ClaudeConversationTurn, RendererMessage, ThreadGoal } from '../../contracts/index';
 import type { HarnessEvent } from '../../driver';
 import type { ClaudeTaskPlan } from './claude-task-plan';
 

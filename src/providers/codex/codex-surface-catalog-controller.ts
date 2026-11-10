@@ -7,7 +7,7 @@ import type {
   CodexSurfaceSnapshot,
   CodexSurfaceSkill,
   ListCodexModelsOptions,
-} from 'multi-agents-sdk/surface';
+} from '../../core/surface';
 import {
   boundedImageDataUrl,
   catalogIconMimeType,

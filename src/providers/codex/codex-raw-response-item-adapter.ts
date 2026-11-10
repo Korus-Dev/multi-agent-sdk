@@ -1,5 +1,5 @@
 import type { ResponseItem } from 'codex-sdk/protocol/generated/ResponseItem';
-import type { SurfaceMessageToolPart, SurfaceMessageToolPartUpdate } from 'multi-agents-sdk/surface';
+import type { SurfaceMessageToolPart, SurfaceMessageToolPartUpdate } from '../../core/surface';
 import { codexThreadItemToToolPart, rawOutputToToolPartUpdate } from './codex-tool-part-adapter';
 
 type AdaptedRawResponseItemEvent =

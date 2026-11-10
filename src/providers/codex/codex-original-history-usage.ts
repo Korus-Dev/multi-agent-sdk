@@ -1,7 +1,7 @@
 import { open } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
 import type { CodexAppServerClient } from 'codex-sdk';
-import type { CodexSurfaceTokenUsage } from 'multi-agents-sdk/surface';
+import type { CodexSurfaceTokenUsage } from '../../core/surface';
 import { validCounts } from './codex-surface-usage-controller';
 
 export type CodexHistoricalExecutionUsage = {

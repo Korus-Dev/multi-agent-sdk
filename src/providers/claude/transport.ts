@@ -1,4 +1,4 @@
-import type { AskUserAnswers, AskUserQuestion, PromptAttachment } from 'multi-agents-sdk/contracts';
+import type { AskUserAnswers, AskUserQuestion, PromptAttachment } from '../../contracts/index';
 import type { randomUUID } from 'node:crypto';
 import type { ClaudeSdkMessage } from './protocol';
 

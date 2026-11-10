@@ -1,7 +1,7 @@
 import { appendFile, mkdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
-import type { RendererMessage, RendererMessagePart } from 'multi-agents-sdk/contracts';
-import { normalizePromptContent } from 'multi-agents-sdk/surface';
+import type { RendererMessage, RendererMessagePart } from '../../contracts/index';
+import { normalizePromptContent } from '../../core/surface';
 
 type Entry = { wireText: string; text: string; parts: RendererMessagePart[]; metadata?: RendererMessage['metadata'] };
 

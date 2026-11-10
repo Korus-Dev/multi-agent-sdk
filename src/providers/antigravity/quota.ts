@@ -1,4 +1,4 @@
-import type { AccountRateLimitWindow, AccountRateLimits } from 'multi-agents-sdk/contracts';
+import type { AccountRateLimitWindow, AccountRateLimits } from '../../contracts/index';
 
 /**
  * Reads the quota section of the runtime's `/usage` reply. The ACP offers it only as

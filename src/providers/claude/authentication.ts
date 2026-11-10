@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import type { ClaudeAuthentication } from 'multi-agents-sdk/contracts';
+import type { ClaudeAuthentication } from '../../contracts/index';
 import { resolveClaudeLaunch } from './claude-command';
 import { claudeConfigDirectoryOverride } from './config-directory';
 

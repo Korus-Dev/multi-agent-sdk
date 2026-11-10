@@ -1,5 +1,5 @@
 import type { HarnessTextGenerationInput, HarnessTextGenerationResult } from '../../generation';
-import { clientResponseFromAgentResponse } from 'multi-agents-sdk/conversations/agent-request';
+import { clientResponseFromAgentResponse } from '../../conversations/agent-request';
 import type {
   Agent,
   ApprovalPreset,
@@ -19,7 +19,7 @@ import type {
   DevicePairingSession,
   DevicePairingStatus,
   PairedDevice
-} from 'multi-agents-sdk/contracts';
+} from '../../contracts/index';
 import { codexBackendCapabilities } from '../../capabilities';
 import type { HarnessDriver, HarnessApprovalPresetResult, HarnessConversationForkResult, HarnessConversationResumeResult, HarnessEvent, HarnessGoalResult, HarnessSendResult, HarnessConversationReplacementResult, HarnessTurnActionResult } from '../../driver';
 import type { CodexSurfaceAgentAdapter } from './host';
@@ -34,7 +34,7 @@ export class CodexBackendDriver<Context extends Agent = Agent> implements Harnes
   ) {}
 
   getBankedResets() { return this.sessionManager.getBankedResets(); }
-  useBankedReset(input: import('multi-agents-sdk/contracts/banked-resets').UseBankedResetInput) { return this.sessionManager.useBankedReset(input); }
+  useBankedReset(input: import('../../contracts/banked-resets').UseBankedResetInput) { return this.sessionManager.useBankedReset(input); }
 
   getRuntimeStatus(): BackendRuntimeStatus {
     return this.sessionManager.getRuntimeStatus();
@@ -44,7 +44,7 @@ export class CodexBackendDriver<Context extends Agent = Agent> implements Harnes
     return this.sessionManager.getAuthentication();
   }
 
-  async authenticate(request: import('multi-agents-sdk/contracts/authentication').ProviderAuthenticationAction): Promise<import('multi-agents-sdk/contracts/authentication').ProviderAuthentication> {
+  async authenticate(request: import('../../contracts/authentication').ProviderAuthenticationAction): Promise<import('../../contracts/authentication').ProviderAuthentication> {
     const state = await (request.action === 'logout' ? this.logout()
       : request.action === 'cancel' ? this.cancelChatGptLogin(request.loginId) : this.getAuthentication());
     return { kind: 'codex', connected: request.action !== 'logout' && Boolean(state.account || !state.requiresOpenaiAuth), state };
@@ -244,7 +244,7 @@ export class CodexBackendDriver<Context extends Agent = Agent> implements Harnes
     };
   }
 
-  readConversationContent(agent: Context, input: import('multi-agents-sdk/contracts/conversation').ConversationContentInput) {
+  readConversationContent(agent: Context, input: import('../../contracts/conversation').ConversationContentInput) {
     return this.sessionManager.readConversationContent(agent, input);
   }
 
@@ -315,14 +315,14 @@ export class CodexBackendDriver<Context extends Agent = Agent> implements Harnes
     };
   }
 
-  async respondToAgentRequest(response: import('multi-agents-sdk/conversations/agent-request').AgentRequestResponse): Promise<void> {
+  async respondToAgentRequest(response: import('../../conversations/agent-request').AgentRequestResponse): Promise<void> {
     await this.sessionManager.respondToClientRequest({
       ...clientResponseFromAgentResponse(response),
       ...(response.agentId ? { agentId: response.agentId } : {}),
     });
   }
 
-  onUsage(listener: (observation: import('multi-agents-sdk/contracts/usage').ExecutionObservation)=>void):()=>void { return this.sessionManager.onUsage(listener); }
+  onUsage(listener: (observation: import('../../contracts/usage').ExecutionObservation)=>void):()=>void { return this.sessionManager.onUsage(listener); }
 
   onEvent(listener: (event: HarnessEvent) => void): () => void {
     return this.sessionManager.onEvent(listener);

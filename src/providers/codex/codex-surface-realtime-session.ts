@@ -1,5 +1,5 @@
 import type { CodexAppServerClient, RealtimeVoice } from 'codex-sdk';
-import type { CodexConversationEvent, CodexRealtimeEvent, StartCodexRealtimeOptions } from 'multi-agents-sdk/surface';
+import type { CodexConversationEvent, CodexRealtimeEvent, StartCodexRealtimeOptions } from '../../core/surface';
 import type { CodexRealtimeSession } from './codex-surface-contracts';
 import {
   normalizedOptionalRealtimeString,
