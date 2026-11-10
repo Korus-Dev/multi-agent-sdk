@@ -42,7 +42,7 @@ jobs:
           mkdir -p release-package
           npm pack --ignore-scripts --pack-destination release-package
       - name: Publish with OIDC provenance
-        run: npm publish release-package/*.tgz --ignore-scripts --access public --provenance
+        run: npm publish ./release-package/*.tgz --ignore-scripts --access public --provenance
   release:
     needs: publish
     runs-on: ubuntu-latest
