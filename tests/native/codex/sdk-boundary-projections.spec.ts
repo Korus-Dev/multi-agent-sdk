@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { CodexConversationSnapshot, CodexSurfaceSkill } from '@korus-dev/multi-agent-sdk/surface';
+import type { CodexConversationSnapshot } from '../../../src/index';
 
 import { codexSdkFixture, sdkAgent } from './sdk-surface-fixture';
 

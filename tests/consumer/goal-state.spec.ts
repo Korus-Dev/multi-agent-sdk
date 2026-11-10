@@ -8,7 +8,7 @@ it('publishes authoritative goal mutation results even when the native transport
   const native = { onEvent: () => () => {}, close: vi.fn(),
     setGoal: async () => ({ backendSession: { kind: 'claude', sessionId: 'native', transport: 'stdio' }, goal }),
     clearGoal: async () => ({ backendSession: { kind: 'claude', sessionId: 'native', transport: 'stdio' }, cleared: true }),
-  } as unknown as NativeDriver;
+  } as unknown as NativeDriver<import('../../src/context').HarnessContext, import('../../src/driver').HarnessEvent>;
   const driver = adaptHarnessDriver('claude', native);
   const session = driver.open({ id: 'main', folder: '/tmp' });
   const changed = vi.fn(); driver.onEvent(event => { if (event.type === 'session.changed') changed(event.state.goal); });

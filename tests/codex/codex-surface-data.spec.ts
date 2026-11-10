@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import type { v2 } from '@korus-dev/codex-sdk/protocol';
+import type { v2 } from '@korus-dev/codex-sdk';
 import type {
   CodexConversationSummary,
   CodexSurfaceModel,
   CodexSurfaceRateLimitSnapshot,
   CodexSurfaceSnapshot,
   SurfaceMessage,
-} from '@korus-dev/multi-agent-sdk/surface';
+} from '../../src/index';
 import {
   attachmentInput,
   conversationStatus,

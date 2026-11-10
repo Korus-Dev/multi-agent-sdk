@@ -1,141 +1,45 @@
 {
-  "version": "0.0.0",
+  "version": "0.25.0",
   "type": "module",
   "license": "Apache-2.0",
   "files": [
     "dist",
+    "prompt.js",
+    "prompt.d.ts",
+    "surface-bridge.js",
+    "surface-bridge.d.ts",
+    "native.js",
+    "native.d.ts",
+    "codex.js",
+    "codex.d.ts",
+    "web.js",
+    "web.d.ts",
+    "web",
+    "docs/**/*.md",
+    "examples",
+    "README.md",
     "LICENSE"
   ],
   "scripts": {
     "build": "vite build && node scripts/typecheck.mjs plain -p tsconfig.build.json",
     "typecheck": "node scripts/typecheck.mjs plain --noEmit",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "prepack": "npm run build",
+    "check": "npm run typecheck && npm run typecheck:tests && npm run test:coverage && npm run build && npm run check:package && npm run build:docs",
+    "check:package": "node scripts/check-package.mjs",
+    "dev:docs": "vitepress dev docs --port 5175",
+    "build:docs": "npm run typecheck:examples && vitepress build docs",
+    "preview:docs": "vitepress preview docs --port 4175",
+    "typecheck:examples": "tsc -p tsconfig.examples.json --noEmit",
+    "typecheck:tests": "node scripts/typecheck.mjs plain -p tsconfig.tests.json --noEmit"
   },
   "name": "@korus-dev/multi-agent-sdk",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    },
-    "./codex": {
-      "types": "./dist/providers/codex/index.d.ts",
-      "import": "./dist/providers/codex/index.js"
-    },
-    "./core": {
-      "types": "./dist/core/index.d.ts",
-      "import": "./dist/core/index.js"
-    },
-    "./surface": {
-      "types": "./dist/core/surface.d.ts",
-      "import": "./dist/core/surface.js"
-    },
-    "./events": {
-      "types": "./dist/core/typed-event-bus.d.ts",
-      "import": "./dist/core/typed-event-bus.js"
-    },
-    "./surface-bridge": {
-      "types": "./dist/core/surface-bridge.d.ts",
-      "import": "./dist/core/surface-bridge.js"
-    },
-    "./conversation-replica": {
-      "types": "./dist/core/conversation-replica.d.ts",
-      "import": "./dist/core/conversation-replica.js"
-    },
-    "./web": {
-      "types": "./dist/web/index.d.ts",
-      "import": "./dist/web/index.js"
-    },
-    "./web/client": {
-      "types": "./dist/web/client.d.ts",
-      "import": "./dist/web/client.js"
-    },
-    "./web/server": {
-      "types": "./dist/web/server.d.ts",
-      "import": "./dist/web/server.js"
-    },
-    "./web/protocol": {
-      "types": "./dist/web/protocol.d.ts",
-      "import": "./dist/web/protocol.js"
-    },
-    "./contracts": {
-      "types": "./dist/contracts/index.d.ts",
-      "import": "./dist/contracts/index.js"
-    },
-    "./contracts/*": {
-      "types": "./dist/contracts/*.d.ts",
-      "import": "./dist/contracts/*.js"
-    },
-    "./conversations/*": {
-      "types": "./dist/conversations/*.d.ts",
-      "import": "./dist/conversations/*.js"
-    },
-    "./acp/*": {
-      "types": "./dist/acp/*.d.ts",
-      "import": "./dist/acp/*.js"
-    },
-    "./generation": {
-      "types": "./dist/generation.d.ts",
-      "import": "./dist/generation.js"
-    },
-    "./runtime": {
-      "types": "./dist/runtime/discovery.d.ts",
-      "import": "./dist/runtime/discovery.js"
-    },
-    "./backend": {
-      "types": "./dist/backend.d.ts",
-      "import": "./dist/backend.js"
-    },
-    "./native": {
-      "types": "./dist/native.d.ts",
-      "import": "./dist/native.js"
-    },
-    "./bridge": {
-      "types": "./dist/bridge.d.ts",
-      "import": "./dist/bridge.js"
-    },
-    "./consumer-types": {
-      "types": "./dist/consumer-types.d.ts",
-      "import": "./dist/consumer-types.js"
-    },
-    "./providers/codex": {
-      "types": "./dist/providers/codex/index.d.ts",
-      "import": "./dist/providers/codex/index.js"
-    },
-    "./providers/claude": {
-      "types": "./dist/providers/claude/index.d.ts",
-      "import": "./dist/providers/claude/index.js"
-    },
-    "./providers/cursor": {
-      "types": "./dist/providers/cursor/index.d.ts",
-      "import": "./dist/providers/cursor/index.js"
-    },
-    "./providers/antigravity": {
-      "types": "./dist/providers/antigravity/index.d.ts",
-      "import": "./dist/providers/antigravity/index.js"
-    },
-    "./capabilities": {
-      "types": "./dist/capabilities.d.ts",
-      "import": "./dist/capabilities.js"
-    },
-    "./diagnostics": {
-      "types": "./dist/diagnostics.d.ts",
-      "import": "./dist/diagnostics.js"
-    },
-    "./ui-types": {
-      "types": "./dist/ui-types.d.ts",
-      "import": "./dist/ui-types.js"
-    },
-    "./prompt": {
-      "types": "./dist/prompt.d.ts",
-      "import": "./dist/prompt.js"
-    }
-  },
   "dependencies": {
-    "image-size": "2.0.4",
     "@anthropic-ai/claude-agent-sdk": "0.3.319",
-    "yauzl": "3.4.0",
-    "@korus-dev/codex-sdk": "0.0.0"
+    "@korus-dev/codex-sdk": "0.167.0",
+    "image-size": "2.0.4",
+    "yauzl": "3.4.0"
   },
   "engines": {
     "node": ">=22.19.0"
@@ -143,11 +47,12 @@
   "description": "Unified native coding-agent harness interface and adapters.",
   "devDependencies": {
     "@types/node": "25.9.5",
+    "@types/yauzl": "2.10.3",
     "@vitest/coverage-v8": "4.1.10",
     "typescript": "6.0.3",
     "vite": "8.1.5",
-    "vitest": "4.1.10",
-    "@types/yauzl": "2.10.3"
+    "vitepress": "1.6.4",
+    "vitest": "4.1.10"
   },
   "publishConfig": {
     "access": "public",
@@ -156,5 +61,21 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Korus-Dev/multi-agent-sdk.git"
-  }
+  },
+  "author": "Nicolas Bonamy",
+  "homepage": "https://github.com/Korus-Dev/multi-agent-sdk#readme",
+  "bugs": {
+    "url": "https://github.com/Korus-Dev/multi-agent-sdk/issues"
+  },
+  "keywords": [
+    "agents",
+    "codex",
+    "claude",
+    "cursor",
+    "acp",
+    "mcp",
+    "typescript"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts"
 }

@@ -2,7 +2,7 @@ import { afterAll, beforeAll, bench, describe } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { CodexAppServerClient } from '@korus-dev/codex-sdk/protocol';
+import { CodexAppServerClient } from '@korus-dev/codex-sdk';
 import { CodexSurface } from '../../../src/providers/codex';
 import { MockCodexAppServer, resumeResponse, thread, turn } from '../helpers/codex-surface-fixture';
 

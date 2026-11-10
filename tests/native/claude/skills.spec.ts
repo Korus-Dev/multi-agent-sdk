@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { Agent } from '@korus-dev/multi-agent-sdk/contracts';
+import type { Agent } from '../../../src/contracts/index';
 import { listClaudeSkills } from '../../../src/providers/claude/skills';
 
 let tempRoot = '';
@@ -90,7 +90,7 @@ describe('listClaudeSkills', () => {
 
     const skills = await listClaudeSkills(agentForFolder(repoDir), { homeDir });
 
-    await expect(listClaudeSkills({ ...agentForFolder(repoDir), folder: null, sessionKind: 'quickChat' }, { homeDir }))
+    await expect(listClaudeSkills({ ...agentForFolder(repoDir), folder: null }, { homeDir }))
       .resolves.toEqual([expect.objectContaining({ name: 'reviewer', description: 'Global reviewer.', scope: 'user' })]);
 
     expect(skills).toStrictEqual([
@@ -136,8 +136,5 @@ function agentForFolder(folder: string): Agent {
     folder,
     backend: 'claude',
     backendDefaults: { kind: 'claude' },
-    status: { type: 'idle' },
-    createdAt: '2026-06-05T00:00:00.000Z',
-    updatedAt: '2026-06-05T00:00:00.000Z',
   };
 }

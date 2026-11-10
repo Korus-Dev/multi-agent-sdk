@@ -6,8 +6,8 @@ import type {
   RpcTransport,
   ServerNotification,
   ServerRequest,
-} from '@korus-dev/codex-sdk/protocol';
-import { codexSchemaCliVersion } from '@korus-dev/codex-sdk/protocol/schema-version';
+} from '@korus-dev/codex-sdk';
+import { codexSchemaCliVersion } from '@korus-dev/codex-sdk';
 
 export type MockCodexAppServerMethod = keyof CodexAppServerMethodMap & string;
 type Method = MockCodexAppServerMethod;

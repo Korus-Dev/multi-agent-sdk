@@ -1,0 +1,43 @@
+name: Documentation
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['docs/**', 'examples/**', 'src/**', 'package*.json', '.github/workflows/docs.yml']
+permissions:
+  contents: read
+concurrency:
+  group: docs-pages
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      SDK_LOCAL_SOURCE: '0'
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build:docs
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/.vitepress/dist
+  deploy:
+    if: github.event_name == 'workflow_dispatch'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy docs
+        id: deployment
+        uses: actions/deploy-pages@v4

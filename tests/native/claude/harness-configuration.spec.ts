@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { ClaudeAgentSdkTransport } from '@korus-dev/multi-agent-sdk/providers/claude';
+import { ClaudeAgentSdkTransport } from '../../../src/providers/claude/index';
 import type { ClaudePermissionRequest } from '../../../src/providers/claude/transport';
 import { createQueryHarness } from './sdk-query-fixture';
 
@@ -83,8 +83,8 @@ it.each(['inherit', 'auto'] as const)('keeps utility MCP availability distinct f
     const result = transport.generateText({ cwd: '/tmp/project', prompt: 'Read ledger', mcpServers: [{ name: 'ledger', url: 'http://127.0.0.1:1234/ledger', enabledTools: ['read'], approval }] });
     await vi.waitFor(() => expect(harness.inputs).toHaveLength(1));
     const options = harness.options[0]!;
-    await expect(options.canUseTool!('mcp__ledger__read', {}, { signal: new AbortController().signal, toolUseID: 'read' })).resolves.toMatchObject({ behavior: approval === 'auto' ? 'allow' : 'deny' });
-    await expect(options.canUseTool!('mcp__ledger__write', {}, { signal: new AbortController().signal, toolUseID: 'write' })).resolves.toMatchObject({ behavior: 'deny' });
+    await expect(options.canUseTool!('mcp__ledger__read', {}, { signal: new AbortController().signal, toolUseID: 'read', requestId: 'read' })).resolves.toMatchObject({ behavior: approval === 'auto' ? 'allow' : 'deny' });
+    await expect(options.canUseTool!('mcp__ledger__write', {}, { signal: new AbortController().signal, toolUseID: 'write', requestId: 'write' })).resolves.toMatchObject({ behavior: 'deny' });
     expect(options.allowedTools ?? []).toEqual(approval === 'auto' ? ['mcp__ledger__read'] : []);
     harness.emit({ type: 'result', subtype: 'success', session_id: 'utility', is_error: false, result: 'Done' });
     await expect(result).resolves.toEqual({ text: 'Done' });
@@ -98,7 +98,7 @@ it('denies unavailable native MCP tools before explicit trust can bypass permiss
   try {
     const turn = transport.startTurn({ cwd: '/tmp/project', prompt: 'Read ledger', sessionId: 'ledger', mcpServerUrl: 'http://127.0.0.1:1234/ledger', mcpServerName: 'ledger', enabledMcpTools: { ledger: [] }, allowedTools: ['mcp__ledger__*'] }, () => {}, request => requests.push(request));
     await vi.waitFor(() => expect(harness.inputs).toHaveLength(1));
-    await expect(harness.options[0]!.canUseTool!('mcp__ledger__write', {}, { signal: new AbortController().signal, toolUseID: 'write' })).resolves.toMatchObject({ behavior: 'deny' });
+    await expect(harness.options[0]!.canUseTool!('mcp__ledger__write', {}, { signal: new AbortController().signal, toolUseID: 'write', requestId: 'write' })).resolves.toMatchObject({ behavior: 'deny' });
     expect(requests).toEqual([]);
     harness.emit({ type: 'result', subtype: 'success', session_id: 'ledger', is_error: false }); await turn.done;
   } finally { await transport.close(); }

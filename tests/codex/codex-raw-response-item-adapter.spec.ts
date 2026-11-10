@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ResponseItem } from '@korus-dev/codex-sdk/protocol/generated/ResponseItem';
+import type { ResponseItem } from '@korus-dev/codex-sdk';
 import { rawResponseItemToEvent } from '../../src/providers/codex/codex-raw-response-item-adapter';
 
 const adapt = (item: unknown) => rawResponseItemToEvent(item as ResponseItem);

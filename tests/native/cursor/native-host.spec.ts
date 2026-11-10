@@ -10,20 +10,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 
 
-import type { BackendCodeReviewResult } from '@korus-dev/multi-agent-sdk/driver';
-import type { Agent } from '@korus-dev/multi-agent-sdk/contracts';
-import type { HarnessDriver, HarnessEvent } from '@korus-dev/multi-agent-sdk/driver';
+import type { NativeHarnessEvent as HarnessEvent } from '../../../src/index';
 
 
 
-import { isCursorSnapshot, isCursorEvent } from '@korus-dev/multi-agent-sdk/conversations/cursor-guards';
-import type { CursorConversationSnapshot } from '@korus-dev/multi-agent-sdk/contracts/cursor-conversation';
+import { isCursorSnapshot, isCursorEvent } from '../../../src/conversations/cursor-guards';
+import type { CursorConversationSnapshot } from '../../../src/contracts/cursor-conversation';
 
 
 
 
 vi.mock('node:fs/promises', async importOriginal => { const actual = await importOriginal<typeof import('node:fs/promises')>(); return {...actual,open:vi.fn(actual.open),realpath:vi.fn(actual.realpath)}; });
-let root: string, host: HarnessDriver;
+let root: string, host: CursorHost;
 let events: HarnessEvent[];
 const observedPng='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jK1cAAAAASUVORK5CYII=';
 const agent = { name: 'Fixture', folder: '', id: 'cursor-fixture', backend: 'cursor' as const, backendDefaults: { kind: 'cursor' as const }, backendSession: undefined };
@@ -440,7 +438,7 @@ describe('Cursor ACP host transport boundary', () => {
     expect(calls[2].params).toEqual({ cwd: root, mcpServers: [] });
     expect(calls.find(call => call.method === 'session/prompt').params.prompt[0].text).toContain('<context id=');
     expect(calls.find(call => call.method === 'session/prompt').params.prompt[0].text).toContain(`agent ID is ${agent.id}`);
-    expect(host.getCapabilities(agent)).toMatchObject({ interrupt: true, approvals: false, history: true, models: true });
+    expect(host.getCapabilities()).toMatchObject({ interrupt: true, approvals: false, history: true, models: true });
   });
   it('denies permissions using the native reject option and keeps a completed-but-rejected tool visibly failed', async () => {
     await host.sendPrompt(agent, 'permission');

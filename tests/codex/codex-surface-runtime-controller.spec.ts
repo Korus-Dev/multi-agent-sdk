@@ -3,7 +3,7 @@ import type {
   CodexConversationSummary,
   CodexSurfaceSnapshot,
   SurfaceMessage,
-} from '@korus-dev/multi-agent-sdk/surface';
+} from '../../src/index';
 import { CodexSurfaceRuntimeController } from '../../src/providers/codex/codex-surface-runtime-controller';
 import { initialAuthentication } from '../../src/providers/codex/codex-surface-authentication';
 import { initialSurfaceSnapshot } from '../../src/providers/codex/codex-surface-runtime';

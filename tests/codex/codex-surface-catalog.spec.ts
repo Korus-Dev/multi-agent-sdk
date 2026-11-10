@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { v2 } from '@korus-dev/codex-sdk/protocol';
+import type { v2 } from '@korus-dev/codex-sdk';
 import {
   boundedImageDataUrl,
   catalogIconMimeType,

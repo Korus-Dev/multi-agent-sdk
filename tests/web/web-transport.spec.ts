@@ -3,8 +3,8 @@ import type {
   CodexSurfaceEvent,
   CodexSurfaceSnapshot,
   CodexSurfaceStatePatch,
-} from '@korus-dev/multi-agent-sdk/surface';
-import type { CodexSurfaceBridgeTarget } from '@korus-dev/multi-agent-sdk/surface-bridge';
+} from '../../src/index';
+import type { CodexSurfaceBridgeTarget } from '../../src/core/surface-bridge';
 import {
   bindCodexWebSocket,
   createCodexWebSurfaceClient,

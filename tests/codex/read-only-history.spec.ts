@@ -5,11 +5,11 @@ import { MockCodexAppServer, thread, turn } from './helpers/codex-surface-fixtur
 
 it('reads archived history across pages without resuming, selecting or changing archive state', async () => {
   const transport = new MockCodexAppServer({
-    'thread/read': () => ({ thread: thread('archived', false) }),
+    'thread/read': () => ({ thread: thread('archived', false), readState: null }),
     'thread/turns/list': params => ({
       data: [turn(params.cursor ? 'second' : 'first', 'completed', [{
         type: 'agentMessage', id: params.cursor ? 'two' : 'one',
-        text: params.cursor ? 'Second answer' : 'First answer', phase: 'final_answer',
+        text: params.cursor ? 'Second answer' : 'First answer', phase: 'final_answer', memoryCitation: null, delivery: null, questions: null,
       }])], nextCursor: params.cursor ? null : 'page-2', backwardsCursor: null,
     }),
   });
@@ -26,7 +26,7 @@ it('reads archived history across pages without resuming, selecting or changing 
 
 it.each(['identity', 'cursor'] as const)('rejects invalid read-only history %s evidence without resuming', async mode => {
   const transport = new MockCodexAppServer({
-    'thread/read': () => ({ thread: thread(mode === 'identity' ? 'foreign' : 'archived', false) }),
+    'thread/read': () => ({ thread: thread(mode === 'identity' ? 'foreign' : 'archived', false), readState: null }),
     'thread/turns/list': () => ({ data: [], nextCursor: 'repeated', backwardsCursor: null }),
   });
   const surface = new CodexSurface({ client: new CodexAppServerClient(transport), autoSelectFirstConversation: false });

@@ -1,6 +1,5 @@
 import { RpcRemoteError } from '@korus-dev/codex-sdk';
 import type { CodexAppServerClient, v2 } from '@korus-dev/codex-sdk';
-import type { ExperimentalFeatureListResponse } from '@korus-dev/codex-sdk/protocol/generated/v2/ExperimentalFeatureListResponse';
 import type {
   CodexSurfaceAuthentication,
   CodexSurfaceChatGptDeviceCodeLogin,
@@ -122,7 +121,7 @@ export class CodexSurfaceConnectionController {
       let cursor: string | null = null;
       const enablement: Record<string, boolean> = {};
       do {
-        const response: ExperimentalFeatureListResponse = await this.client.request('experimentalFeature/list', {
+        const response: v2.ExperimentalFeatureListResponse = await this.client.request('experimentalFeature/list', {
           cursor,
           limit: 100,
           threadId: null,

@@ -1,14 +1,13 @@
 import { promptContentDispatchText } from '../../../src/core/surface';
 import { appendFile, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AcpSession } from '../../../src/providers/antigravity/session';
 import { AntigravityHost } from '../../../src/providers/antigravity/host';
 
-import type { Agent } from '@korus-dev/multi-agent-sdk/contracts';
-import type { HarnessEvent } from '@korus-dev/multi-agent-sdk/driver';
+import type { Agent } from '../../../src/contracts/index';
+import type { NativeHarnessEvent as HarnessEvent } from '../../../src/index';
 
 
 
@@ -18,10 +17,8 @@ import type { HarnessEvent } from '@korus-dev/multi-agent-sdk/driver';
 import { sessionMcpServer as nativeSessionMcpServer } from '../../../src/acp/mcp-bridge';
 const product = { name: 'CPA workbench', mcpServerName: 'accounting' };
 const sessionMcpServer = (url: string) => nativeSessionMcpServer(url, product.mcpServerName);
-import type { ExecutionObservation, UsageCost } from '@korus-dev/multi-agent-sdk/contracts/usage';
 
 
-import usageFixture from './fixtures/usage-capability.json';
 import authorshipFixture from './fixtures/authorship-capability.json';
 
 
@@ -30,8 +27,8 @@ import authorshipFixture from './fixtures/authorship-capability.json';
 let root: string;
 const sessions: AcpSession[] = [];
 const fixtureRuntime = () => ({ command: path.join(root, 'runtime'), harness: path.join(root, 'harness'), args: [] });
-vi.mock('@korus-dev/multi-agent-sdk/runtime', async importOriginal => ({
-  ...await importOriginal<typeof import('@korus-dev/multi-agent-sdk/runtime')>(),
+vi.mock('../../../src/runtime/discovery', async importOriginal => ({
+  ...await importOriginal<typeof import('../../../src/runtime/discovery')>(),
   withDiscoveredRuntimePath: () => ({ ...process.env }),
 }));
 beforeEach(async () => {
@@ -156,7 +153,7 @@ afterEach(async () => {
 });
 async function open(sessionId?: string, options: Partial<Parameters<typeof AcpSession.open>[0]> = {}) {
   const changed = vi.fn();
-  const session = await AcpSession.open({ runtimeOptions: { runtime: fixtureRuntime() }, agentId: 'agent', cwd: root, home: path.join(root, 'home'), mcpServers: [], sessionId, changed, client: { name: 'cpa-workbench', trustedMcpServerName: product.mcpServerName, metadataDirectory: 'korus-sessions' }, ...options });
+  const session = await AcpSession.open({ runtimeOptions: { runtime: fixtureRuntime() }, agentId: 'agent', cwd: root, home: path.join(root, 'home'), mcpServers: [], sessionId, changed, client: { trustedMcpServerName: product.mcpServerName, metadataDirectory: 'korus-sessions' }, ...options });
   sessions.push(session);
   return { session, changed };
 }
@@ -175,7 +172,7 @@ describe('Antigravity native session', () => {
       "started",
       "completed",
     ]);
-    expect(usage.mock.calls[1][0]).toMatchObject({
+    expect(usage.mock.calls[1]![0]).toMatchObject({
       provider: "antigravity",
       agentId: "agent",
       tokens: null,
@@ -386,7 +383,7 @@ describe('Antigravity native session', () => {
     const file = path.join(root, 'notes.txt');
     await writeFile(file, 'Synthetic context');
     const host = new AntigravityHost({ resolveRuntime: fixtureRuntime, formatPrompt: (prompt, content) => promptContentDispatchText(content ?? [], prompt) + '\n\n<context>Caller-owned instructions</context>', home: () => path.join(root, 'home'), stateDirectory: () => path.join(root, 'app'), client: { name: 'cpa-workbench', metadataDirectory: 'korus-sessions', trustedMcpServerName: product.mcpServerName } });
-    const agent: Agent = { id: 'attachments', name: 'Attachments', folder: root, backend: 'antigravity', createdAt: '', updatedAt: '', status: { type: 'idle' } };
+    const agent: Agent = { id: 'attachments', name: 'Attachments', folder: root, backend: 'antigravity' };
     const events: HarnessEvent[] = [];
     const content = [{ type: 'mention' as const, kind: 'file' as const, id: file, value: file, label: 'Read my notes' }];
     host.onEvent(event => events.push(event));
@@ -409,7 +406,7 @@ describe('Antigravity native session', () => {
 
   it('opens a conversation whose prompt journal ends in a torn line, keeping the intact entries', async () => {
     const host = new AntigravityHost({ resolveRuntime: fixtureRuntime, home: () => path.join(root, 'home'), stateDirectory: () => path.join(root, 'app'), client: { name: 'cpa-workbench', metadataDirectory: 'korus-sessions', trustedMcpServerName: product.mcpServerName } });
-    const agent: Agent = { id: 'torn', name: 'Torn', folder: root, backend: 'antigravity', createdAt: '', updatedAt: '', status: { type: 'idle' } };
+    const agent: Agent = { id: 'torn', name: 'Torn', folder: root, backend: 'antigravity' };
     const events: HarnessEvent[] = [];
     host.onEvent(event => events.push(event));
     try {
@@ -460,7 +457,7 @@ describe('Antigravity native session', () => {
     const host = new AntigravityHost({ resolveRuntime: fixtureRuntime, home: () => path.join(root, 'home'), stateDirectory: () => path.join(root, 'app'), client: { name: 'cpa-workbench', metadataDirectory: 'korus-sessions', trustedMcpServerName: product.mcpServerName } });
     const events: HarnessEvent[] = [];
     host.onEvent(event => events.push(event));
-    const agent: Agent = { id: 'resume', name: 'Resume', folder: root, backend: 'antigravity', createdAt: '', updatedAt: '', status: { type: 'idle' } };
+    const agent: Agent = { id: 'resume', name: 'Resume', folder: root, backend: 'antigravity' };
     try {
       const first = await host.sendPrompt(agent, 'hello');
       agent.backendSession = first.backendSession;
@@ -477,7 +474,7 @@ describe('Antigravity native session', () => {
 
   it('validates folder-scoped history and coordinates model reads with completed or cancelled resume', async () => {
     const host = new AntigravityHost({ resolveRuntime: fixtureRuntime, home: () => path.join(root, 'home'), stateDirectory: () => path.join(root, 'app'), client: { name: 'cpa-workbench', metadataDirectory: 'korus-sessions', trustedMcpServerName: product.mcpServerName } });
-    const agent: Agent = { id: 'history', name: 'History', folder: root, backend: 'antigravity', createdAt: '', updatedAt: '', status: { type: 'idle' } };
+    const agent: Agent = { id: 'history', name: 'History', folder: root, backend: 'antigravity' };
     try {
       const rows = await host.listConversations(agent, { searchTerm: 'file' });
       expect(rows).toEqual([expect.objectContaining({ id: 'stored-session', title: 'Create a file', updatedAt: '', ref: { backend: 'antigravity', sessionId: 'stored-session', folder: root } })]);

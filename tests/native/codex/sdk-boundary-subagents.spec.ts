@@ -1,6 +1,6 @@
 const product = { name: 'CPA workbench' };
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { CodexConversationEvent, SurfaceMessage } from '@korus-dev/multi-agent-sdk/surface';
+import type { CodexConversationEvent, SurfaceMessage } from '../../../src/index';
 import { codexSdkFixture, sdkAgent, sdkSummary } from './sdk-surface-fixture';
 
 const metadata = { seq: 1, origin: 'notification' as const, occurredAt: '2026-09-16T00:00:00Z', conversationId: 'conversation-a', turnId: 'turn' };
@@ -18,7 +18,7 @@ describe(`Codex SDK → ${product.name} subagent ownership`, () => {
   afterEach(async () => { await Promise.all(fixtures.splice(0).map(({ driver }) => driver.close())); });
 
   it('projects child identity and completion only to its root owner', async () => {
-    const { driver, adapter, conversation, surface, events, emit } = setup();
+    const { driver, conversation, surface, events, emit } = setup();
     surface.readConversationSummary.mockResolvedValue(sdkSummary('child', { parentConversationId: 'conversation-a', agentNickname: 'Scout', agentRole: 'reviewer' }));
     await driver.loadConversation(sdkAgent());
     await driver.loadConversation(sdkAgent('agent-b', 'conversation-b'));

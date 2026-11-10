@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { CodexSurfaceModel, CodexSurfaceSnapshot } from '@korus-dev/multi-agent-sdk/surface';
-import type { CodexAppServerClient, v2 } from '@korus-dev/codex-sdk/protocol';
+import type { CodexSurfaceModel, CodexSurfaceSnapshot } from '../../src/index';
+import type { CodexAppServerClient, v2 } from '@korus-dev/codex-sdk';
 import { initialAuthentication } from '../../src/providers/codex/codex-surface-authentication';
 import { initialSurfaceSnapshot } from '../../src/providers/codex/codex-surface-runtime';
 import { CodexSurfaceTextGenerationController } from '../../src/providers/codex/codex-surface-text-generation-controller';

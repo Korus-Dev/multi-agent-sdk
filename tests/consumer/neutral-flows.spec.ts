@@ -16,7 +16,7 @@ it('Codex: CPA consumer observes native messages and completion through neutral 
     'thread/start': () => resumeResponse(thread('tax-session', false)),
     'thread/name/set': () => ({}),
     'thread/settings/update': () => ({}),
-    'turn/start': () => ({ turn: turn('tax-turn', 'completed', [{ type: 'agentMessage', id: 'answer', text: 'Ledger verified.', phase: 'final_answer' }]) }),
+    'turn/start': () => ({ turn: turn('tax-turn', 'completed', [{ type: 'agentMessage', id: 'answer', text: 'Ledger verified.', phase: 'final_answer', memoryCitation: null, delivery: null, questions: null }]) }),
   });
   const driver = createHarnessDriver('codex', { client: { name: 'cpa' }, codex: { surface: { client: new CodexAppServerClient(transport) } } });
   const input = { id: 'tax', folder: '/accounting' }; const original = structuredClone(input);
@@ -24,7 +24,7 @@ it('Codex: CPA consumer observes native messages and completion through neutral 
   try {
     const admission = await driver.sendPrompt(session, 'Reconcile ledger');
     expect(admission).toMatchObject({ session, turnId: 'tax-turn' });
-    transport.emitNotification('item/completed', { threadId: 'tax-session', turnId: 'tax-turn', item: { type: 'agentMessage', id: 'answer', text: 'Ledger verified.', phase: 'final_answer' } });
+    transport.emitNotification('item/completed', { completedAtMs: 1, threadId: 'tax-session', turnId: 'tax-turn', item: { type: 'agentMessage', id: 'answer', text: 'Ledger verified.', phase: 'final_answer', memoryCitation: null, delivery: null, questions: null } });
     transport.emitNotification('turn/completed', { threadId: 'tax-session', turn: turn('tax-turn', 'completed', []) });
     await expect.poll(() => text(driver, session)).toContain('Ledger verified.');
     expect(driver.readSession(session).busy).toBe(false);

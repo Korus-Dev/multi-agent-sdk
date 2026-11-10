@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from 'node:util';
 import { afterEach, beforeEach, expect } from 'vitest';
-import { createCodexSurfaceStateMirror, type CodexSurfaceStateMirror } from '@korus-dev/multi-agent-sdk/surface-bridge';
+import { createCodexSurfaceStateMirror, type CodexSurfaceStateMirror } from '../../../src/core/surface-bridge';
 
 // Every surface in the suite doubles as a state-patch consistency check:
 // after each state change, a mirror built only from the emitted patches must

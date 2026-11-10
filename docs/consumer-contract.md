@@ -1,6 +1,6 @@
 # Harness consumer contract
 
-Import `createHarnessDriver` from `@korus-dev/multi-agent-sdk` and types from `@korus-dev/multi-agent-sdk/consumer-types`. The root is the generic Node harness interface. It contains no bridge, UI runtime or Computer Use API.
+Import `createHarnessDriver` from `@korus-dev/multi-agent-sdk` and public types from the same package root. The root is the generic Node harness interface. It contains no bridge, UI runtime or Computer Use API.
 
 ```ts
 import { createHarnessDriver } from '@korus-dev/multi-agent-sdk';
@@ -53,23 +53,14 @@ Each provider's existing replica owns transcript changes. The facade only dispat
 
 | Import | Contract |
 | --- | --- |
-| `@korus-dev/multi-agent-sdk` | Neutral factory, driver and types |
-| `@korus-dev/multi-agent-sdk/consumer-types` | Types only; no provider initialization |
-| `@korus-dev/multi-agent-sdk/ui-types` | Neutral serializable presentation DTOs; types only |
-| `@korus-dev/multi-agent-sdk/prompt` | Pure prompt authoring helpers and types |
-| `@korus-dev/multi-agent-sdk/capabilities` | Pure native capability constants; safe for browser consumers |
-| `@korus-dev/multi-agent-sdk/diagnostics` | Structured diagnostic types only |
-| `@korus-dev/multi-agent-sdk/native` | `createNativeHarnessDriver`, `NativeHarnessOptions`, existing native driver/context/event/contracts |
-| `@korus-dev/multi-agent-sdk/backend` | Compatibility native `createHarnessDriver` |
-| `@korus-dev/multi-agent-sdk/providers/codex` | Explicit Codex surface/runtime adapter |
-| `@korus-dev/multi-agent-sdk/providers/claude` | Claude host, transport and replica |
-| `@korus-dev/multi-agent-sdk/providers/cursor` | Cursor host and replica |
-| `@korus-dev/multi-agent-sdk/providers/antigravity` | Antigravity host and replica |
-| `@korus-dev/multi-agent-sdk/bridge` | Existing native Codex surface, bridge, replica and state APIs |
-| `@korus-dev/multi-agent-sdk/web` | Explicit WebSocket transport |
-| `/core`, `/surface`, `/surface-bridge`, `/conversation-replica`, `/events`, `/codex` | Existing native compatibility entries |
+| `@korus-dev/multi-agent-sdk` | Neutral factory, `TypedEventBus`, and public neutral/UI/native type declarations |
+| `@korus-dev/multi-agent-sdk/prompt.js` | Pure prompt authoring helpers |
+| `@korus-dev/multi-agent-sdk/surface-bridge.js` | Native bridge operations and state subscriptions |
+| `@korus-dev/multi-agent-sdk/native.js` | `createNativeHarnessDriver` and native contracts |
+| `@korus-dev/multi-agent-sdk/codex.js` | Codex surface/runtime adapter |
+| `@korus-dev/multi-agent-sdk/web.js` | Optional WebSocket transport; client/server/protocol modules also available under `/web/` |
 
-Korus native wire consumers should import native driver/context/event types from `/native`, and surface contracts from `/surface`. Contracts, conversation replicas and ACP compatibility entries remain usable. Provider-native APIs use the explicit provider index entries; internal provider modules are not public exports. Native events retain provider prefixes and reducers retain their original wire contracts. The native factory and neutral factory deliberately have different names at `/native` and root.
+Native wire consumers can import `NativeHarnessDriver`, `NativeHarnessContext`, and `NativeHarnessEvent` type-only from the root. Ordinary neutral `HarnessDriver` and `HarnessEvent` remain different contracts. Optional native values use `/native.js` and surface construction uses `/codex.js`. Native events retain provider prefixes and reducers retain their original wire contracts. The native factory is named `createNativeHarnessDriver` to distinguish it from the neutral root factory. Application imports never need build-directory paths.
 
 ## Public name map
 
@@ -102,7 +93,7 @@ Low-level RPC settlement is separate: `CodexSurfaceOptions.onRequestSettled` for
 
 ## Portable contracts and native detail
 
-`Turn`, `TurnError`, `TurnExecutionUsage`, `TokenUsage`, `RequestUsage`, `SafetyFindings` and `JsonValue` are underlying neutral definitions in `contracts/turn.ts`; old Codex surface names re-export them for native compatibility. Internal code uses canonical `Message`, `MessagePart`, `ToolPart`, `ClientApi` and `PromptPart` vocabulary. Deprecated Renderer and Codex prompt aliases remain only for existing imports. `/backend` is a deprecated native compatibility factory; use the neutral root or explicit `/native` factory according to the intended contract. Compatibility leaves remain available while native consumers migrate; there is no automatic removal date.
+`Turn`, `TurnError`, `TurnExecutionUsage`, `TokenUsage`, `RequestUsage`, `SafetyFindings` and `JsonValue` are underlying neutral definitions in `contracts/turn.ts`; old Codex surface names re-export them for native compatibility. Internal code uses canonical `Message`, `MessagePart`, `ToolPart`, `ClientApi` and `PromptPart` vocabulary. Deprecated Renderer and Codex prompt aliases remain only for existing imports. Use the neutral root factory or explicit `/native.js` factory according to the intended contract. Public types are available from the root; optional runtime entries preserve browser/host separation.
 
 Portable consumers must not interpret `Authentication.native`, `SessionStatus.native`, `TurnError.codexErrorInfo`, arbitrary catalog `providerMetadata`, or other provider-specific escape data. Those fields preserve native evidence for integrations that deliberately accept provider coupling. Generic errors use `message` and `additionalDetails`; native details are retained without being reinterpreted. Catalog IDs/model values are selection identities. Display names, descriptions and icons are optional provider-authored metadata, not required portable behavior. Applications supply labels for SDK-default permission IDs.
 

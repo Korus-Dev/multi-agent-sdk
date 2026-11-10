@@ -18,7 +18,7 @@ describe('native conversation presentation', () => {
   });
   it('keeps Cursor native reasoning while presenting text and normalizing pending questions', () => {
     const snapshot = emptyCursorSnapshot('a', 'session');
-    snapshot.messages = [{ id: 'mixed', agentId: 'a', role: 'assistant', createdAt: '', status: 'complete', parts: [{ type: 'reasoning', id: 'r', text: 'Thought' }, { type: 'text', text: 'Answer' }] }, { id: 'reasoning', agentId: 'a', role: 'assistant', createdAt: '', status: 'complete', parts: [{ type: 'reasoning', id: 'r2', text: 'Thought' }] }];
+    snapshot.messages = [{ id: 'mixed', agentId: 'a', role: 'assistant', createdAt: '', status: 'complete', parts: [{ type: 'reasoning', itemId: 'r', summary: 'Thought', summaryIndex: 0 }, { type: 'text', text: 'Answer' }] }, { id: 'reasoning', agentId: 'a', role: 'assistant', createdAt: '', status: 'complete', parts: [{ type: 'reasoning', itemId: 'r2', summary: 'Thought', summaryIndex: 0 }] }];
     snapshot.clientRequests = [{ id: 'ask', kind: 'ask_user', payload: { request: { itemId: 'tool', questions: [] } } }];
     const original = structuredClone(snapshot);
     const presentation = projectCursorConversation(snapshot)!;

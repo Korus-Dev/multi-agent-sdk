@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CodexAppServerClient, type ServerRequest } from '@korus-dev/codex-sdk/protocol';
-import type { CodexSurfaceSnapshot } from '@korus-dev/multi-agent-sdk/surface';
+import { CodexAppServerClient, type ServerRequest } from '@korus-dev/codex-sdk';
+import type { CodexSurfaceSnapshot } from '../../src/index';
 import {
   CodexSurfaceApprovalsController,
   type CodexSurfaceApprovalsHost,

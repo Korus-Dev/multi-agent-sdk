@@ -3,7 +3,7 @@ import path from 'node:path';
 import { homedir, tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
 import { claudeTranscriptGoal, claudeTranscriptSettings, claudeTranscriptToRendererMessages, listClaudeTranscriptSummaries, loadClaudeTranscriptHistory } from '../../../src/providers/claude/transcript-history-adapter';
-import type { Agent } from '@korus-dev/multi-agent-sdk/contracts';
+import type { Agent } from '../../../src/contracts/index';
 
 describe('native Claude goal history', () => {
   it('distinguishes an active goal, native completion, explicit clear, and sidechain records', () => {
@@ -177,7 +177,7 @@ describe('loadClaudeTranscriptHistory', () => {
         { type: 'user', uuid: 'assignment', message: { content: 'Task directions' } },
         { type: 'assistant', uuid: 'answer', message: { content: 'Inherited design decision' } },
       ].map(row => JSON.stringify(row)).join('\n'));
-      const worker: Agent = { id: 'worker', name: 'Worker', folder: '/worker/worktree', backend: 'claude', backendSession: { kind: 'claude', sessionId: 'native-child', transport: 'stdio', transcriptFolder }, status: { type: 'idle' }, createdAt: '', updatedAt: '' };
+      const worker: Agent = { id: 'worker', name: 'Worker', folder: '/worker/worktree', backend: 'claude', backendSession: { kind: 'claude', sessionId: 'native-child', transport: 'stdio', transcriptFolder } };
       const history = await loadClaudeTranscriptHistory(worker, { projectsRoot });
       expect(history?.messages).toContainEqual(expect.objectContaining({ agentId: 'worker', role: 'assistant', parts: [{ type: 'text', text: 'Inherited design decision' }] }));
       expect(history?.backendSession).toMatchObject({ transcriptFolder });
@@ -209,9 +209,6 @@ describe('loadClaudeTranscriptHistory', () => {
       folder,
       backend: 'claude',
       backendSession: { kind: 'claude', sessionId: 'session-1', transport: 'stdio' },
-      status: { type: 'idle' },
-      createdAt: '2026-06-06T00:00:00.000Z',
-      updatedAt: '2026-06-06T00:00:00.000Z',
     };
 
     const history = await loadClaudeTranscriptHistory(agent, { projectsRoot });
@@ -289,9 +286,6 @@ describe('listClaudeTranscriptSummaries', () => {
       name: 'Claude',
       folder: '/Users/nbonamy/src/id8',
       backend: 'claude',
-      status: { type: 'idle' },
-      createdAt: '2026-06-06T00:00:00.000Z',
-      updatedAt: '2026-06-06T00:00:00.000Z',
     };
 
     await expect(listClaudeTranscriptSummaries(agent, { projectsRoot })).resolves.toStrictEqual([

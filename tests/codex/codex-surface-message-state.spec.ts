@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { v2 } from '@korus-dev/codex-sdk/protocol';
+import type { v2 } from '@korus-dev/codex-sdk';
 import type {
   SurfaceMessage,
   SurfaceMessageMediaPart,
   SurfaceMessageToolPart,
-} from '@korus-dev/multi-agent-sdk/surface';
+} from '../../src/index';
 import {
   activeTurnId,
   addUnique,

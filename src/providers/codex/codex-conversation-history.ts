@@ -1,7 +1,5 @@
+import type { v2 } from '@korus-dev/codex-sdk';
 import { normalizePromptContent, promptContentText } from '../../core/surface';
-import type { Thread } from '@korus-dev/codex-sdk/protocol/generated/v2/Thread';
-import type { ThreadItem } from '@korus-dev/codex-sdk/protocol/generated/v2/ThreadItem';
-import type { Turn } from '@korus-dev/codex-sdk/protocol/generated/v2/Turn';
 import { basename, extname, isAbsolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { fileAttachmentReference } from './codex-file-attachment';
@@ -30,7 +28,7 @@ const supportedGeneratedImageMimeTypes = new Set([
   'image/webp',
 ]);
 
-export function codexThreadToSurfaceMessages(thread: Thread): SurfaceMessage[] {
+export function codexThreadToSurfaceMessages(thread: v2.Thread): SurfaceMessage[] {
   const turns = Array.isArray(thread.turns) ? thread.turns : [];
   return turns.flatMap((turn) => codexTurnToSurfaceMessages(thread.id, turn));
 }
@@ -85,7 +83,7 @@ export function preserveHistoricalMessagePresentation(previous: readonly Surface
   });
 }
 
-export function codexTurnToSurfaceMessages(threadId: string, turn: Turn): SurfaceMessage[] {
+export function codexTurnToSurfaceMessages(threadId: string, turn: v2.Turn): SurfaceMessage[] {
   const messages: SurfaceMessage[] = [];
   const assistantParts: SurfaceMessagePart[] = [];
   const createdAt = timestampToIso(turn.startedAt ?? turn.completedAt);
@@ -245,8 +243,8 @@ export function codexTurnToSurfaceMessages(threadId: string, turn: Turn): Surfac
 
 export function codexItemToSurfaceMessage(
   threadId: string,
-  turn: Pick<Turn, 'id' | 'status' | 'startedAt'>,
-  item: ThreadItem,
+  turn: Pick<v2.Turn, 'id' | 'status' | 'startedAt'>,
+  item: v2.ThreadItem,
 ): SurfaceMessage | null {
   const createdAt = timestampToIso(turn.startedAt);
   if (item.type === 'userMessage') {
@@ -340,7 +338,7 @@ export function codexItemToSurfaceMessage(
 export function codexItemToQuestionPart(
   threadId: string,
   turnId: string,
-  item: Extract<ThreadItem, { type: 'agentMessage' }>,
+  item: Extract<v2.ThreadItem, { type: 'agentMessage' }>,
   historical = false,
 ): SurfaceMessageQuestionPart | null {
   if (item.delivery !== 'async') return null;
@@ -383,7 +381,7 @@ export function codexItemToQuestionPart(
   return { type: 'question', request, ...(historical ? { historical: true } : {}) };
 }
 
-export function codexItemToMediaPart(item: ThreadItem): SurfaceMessageMediaPart | null {
+export function codexItemToMediaPart(item: v2.ThreadItem): SurfaceMessageMediaPart | null {
   if (item.type !== 'imageGeneration') return null;
   const toolPart = codexThreadItemToToolPart(item);
   if (toolPart?.status !== 'completed') return null;
@@ -415,7 +413,7 @@ export function codexItemToMediaPart(item: ThreadItem): SurfaceMessageMediaPart 
 }
 
 /** Tool result images are media, independently of the small text/JSON tool-output budget. */
-export function codexItemToMediaParts(item: ThreadItem): SurfaceMessageMediaPart[] {
+export function codexItemToMediaParts(item: v2.ThreadItem): SurfaceMessageMediaPart[] {
   if (item.type === 'imageView') {
     if (typeof item.path !== 'string') return [];
     const mimeType = mimeTypeForSource(item.path);
@@ -464,7 +462,7 @@ export function codexItemToMediaParts(item: ThreadItem): SurfaceMessageMediaPart
   return parts;
 }
 
-function userMessageParts(item: Extract<ThreadItem, { type: 'userMessage' }>): SurfaceMessagePart[] {
+function userMessageParts(item: Extract<v2.ThreadItem, { type: 'userMessage' }>): SurfaceMessagePart[] {
   const content = Array.isArray(item.content) ? item.content : [];
   const hasTextInput = content.some((input) => (
     isRecord(input) && input.type === 'text' && typeof input.text === 'string' && input.text.length > 0
@@ -519,7 +517,7 @@ function userInputText(input: unknown): string {
 }
 
 function asyncQuestionRequestIdsForUserMessage(
-  item: Extract<ThreadItem, { type: 'userMessage' }>,
+  item: Extract<v2.ThreadItem, { type: 'userMessage' }>,
 ): string[] {
   const ids = new Set<string>();
   for (const input of Array.isArray(item.content) ? item.content : []) {
@@ -529,7 +527,7 @@ function asyncQuestionRequestIdsForUserMessage(
   return [...ids];
 }
 
-function asyncQuestionAnswersForUserMessage(item: Extract<ThreadItem, { type: 'userMessage' }>): Record<string, { answers: string[] }> {
+function asyncQuestionAnswersForUserMessage(item: Extract<v2.ThreadItem, { type: 'userMessage' }>): Record<string, { answers: string[] }> {
   const answers: Record<string, { answers: string[] }> = {};
   for (const input of Array.isArray(item.content) ? item.content : []) {
     if (!isRecord(input) || input.type !== 'text' || typeof input.text !== 'string') continue;
@@ -693,7 +691,7 @@ function startsWithBytes(bytes: Uint8Array, prefix: readonly number[]): boolean 
   return prefix.every((value, index) => bytes[index] === value);
 }
 
-function surfaceMessageStatus(status: Turn['status']): SurfaceMessage['status'] {
+function surfaceMessageStatus(status: v2.Turn['status']): SurfaceMessage['status'] {
   if (status === 'inProgress') return 'streaming';
   if (status === 'failed') return 'error';
   return 'complete';

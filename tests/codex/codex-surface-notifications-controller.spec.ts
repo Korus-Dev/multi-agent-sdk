@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CodexSurfaceModel, CodexSurfaceSnapshot } from '@korus-dev/multi-agent-sdk/surface';
+import type { CodexSurfaceModel, CodexSurfaceSnapshot } from '../../src/index';
 import { initialAuthentication } from '../../src/providers/codex/codex-surface-authentication';
 import { CodexSurfaceNotificationsController } from '../../src/providers/codex/codex-surface-notifications-controller';
 import {

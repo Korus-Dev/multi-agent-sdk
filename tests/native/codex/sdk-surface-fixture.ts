@@ -1,8 +1,8 @@
 import { vi } from 'vitest';
-import type { Agent } from '@korus-dev/multi-agent-sdk/contracts';
-import type { HarnessEvent } from '@korus-dev/multi-agent-sdk/driver';
-import type { CodexConversation, CodexSurface } from '@korus-dev/multi-agent-sdk/codex';
-import type { CodexConversationEvent, CodexConversationSnapshot, CodexConversationSummary, CodexSurfaceEvent } from '@korus-dev/multi-agent-sdk/surface';
+import type { Agent } from '../../../src/contracts/index';
+import type { NativeHarnessEvent as HarnessEvent } from '../../../src/index';
+import type { CodexConversation, CodexSurface } from '../../../src/providers/codex';
+import type { CodexConversationEvent, CodexConversationSnapshot, CodexConversationSummary, CodexSurfaceEvent } from '../../../src/index';
 import { CodexBackendDriver } from '../../../src/providers/codex/driver';
 import { CodexSurfaceAgentAdapter, type CodexHostOptions } from '../../../src/providers/codex/host';
 
@@ -24,9 +24,8 @@ export function sdkSnapshot(id = 'conversation-a', overrides: Partial<CodexConve
 
 export function sdkAgent(id = 'agent-a', conversationId = 'conversation-a'): Agent {
   return {
-    id, name: id, avatar: 'A', folder: '/repo', backend: 'codex',
+    id, name: id, folder: '/repo', backend: 'codex',
     backendSession: { kind: 'codex', threadId: conversationId },
-    status: { type: 'idle' }, createdAt: '2026-09-16T00:00:00Z', updatedAt: '2026-09-16T00:00:00Z',
   };
 }
 

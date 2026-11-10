@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { v2 } from '@korus-dev/codex-sdk/protocol';
-import type { CodexSurfaceModel, CodexSurfaceSnapshot } from '@korus-dev/multi-agent-sdk/surface';
+import type { v2 } from '@korus-dev/codex-sdk';
+import type { CodexSurfaceModel, CodexSurfaceSnapshot } from '../../src/index';
 import {
   approvalPresetFromSettings,
   approvalPresetsForProfiles,

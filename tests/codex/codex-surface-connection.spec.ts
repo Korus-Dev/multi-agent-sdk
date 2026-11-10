@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CodexAppServerClient, type CodexRequestSettledInfo, type v2 } from '@korus-dev/codex-sdk/protocol';
+import { CodexAppServerClient, type CodexRequestSettledInfo, type v2 } from '@korus-dev/codex-sdk';
 import { CodexSurface } from '../../src/providers/codex';
 import type { HarnessDiagnostic } from '../../src/diagnostics';
-import type { CodexSurfaceEvent } from '@korus-dev/multi-agent-sdk/surface';
+import type { CodexSurfaceEvent } from '../../src/index';
 import { configRequirements, MockCodexAppServer, createSurface, deferred, lastRequest, pluginSummary, requestsFor, resumeResponse, thread, turn } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface', () => {
@@ -67,7 +67,7 @@ describe('CodexSurface', () => {
         threadId: 'thread-existing', stageMs: expect.any(Number), elapsedMs: expect.any(Number),
       });
       expect(settled).toContainEqual(expect.objectContaining({
-        id: lastRequest(transport, 'thread/resume').id,
+        id: (lastRequest(transport, 'thread/resume') as import('@korus-dev/codex-sdk').RpcRequest).id,
         method: 'thread/resume', outcome: 'ok', startedAt: expect.any(Number), durationMs: expect.any(Number),
       }));
       for (const record of settled) {

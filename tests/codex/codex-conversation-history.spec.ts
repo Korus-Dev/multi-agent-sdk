@@ -8,8 +8,8 @@ import {
   codexTurnToSurfaceMessages,
   preserveHistoricalAttachmentPreviews,
 } from '../../src/providers/codex/codex-conversation-history';
-import type { v2 } from '@korus-dev/codex-sdk/protocol';
-import type { SurfaceMessage } from '@korus-dev/multi-agent-sdk/surface';
+import type { v2 } from '@korus-dev/codex-sdk';
+import type { SurfaceMessage } from '../../src/index';
 
 const pngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 

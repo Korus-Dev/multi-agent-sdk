@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { adaptHarnessDriver } from '../../src/consumer';
-import type { HarnessDriver as NativeDriver, HarnessEvent } from '../../src/driver';
+import type { HarnessDriver as NativeDriver } from '../../src/driver';
 
 it('exposes new-chat references and restoration data without owning serialization or storage', async () => {
   const native = {
@@ -9,7 +9,7 @@ it('exposes new-chat references and restoration data without owning serializatio
     sendPrompt: vi.fn(async () => ({ backendSession: { kind: 'codex', threadId: 'created-chat' }, turnId: 'turn' })),
     resumeConversation: vi.fn(async () => ({ backendSession: { kind: 'codex', threadId: 'created-chat' } })),
     readConversationMessages: vi.fn(async () => []),
-  } as unknown as NativeDriver;
+  } as unknown as NativeDriver<import('../../src/context').HarnessContext, import('../../src/driver').HarnessEvent>;
   const driver = adaptHarnessDriver('codex', native);
   const session = driver.open({ id: 'chat', folder: '/workspace', defaults: { model: 'chosen' } });
   try {

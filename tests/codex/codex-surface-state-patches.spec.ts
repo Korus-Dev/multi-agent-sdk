@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CodexSurfaceStatePatch } from '@korus-dev/multi-agent-sdk/surface';
-import { CodexAppServerClient, type v2 } from '@korus-dev/codex-sdk/protocol';
+import type { CodexSurfaceStatePatch } from '../../src/index';
+import { CodexAppServerClient, type v2 } from '@korus-dev/codex-sdk';
 import { CodexSurface } from '../../src/providers/codex';
 import { MockCodexAppServer, pluginSummary, resumeResponse, thread } from './helpers/codex-surface-fixture';
 

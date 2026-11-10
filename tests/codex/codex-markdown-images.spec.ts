@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { CodexAppServerClient } from '@korus-dev/codex-sdk/protocol';
+import { CodexAppServerClient } from '@korus-dev/codex-sdk';
 import { CodexMarkdownImageHydrator, localImagePath } from '../../src/providers/codex/codex-markdown-images';
 import { MockCodexAppServer, generatedPngBase64 } from './helpers/codex-surface-fixture';
 

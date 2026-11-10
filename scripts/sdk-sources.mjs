@@ -41,23 +41,33 @@ export function sdkSources(projectRoot, environment = process.env, requested) {
   const aliases = [], paths = {}, typePaths = {};
   for (const [name, directory] of selected) {
     const metadata = readJson(path.join(directory, 'package.json'));
-    for (const [entry, definition] of Object.entries(metadata.exports ?? {})) {
-      const target = typeof definition === 'string' ? definition : definition.import ?? definition.types;
+    const entries = [{ specifier: name, target: metadata.main, types: metadata.types }];
+    // Optional entries are static published forwarding files, independent of export maps.
+    const publicFiles = (metadata.files ?? []).flatMap(entry => {
+      if (entry.endsWith('.js') && !entry.includes('*')) return [entry];
+      const location = path.join(directory, entry);
+      if (!entry.includes('*') && entry !== 'dist' && fs.existsSync(location) && fs.statSync(location).isDirectory()) {
+        return fs.readdirSync(location, { recursive: true }).filter(file => file.endsWith('.js')).map(file => path.join(entry, file));
+      }
+      return [];
+    });
+    for (const file of publicFiles) {
+      const text = fs.readFileSync(path.join(directory, file), 'utf8');
+      const match = /export \* from ['"]([^'"]+)['"]/.exec(text);
+      if (!match) continue;
+      const target = './' + path.relative(directory, path.resolve(directory, path.dirname(file), match[1]));
+      entries.push({ specifier: name + '/' + file, target, types: './' + file.replace(/\.js$/, '.d.ts') });
+    }
+    for (const { specifier, target, types } of entries) {
       if (!target?.startsWith('./dist/')) continue;
-      const specifier = name + (entry === '.' ? '' : entry.slice(1));
       let source = target.replace(/^\.\/dist\//, 'src/').replace(/\.(d\.ts|js)$/, '');
-      if (name === '@korus-dev/agent-ui-sdk' && entry === './styles.css') source = 'src/vue/styles.css';
-      let replacement = path.resolve(directory, source);
-      if (!source.includes('*') && !source.endsWith('.css')) {
-        if (fs.existsSync(replacement + '.ts')) replacement += '.ts';
-        else if (fs.existsSync(replacement + '.vue')) replacement += '.vue';
-        else throw new Error(`Missing local SDK source for ${specifier}: ${replacement}`);
-      }
-      aliases.push({ find: new RegExp('^' + specifier.split('*').map(escape).join('(.+)') + '$'), replacement: replacement.replace('*', '$1') });
+      if (name === '@korus-dev/agent-ui-sdk' && source === 'src/vue/index') source = 'src/vue/entry';
+      const base = path.resolve(directory, source);
+      const replacement = fs.existsSync(base + '.ts') ? base + '.ts' : fs.existsSync(base + '.vue') ? base + '.vue' : null;
+      if (!replacement) throw new Error(`Missing local SDK source for ${specifier}: ${base}`);
+      aliases.push({ find: new RegExp('^' + escape(specifier) + '$'), replacement });
       paths[specifier] = [replacement];
-      if (typeof definition !== 'string' && definition.types) {
-        typePaths[specifier] = [directory === projectRoot ? replacement : path.resolve(directory, definition.types)];
-      }
+      if (types) typePaths[specifier] = [directory === projectRoot ? replacement : path.resolve(directory, types)];
     }
   }
   aliases.sort((a, b) => b.find.source.length - a.find.source.length);

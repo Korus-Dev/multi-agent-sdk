@@ -2,7 +2,7 @@ import { mkdtemp, writeFile, appendFile, rename, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { expect, it, vi } from 'vitest';
-import { CodexAppServerClient } from '@korus-dev/codex-sdk/protocol';
+import { CodexAppServerClient } from '@korus-dev/codex-sdk';
 import { CodexSurface, CodexOriginalHistoryUsage } from '../../src/providers/codex';
 import { MockCodexAppServer, resumeResponse, thread, turn } from './helpers/codex-surface-fixture';
 

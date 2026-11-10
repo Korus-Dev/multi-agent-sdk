@@ -1,8 +1,8 @@
 import type {
   CodexSurfaceEvent,
   CodexSurfaceSnapshot,
-} from '@korus-dev/multi-agent-sdk/surface';
-import type { CodexSurfaceBridgeTarget } from '@korus-dev/multi-agent-sdk/surface-bridge';
+} from '../../src/index';
+import type { CodexSurfaceBridgeTarget } from '../../src/core/surface-bridge';
 import { vi } from 'vitest';
 import type { CodexWebSocketClose, CodexWebSocketPort } from '../../src/web';
 

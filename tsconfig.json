@@ -26,23 +26,32 @@
     "outDir": "dist",
     "sourceMap": true,
     "paths": {
-      "@korus-dev/multi-agent-sdk/core": [
-        "./src/core/index.ts"
+      "@korus-dev/multi-agent-sdk": [
+        "./src/index.ts"
       ],
-      "@korus-dev/multi-agent-sdk/surface": [
-        "./src/core/surface.ts"
+      "@korus-dev/multi-agent-sdk/prompt.js": [
+        "./src/prompt.ts"
       ],
-      "@korus-dev/multi-agent-sdk/surface-bridge": [
+      "@korus-dev/multi-agent-sdk/native.js": [
+        "./src/native.ts"
+      ],
+      "@korus-dev/multi-agent-sdk/codex.js": [
+        "./src/providers/codex/index.ts"
+      ],
+      "@korus-dev/multi-agent-sdk/surface-bridge.js": [
         "./src/core/surface-bridge.ts"
       ],
-      "@korus-dev/multi-agent-sdk/events": [
-        "./src/core/typed-event-bus.ts"
+      "@korus-dev/multi-agent-sdk/web.js": [
+        "./src/web/index.ts"
       ],
-      "@korus-dev/multi-agent-sdk/contracts/*": [
-        "./src/contracts/*"
+      "@korus-dev/multi-agent-sdk/web/client.js": [
+        "./src/web/client.ts"
       ],
-      "@korus-dev/multi-agent-sdk/conversations/*": [
-        "./src/conversations/*"
+      "@korus-dev/multi-agent-sdk/web/server.js": [
+        "./src/web/server.ts"
+      ],
+      "@korus-dev/multi-agent-sdk/web/protocol.js": [
+        "./src/web/protocol.ts"
       ]
     }
   },

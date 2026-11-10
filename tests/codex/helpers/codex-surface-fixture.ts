@@ -1,5 +1,5 @@
-import type { RpcMessage, v2 } from '@korus-dev/codex-sdk/protocol';
-import { CodexAppServerClient } from '@korus-dev/codex-sdk/protocol';
+import type { RpcMessage, v2 } from '@korus-dev/codex-sdk';
+import { CodexAppServerClient } from '@korus-dev/codex-sdk';
 import { CodexSurface } from '../../../src/providers/codex';
 import {
   MockCodexAppServer as StrictMockCodexAppServer,

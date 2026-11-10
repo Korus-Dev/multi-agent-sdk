@@ -1,4 +1,4 @@
-import type { ResponseItem } from '@korus-dev/codex-sdk/protocol/generated/ResponseItem';
+import type { ResponseItem } from '@korus-dev/codex-sdk';
 import type { SurfaceMessageToolPart, SurfaceMessageToolPartUpdate } from '../../core/surface';
 import { codexThreadItemToToolPart, rawOutputToToolPartUpdate } from './codex-tool-part-adapter';
 

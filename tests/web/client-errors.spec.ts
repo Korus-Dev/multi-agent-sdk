@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { CodexSurfaceSnapshot } from '@korus-dev/multi-agent-sdk/surface';
+import type { CodexSurfaceSnapshot } from '../../src/index';
 import {
   CodexWebSocketTransportError,
   createCodexWebSurfaceClient,

@@ -1,3 +1,4 @@
+import type { v2 } from '@korus-dev/codex-sdk';
 import type {
   CodexSurfaceApproval,
   CodexSurfaceAuthentication,
@@ -9,7 +10,6 @@ import type {
   CodexSurfaceTurn,
   SurfaceMessage,
 } from '../../core/surface';
-import type { ThreadHistoryMode } from '@korus-dev/codex-sdk/protocol/generated/v2/ThreadHistoryMode';
 
 export type ThreadRuntimeState = {
   threadId: string;
@@ -38,7 +38,7 @@ export type ThreadRuntimeState = {
   busy: boolean;
   turnStartPending: boolean;
   historyLoading: boolean;
-  historyMode: ThreadHistoryMode;
+  historyMode: v2.ThreadHistoryMode;
   loadingStrategy: CodexConversationLoadingStrategy;
   historyItemsView: 'full' | 'summary';
   historyCursor: string | null;

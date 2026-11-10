@@ -3,8 +3,8 @@ import {
   invokeCodexConversationBridgeOperation,
   subscribeCodexConversationBridge,
   type CodexConversationBridgeNotification,
-} from '@korus-dev/multi-agent-sdk/surface-bridge';
-import { CodexAppServerClient, type v2 } from '@korus-dev/codex-sdk/protocol';
+} from '../../src/core/surface-bridge';
+import { CodexAppServerClient, type v2 } from '@korus-dev/codex-sdk';
 import { CodexSurface, createCodexSurface } from '../../src/providers/codex';
 import {
   createSurface,

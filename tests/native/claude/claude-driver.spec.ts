@@ -1,12 +1,11 @@
-const product = { name: 'CPA workbench', mcpServerName: 'accounting' };
 import { describe, expect, it, vi } from 'vitest';
 import { homedir } from 'node:os';
 import { ClaudeConversationHost as ClaudeBackendDriver } from '../../../src/providers/claude/host';
 import type { ClaudeSdkMessage } from '../../../src/providers/claude/protocol';
 import type { ClaudeTurnHandle, ClaudeTurnParams, ClaudeTurnTransport } from '../../../src/providers/claude/transport';
-import type { Agent } from '@korus-dev/multi-agent-sdk/contracts';
-import type { HarnessEvent } from '@korus-dev/multi-agent-sdk/driver';
-import { createClaudeConversationReplica, type ClaudeConversationReplica } from '@korus-dev/multi-agent-sdk/conversations/claude-conversation-replica';
+import type { Agent } from '../../../src/contracts/index';
+import type { NativeHarnessEvent as HarnessEvent } from '../../../src/index';
+import { createClaudeConversationReplica, type ClaudeConversationReplica } from '../../../src/conversations/claude-conversation-replica';
 import { claudeTranscriptToRendererMessages } from '../../../src/providers/claude/transcript-history-adapter';
 
 const agent: Agent = {
@@ -15,9 +14,6 @@ const agent: Agent = {
   folder: '/Users/nbonamy/src/agent-workspace',
   backend: 'claude',
   backendDefaults: { kind: 'claude' },
-  status: { type: 'idle' },
-  createdAt: '2026-06-05T00:00:00.000Z',
-  updatedAt: '2026-06-05T00:00:00.000Z',
 };
 
 function unwrapClaudeConversationEvent(event: HarnessEvent) {
@@ -142,7 +138,7 @@ describe('ClaudeBackendDriver', () => {
   it('loads models and starts a folderless Quick Chat', async () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);
-    const quickChat: Agent = { ...agent, folder: null, sessionKind: 'quickChat' };
+    const quickChat: Agent = { ...agent, folder: null };
     const models = await driver.listModels(quickChat);
     expect(models.length).toBeGreaterThan(0);
     expect(transport.discoverModels).toHaveBeenCalledWith({ cwd: homedir() });
@@ -500,15 +496,6 @@ describe('ClaudeBackendDriver', () => {
     expect(transport.closeSession).toHaveBeenLastCalledWith('claude-session-second');
   });
 
-  it(`preserves Claude transcripts when a ${product.name} agent retires its conversation`, async () => {
-    const transport = createFakeTransport();
-    const driver = new ClaudeBackendDriver(transport);
-
-    expect(transport.closeSession).not.toHaveBeenCalled();
-  });
-
-
-
   it('normalizes startup failures and an early clean exit before Claude reports a session', async () => {
     const missingTransport = createFakeTransport();
     const missingDriver = new ClaudeBackendDriver(missingTransport);
@@ -551,7 +538,7 @@ describe('ClaudeBackendDriver', () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);
     const chat = {
-      id: 'agent-chat', name: null, folder: null, sessionKind: 'quickChat', backend: 'claude',
+      id: 'agent-chat', name: null, folder: null, backend: 'claude',
       backendSession: { kind: 'claude', sessionId: 'session-chat', transport: 'stdio' },
       status: { type: 'idle' }, createdAt: 'now', updatedAt: 'now',
     } as unknown as Agent;

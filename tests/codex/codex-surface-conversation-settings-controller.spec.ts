@@ -3,7 +3,7 @@ import type {
   CodexConversationSummary,
   CodexSurfaceModel,
   CodexSurfaceSnapshot,
-} from '@korus-dev/multi-agent-sdk/surface';
+} from '../../src/index';
 import {
   CodexSurfaceConversationSettingsController,
   type CodexSurfaceConversationSettingsHost,
