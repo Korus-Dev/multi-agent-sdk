@@ -1,4 +1,4 @@
-import type { ServerNotification } from 'codex-sdk';
+import type { ServerNotification } from '@korus-dev/codex-sdk';
 import type {
   CodexConversationSummary,
   CodexSurfaceEvent,

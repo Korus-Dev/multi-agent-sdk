@@ -3,7 +3,7 @@ import {
   codexSchemaCliVersion,
   type CodexAppServerMethodMap,
   type CodexServerRequestMethodMap,
-} from '../../../codex-sdk/src/protocol';
+} from '@korus-dev/codex-sdk/protocol';
 
 describe('generated Codex app-server schema', () => {
   it('records the Codex CLI version used to generate bindings', () => {

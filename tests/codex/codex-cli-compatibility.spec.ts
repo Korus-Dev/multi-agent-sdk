@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createCodexConversationReplica } from 'multi-agents-sdk/core';
-import { CodexAppServerClient, type v2 } from '../../../codex-sdk/src/protocol';
+import { createCodexConversationReplica } from '@korus-dev/multi-agent-sdk/core';
+import { CodexAppServerClient, type v2 } from '@korus-dev/codex-sdk/protocol';
 import { CodexSurface } from '../../src/providers/codex';
 import { MockCodexAppServer, lastRequest } from './helpers/codex-surface-fixture';
 

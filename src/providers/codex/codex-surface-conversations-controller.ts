@@ -1,6 +1,6 @@
 import { suppressViewedImagePreviews } from './codex-original-history-images';
 import type { CodexOriginalHistoryImages } from './codex-original-history-images';
-import type { CodexAppServerClient, v2 } from 'codex-sdk';
+import type { CodexAppServerClient, v2 } from '@korus-dev/codex-sdk';
 import type {
   CodexConversationSummary,
   CodexSurfaceSnapshot,

@@ -4,9 +4,9 @@ import { homedir } from 'node:os';
 import { ClaudeConversationHost as ClaudeBackendDriver } from '../../../src/providers/claude/host';
 import type { ClaudeSdkMessage } from '../../../src/providers/claude/protocol';
 import type { ClaudeTurnHandle, ClaudeTurnParams, ClaudeTurnTransport } from '../../../src/providers/claude/transport';
-import type { Agent } from 'multi-agents-sdk/contracts';
-import type { HarnessEvent } from 'multi-agents-sdk/driver';
-import { createClaudeConversationReplica, type ClaudeConversationReplica } from 'multi-agents-sdk/conversations/claude-conversation-replica';
+import type { Agent } from '@korus-dev/multi-agent-sdk/contracts';
+import type { HarnessEvent } from '@korus-dev/multi-agent-sdk/driver';
+import { createClaudeConversationReplica, type ClaudeConversationReplica } from '@korus-dev/multi-agent-sdk/conversations/claude-conversation-replica';
 import { claudeTranscriptToRendererMessages } from '../../../src/providers/claude/transcript-history-adapter';
 
 const agent: Agent = {

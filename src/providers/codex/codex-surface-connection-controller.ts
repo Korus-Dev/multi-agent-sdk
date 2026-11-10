@@ -1,6 +1,6 @@
-import { RpcRemoteError } from 'codex-sdk';
-import type { CodexAppServerClient, v2 } from 'codex-sdk';
-import type { ExperimentalFeatureListResponse } from 'codex-sdk/protocol/generated/v2/ExperimentalFeatureListResponse';
+import { RpcRemoteError } from '@korus-dev/codex-sdk';
+import type { CodexAppServerClient, v2 } from '@korus-dev/codex-sdk';
+import type { ExperimentalFeatureListResponse } from '@korus-dev/codex-sdk/protocol/generated/v2/ExperimentalFeatureListResponse';
 import type {
   CodexSurfaceAuthentication,
   CodexSurfaceChatGptDeviceCodeLogin,

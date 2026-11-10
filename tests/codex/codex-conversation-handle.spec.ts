@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CodexConversationSnapshot } from 'multi-agents-sdk/surface';
+import type { CodexConversationSnapshot } from '@korus-dev/multi-agent-sdk/surface';
 import {
   createCodexConversationHandle,
   type CodexConversationHandleOperations,

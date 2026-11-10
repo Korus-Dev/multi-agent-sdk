@@ -3,7 +3,7 @@ import path from 'node:path';
 import { homedir, tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
 import { claudeTranscriptGoal, claudeTranscriptSettings, claudeTranscriptToRendererMessages, listClaudeTranscriptSummaries, loadClaudeTranscriptHistory } from '../../../src/providers/claude/transcript-history-adapter';
-import type { Agent } from 'multi-agents-sdk/contracts';
+import type { Agent } from '@korus-dev/multi-agent-sdk/contracts';
 
 describe('native Claude goal history', () => {
   it('distinguishes an active goal, native completion, explicit clear, and sidechain records', () => {

@@ -1,4 +1,4 @@
-import type { CodexAppServerClient } from 'codex-sdk';
+import type { CodexAppServerClient } from '@korus-dev/codex-sdk';
 import type {
   CodexSurfaceApprovalDecision,
   CodexSurfaceApprovalScope,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { RendererToolPart } from 'multi-agents-sdk/contracts';
+import type { RendererToolPart } from '@korus-dev/multi-agent-sdk/contracts';
 import { ClaudeTaskPlan } from '../../../src/providers/claude/claude-task-plan';
 
 let sequence = 0;

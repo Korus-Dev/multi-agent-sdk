@@ -2,7 +2,7 @@ import { cp, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { expect, it, vi } from 'vitest';
-import { CodexAppServerClient } from 'codex-sdk';
+import { CodexAppServerClient } from '@korus-dev/codex-sdk';
 import { createHarnessDriver } from '../../src';
 import type { HarnessDriver, HarnessEvent, Session } from '../../src';
 import { MockCodexAppServer, resumeResponse, thread, turn } from '../codex/helpers/codex-surface-fixture';

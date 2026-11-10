@@ -2,7 +2,7 @@ import { basename, isAbsolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 import { fileAttachmentInput } from './codex-file-attachment';
-import type { v2 } from 'codex-sdk';
+import type { v2 } from '@korus-dev/codex-sdk';
 import type {
   CodexConversationSummary,
   CodexSurfaceAttachment,

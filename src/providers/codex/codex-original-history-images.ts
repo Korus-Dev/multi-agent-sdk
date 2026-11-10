@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { open, stat } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
 import type { FileHandle } from 'node:fs/promises';
-import type { CodexAppServerClient } from 'codex-sdk';
+import type { CodexAppServerClient } from '@korus-dev/codex-sdk';
 import type { SurfaceMessage, SurfaceMessageMediaPart } from '../../core/surface';
 import { codexImageDataUrl } from './codex-conversation-history';
 import { imageDimensions } from './conversation-content-transport';

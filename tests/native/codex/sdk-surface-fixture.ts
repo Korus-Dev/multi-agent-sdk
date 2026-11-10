@@ -1,8 +1,8 @@
 import { vi } from 'vitest';
-import type { Agent } from 'multi-agents-sdk/contracts';
-import type { HarnessEvent } from 'multi-agents-sdk/driver';
-import type { CodexConversation, CodexSurface } from 'multi-agents-sdk/codex';
-import type { CodexConversationEvent, CodexConversationSnapshot, CodexConversationSummary, CodexSurfaceEvent } from 'multi-agents-sdk/surface';
+import type { Agent } from '@korus-dev/multi-agent-sdk/contracts';
+import type { HarnessEvent } from '@korus-dev/multi-agent-sdk/driver';
+import type { CodexConversation, CodexSurface } from '@korus-dev/multi-agent-sdk/codex';
+import type { CodexConversationEvent, CodexConversationSnapshot, CodexConversationSummary, CodexSurfaceEvent } from '@korus-dev/multi-agent-sdk/surface';
 import { CodexBackendDriver } from '../../../src/providers/codex/driver';
 import { CodexSurfaceAgentAdapter, type CodexHostOptions } from '../../../src/providers/codex/host';
 

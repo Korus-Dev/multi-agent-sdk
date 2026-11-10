@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { CodexAppServerClient, type v2 } from '../../../codex-sdk/src/protocol';
+import { CodexAppServerClient, type v2 } from '@korus-dev/codex-sdk/protocol';
 import { CodexSurface } from '../../src/providers/codex';
 import { deferred, MockCodexAppServer } from './helpers/codex-surface-fixture';
 

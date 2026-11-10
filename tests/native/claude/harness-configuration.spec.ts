@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { ClaudeAgentSdkTransport } from 'multi-agents-sdk/providers/claude/agent-sdk-transport';
+import { ClaudeAgentSdkTransport } from '@korus-dev/multi-agent-sdk/providers/claude';
 import type { ClaudePermissionRequest } from '../../../src/providers/claude/transport';
 import { createQueryHarness } from './sdk-query-fixture';
 

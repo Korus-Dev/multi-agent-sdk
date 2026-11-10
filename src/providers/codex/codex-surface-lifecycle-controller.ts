@@ -1,7 +1,7 @@
-import { notifyListeners } from 'codex-sdk';
+import { notifyListeners } from '@korus-dev/codex-sdk';
 import { readTurnItems } from './codex-surface-conversations-controller';
 import type { CodexOriginalHistoryImages } from './codex-original-history-images';
-import type { CodexAppServerClient, v2 } from 'codex-sdk';
+import type { CodexAppServerClient, v2 } from '@korus-dev/codex-sdk';
 import type {
   CodexConversationHistory,
   CodexConversationSummary,

@@ -4,3 +4,7 @@ coverage/
 .vite/
 *.log
 .DS_Store
+
+.env
+
+.sdk-typecheck-*/

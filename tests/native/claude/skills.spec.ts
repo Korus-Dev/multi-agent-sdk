@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { Agent } from 'multi-agents-sdk/contracts';
+import type { Agent } from '@korus-dev/multi-agent-sdk/contracts';
 import { listClaudeSkills } from '../../../src/providers/claude/skills';
 
 let tempRoot = '';

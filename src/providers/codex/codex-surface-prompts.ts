@@ -1,5 +1,5 @@
 import { normalizePromptContent, type PromptPart } from '../../core/surface';
-import type { v2 } from 'codex-sdk';
+import type { v2 } from '@korus-dev/codex-sdk';
 import type {
   CodexSurfaceReviewTarget,
   CodexSurfaceSkill,

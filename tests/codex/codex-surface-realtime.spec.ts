@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { CodexRealtimeInputAudioChunk } from 'multi-agents-sdk/surface';
+import type { CodexRealtimeInputAudioChunk } from '@korus-dev/multi-agent-sdk/surface';
 import {
   normalizedOptionalRealtimeString,
   normalizedRealtimeText,

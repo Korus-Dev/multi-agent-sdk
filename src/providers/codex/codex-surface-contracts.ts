@@ -1,5 +1,5 @@
 import type { ContinueCodexSafetyReviewOptions } from '../../core/surface';
-import type { CodexAppServerClient, v2 } from 'codex-sdk';
+import type { CodexAppServerClient, v2 } from '@korus-dev/codex-sdk';
 import type {
   CodexConversationEvent,
   CodexConversationHistory,
@@ -24,8 +24,8 @@ import type {
   UpdateCodexConversationSettings,
 } from '../../core/surface';
 import type { CodexMcpServerDefinition } from './codex-surface-mcp';
-import type { CodexAppServerStdioTransportOptions } from 'codex-sdk';
-import type { CodexAppServerUnixSocketTransportOptions } from 'codex-sdk';
+import type { CodexAppServerStdioTransportOptions } from '@korus-dev/codex-sdk';
+import type { CodexAppServerUnixSocketTransportOptions } from '@korus-dev/codex-sdk';
 
 export type GenerateCodexTextOptions = {
   /** Trusted per-call MCP servers, applied only to the ephemeral thread. */
@@ -243,7 +243,7 @@ export type CodexSurfaceOptions = {
   onListenerError?: (error: unknown) => void;
   /** Structured lifecycle measurements; collection and output policy belong to the host. */
   onDiagnostic?: (record: import('../../diagnostics').HarnessDiagnostic) => void;
-  onRequestSettled?: import('codex-sdk').CodexAppServerClientOptions['onRequestSettled'];
+  onRequestSettled?: import('@korus-dev/codex-sdk').CodexAppServerClientOptions['onRequestSettled'];
   permissionMode?: CodexSurfacePermissionMode;
   /** Defaults to a spawned stdio child; use `{ type: 'unixSocket' }` to reuse an existing local daemon. */
   transport?: CodexAppServerTransportOptions;

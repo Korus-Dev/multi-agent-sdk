@@ -5,8 +5,8 @@ import {
   CodexAppServerClient,
   type ServerNotification,
   type v2,
-} from 'codex-sdk';
-import { notifyListeners } from 'codex-sdk';
+} from '@korus-dev/codex-sdk';
+import { notifyListeners } from '@korus-dev/codex-sdk';
 import type {
   CodexConversationSummary,
   CodexConversationEvent,
@@ -43,10 +43,10 @@ import type {
 import { diffCodexSurfaceState } from '../../core/surface-bridge';
 import {
   CodexAppServerStdioTransport,
-} from 'codex-sdk';
+} from '@korus-dev/codex-sdk';
 import {
   CodexAppServerUnixSocketTransport,
-} from 'codex-sdk';
+} from '@korus-dev/codex-sdk';
 import {
   errorMessage,
   normalizedConversationId,

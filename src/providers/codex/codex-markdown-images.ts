@@ -1,6 +1,6 @@
 import { extname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { CodexAppServerClient } from 'codex-sdk';
+import type { CodexAppServerClient } from '@korus-dev/codex-sdk';
 import { codexImageDataUrl } from './codex-conversation-history';
 
 type CodeBlockRange = { start: number; end: number };

@@ -1,9 +1,9 @@
 # Harness consumer contract
 
-Import `createHarnessDriver` from `multi-agents-sdk` and types from `multi-agents-sdk/consumer-types`. The root is the generic Node harness interface. It contains no bridge, UI runtime or Computer Use API.
+Import `createHarnessDriver` from `@korus-dev/multi-agent-sdk` and types from `@korus-dev/multi-agent-sdk/consumer-types`. The root is the generic Node harness interface. It contains no bridge, UI runtime or Computer Use API.
 
 ```ts
-import { createHarnessDriver } from 'multi-agents-sdk';
+import { createHarnessDriver } from '@korus-dev/multi-agent-sdk';
 
 const harness = createHarnessDriver('claude', {
   client: { name: 'cpa-workbench' },
@@ -38,20 +38,20 @@ Each provider's existing replica owns transcript changes. The facade only dispat
 
 | Import | Contract |
 | --- | --- |
-| `multi-agents-sdk` | Neutral factory, driver and types |
-| `multi-agents-sdk/consumer-types` | Types only; no provider initialization |
-| `multi-agents-sdk/ui-types` | Neutral serializable presentation DTOs; types only |
-| `multi-agents-sdk/prompt` | Pure prompt authoring helpers and types |
-| `multi-agents-sdk/capabilities` | Pure native capability constants; safe for browser consumers |
-| `multi-agents-sdk/diagnostics` | Structured diagnostic types only |
-| `multi-agents-sdk/native` | `createNativeHarnessDriver`, `NativeHarnessOptions`, existing native driver/context/event/contracts |
-| `multi-agents-sdk/backend` | Compatibility native `createHarnessDriver` |
-| `multi-agents-sdk/providers/codex` | Explicit Codex surface/runtime adapter |
-| `multi-agents-sdk/providers/claude` | Claude host, transport and replica |
-| `multi-agents-sdk/providers/cursor` | Cursor host and replica |
-| `multi-agents-sdk/providers/antigravity` | Antigravity host and replica |
-| `multi-agents-sdk/bridge` | Existing native Codex surface, bridge, replica and state APIs |
-| `multi-agents-sdk/web` | Explicit WebSocket transport |
+| `@korus-dev/multi-agent-sdk` | Neutral factory, driver and types |
+| `@korus-dev/multi-agent-sdk/consumer-types` | Types only; no provider initialization |
+| `@korus-dev/multi-agent-sdk/ui-types` | Neutral serializable presentation DTOs; types only |
+| `@korus-dev/multi-agent-sdk/prompt` | Pure prompt authoring helpers and types |
+| `@korus-dev/multi-agent-sdk/capabilities` | Pure native capability constants; safe for browser consumers |
+| `@korus-dev/multi-agent-sdk/diagnostics` | Structured diagnostic types only |
+| `@korus-dev/multi-agent-sdk/native` | `createNativeHarnessDriver`, `NativeHarnessOptions`, existing native driver/context/event/contracts |
+| `@korus-dev/multi-agent-sdk/backend` | Compatibility native `createHarnessDriver` |
+| `@korus-dev/multi-agent-sdk/providers/codex` | Explicit Codex surface/runtime adapter |
+| `@korus-dev/multi-agent-sdk/providers/claude` | Claude host, transport and replica |
+| `@korus-dev/multi-agent-sdk/providers/cursor` | Cursor host and replica |
+| `@korus-dev/multi-agent-sdk/providers/antigravity` | Antigravity host and replica |
+| `@korus-dev/multi-agent-sdk/bridge` | Existing native Codex surface, bridge, replica and state APIs |
+| `@korus-dev/multi-agent-sdk/web` | Explicit WebSocket transport |
 | `/core`, `/surface`, `/surface-bridge`, `/conversation-replica`, `/events`, `/codex` | Existing native compatibility entries |
 
 Korus native wire consumers should import native driver/context/event types from `/native`, and surface contracts from `/surface`. Contracts, conversation replicas and ACP compatibility entries remain usable. Provider-native APIs use the explicit provider index entries; internal provider modules are not public exports. Native events retain provider prefixes and reducers retain their original wire contracts. The native factory and neutral factory deliberately have different names at `/native` and root.
@@ -75,7 +75,7 @@ Korus native wire consumers should import native driver/context/event types from
 
 Aliases preserve native source compatibility. Reference attachments remain distinct from host filesystem attachments. These are declaration renames in the existing files, not source relocation.
 
-Vendor dependencies remain mandatory because provider construction is statically loaded. The unused direct `@anthropic-ai/sdk` dependency is absent; the Claude Agent SDK remains. Local package names, private status and versions remain unchanged. Build/test aliases are repository-local; source imports use relative paths. No ACP transport substitution is included.
+Vendor dependencies remain mandatory because provider construction is statically loaded. The unused direct `@anthropic-ai/sdk` dependency is absent; the Claude Agent SDK remains. The package uses versioned npm dependencies under the `@korus-dev` scope. Build/test aliases are repository-local; source imports use relative paths. No ACP transport substitution is included.
 
 ## Diagnostics
 

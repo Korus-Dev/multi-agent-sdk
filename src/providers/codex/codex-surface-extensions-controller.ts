@@ -1,4 +1,4 @@
-import type { CodexServerRequestResponder, ServerRequest, v2 } from 'codex-sdk';
+import type { CodexServerRequestResponder, ServerRequest, v2 } from '@korus-dev/codex-sdk';
 import type { CodexSurfaceJsonValue, CreateCodexConversationOptions } from '../../core/surface';
 import {
   assertNoMcpConfigCollision,

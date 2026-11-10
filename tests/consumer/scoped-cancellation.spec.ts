@@ -73,7 +73,7 @@ it('Claude cancels a fresh native query before provider session admission', asyn
 
 it.each(['before-admission', 'active'] as const)('Codex cancels a private native scope at %s without admitting late work', async phase => {
   const { createHarnessDriver } = await import('../../src');
-  const { CodexAppServerClient } = await import('codex-sdk');
+  const { CodexAppServerClient } = await import('@korus-dev/codex-sdk');
   const { MockCodexAppServer, resumeResponse, thread, turn, deferred, requestsFor } = await import('../codex/helpers/codex-surface-fixture');
   const admission = deferred<ReturnType<typeof resumeResponse>>();
   const transport = new MockCodexAppServer({

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { SurfaceMessage, SurfaceMessageToolPart } from 'multi-agents-sdk/surface';
+import type { SurfaceMessage, SurfaceMessageToolPart } from '@korus-dev/multi-agent-sdk/surface';
 import {
   argumentsPreview,
   errorMessage,

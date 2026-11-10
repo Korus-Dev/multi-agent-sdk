@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createCodexConversationReplica } from 'multi-agents-sdk/conversation-replica';
-import { CodexAppServerClient, type v2 } from '../../../codex-sdk/src/protocol';
+import { createCodexConversationReplica } from '@korus-dev/multi-agent-sdk/conversation-replica';
+import { CodexAppServerClient, type v2 } from '@korus-dev/codex-sdk/protocol';
 import { CodexSurface } from '../../src/providers/codex';
-import type { CodexSurfaceEvent } from 'multi-agents-sdk/surface';
+import type { CodexSurfaceEvent } from '@korus-dev/multi-agent-sdk/surface';
 import { deferred, generatedPngBase64, MockCodexAppServer, createSurface, lastRequest, requestsFor, resumeResponse, thread, turn } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface', () => {

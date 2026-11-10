@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CodexSurfaceModel, CodexSurfaceSnapshot } from 'multi-agents-sdk/surface';
+import type { CodexSurfaceModel, CodexSurfaceSnapshot } from '@korus-dev/multi-agent-sdk/surface';
 import type { HarnessDiagnostic } from '../../src/diagnostics';
-import type { v2 } from '../../../codex-sdk/src/protocol';
+import type { v2 } from '@korus-dev/codex-sdk/protocol';
 import {
   CodexSurfaceLifecycleController,
   type CodexSurfaceLifecycleHost,

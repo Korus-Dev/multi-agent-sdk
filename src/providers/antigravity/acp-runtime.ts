@@ -59,7 +59,7 @@ export class AcpRuntime {
       instance.connection.start();
       const initialization = await instance.connection.request('initialize', {
         protocolVersion: 2,
-        clientInfo: { name: options.client?.name ?? 'multi-agents-sdk', ...(options.client?.title ? { title: options.client.title } : {}), version: options.client?.version ?? '1' },
+        clientInfo: { name: options.client?.name ?? 'multi-agent-sdk', ...(options.client?.title ? { title: options.client.title } : {}), version: options.client?.version ?? '1' },
         clientCapabilities: { fs: { readTextFile: options.filesystem !== false, writeTextFile: options.filesystem !== false && options.filesystem !== 'read-only' }, terminal: false },
       });
       if (!record(initialization) || initialization.protocolVersion !== 2 || !record(initialization.agentInfo)

@@ -1,7 +1,7 @@
 import { normalizePromptContent, promptContentText } from '../../core/surface';
-import type { Thread } from 'codex-sdk/protocol/generated/v2/Thread';
-import type { ThreadItem } from 'codex-sdk/protocol/generated/v2/ThreadItem';
-import type { Turn } from 'codex-sdk/protocol/generated/v2/Turn';
+import type { Thread } from '@korus-dev/codex-sdk/protocol/generated/v2/Thread';
+import type { ThreadItem } from '@korus-dev/codex-sdk/protocol/generated/v2/ThreadItem';
+import type { Turn } from '@korus-dev/codex-sdk/protocol/generated/v2/Turn';
 import { basename, extname, isAbsolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { fileAttachmentReference } from './codex-file-attachment';

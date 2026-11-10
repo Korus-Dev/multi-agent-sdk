@@ -1,4 +1,4 @@
-import type { v2 } from 'codex-sdk';
+import type { v2 } from '@korus-dev/codex-sdk';
 import type {
   CodexConversationSummary,
   CodexSurfaceEventOrigin,

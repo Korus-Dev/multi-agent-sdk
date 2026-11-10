@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CodexAppServerClient } from '../../../codex-sdk/src/protocol';
+import type { CodexAppServerClient } from '@korus-dev/codex-sdk/protocol';
 import type {
   CodexSurfaceAuthentication,
   CodexSurfaceEventOrigin,
-} from 'multi-agents-sdk/surface';
+} from '@korus-dev/multi-agent-sdk/surface';
 import {
   initialAuthentication,
   normalizedLoginId,

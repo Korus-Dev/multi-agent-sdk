@@ -1,4 +1,4 @@
-import type { CodexAppServerClient, RealtimeVoice } from 'codex-sdk';
+import type { CodexAppServerClient, RealtimeVoice } from '@korus-dev/codex-sdk';
 import type { CodexConversationEvent, CodexRealtimeEvent, StartCodexRealtimeOptions } from '../../core/surface';
 import type { CodexRealtimeSession } from './codex-surface-contracts';
 import {

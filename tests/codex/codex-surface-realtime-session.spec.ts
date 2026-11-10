@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { CodexConversationEvent, StartCodexRealtimeOptions } from 'multi-agents-sdk/surface';
+import type { CodexConversationEvent, StartCodexRealtimeOptions } from '@korus-dev/multi-agent-sdk/surface';
 import { startCodexRealtimeSession } from '../../src/providers/codex/codex-surface-realtime-session';
 
 describe('startCodexRealtimeSession', () => {

@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CodexAppServerClient, type ServerNotification, type ServerRequest } from '../../../codex-sdk/src/protocol';
+import { CodexAppServerClient, type ServerNotification, type ServerRequest } from '@korus-dev/codex-sdk/protocol';
 import { CodexSurface } from '../../src/providers/codex';
-import type { CodexSurfaceEvent } from 'multi-agents-sdk/surface';
-import { invokeCodexSurfaceBridgeOperation } from 'multi-agents-sdk/surface-bridge';
+import type { CodexSurfaceEvent } from '@korus-dev/multi-agent-sdk/surface';
+import { invokeCodexSurfaceBridgeOperation } from '@korus-dev/multi-agent-sdk/surface-bridge';
 import { MockCodexAppServer, createSurface, lastRequest, lastResponse, requestsFor, thread, turn } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface', () => {

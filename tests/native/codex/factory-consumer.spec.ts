@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { CodexAppServerClient } from 'codex-sdk';
+import { CodexAppServerClient } from '@korus-dev/codex-sdk';
 import { createHarnessDriver } from '../../../src/backend';
 import type { HarnessContext } from '../../../src/driver';
 import { MockCodexAppServer, lastRequest, resumeResponse, thread, turn } from '../../codex/helpers/codex-surface-fixture';

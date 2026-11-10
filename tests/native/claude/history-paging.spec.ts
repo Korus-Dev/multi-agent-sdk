@@ -3,10 +3,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { Agent, RendererMessage } from 'multi-agents-sdk/contracts';
-import { createClaudeConversationReplica, type ClaudeConversationReplica } from 'multi-agents-sdk/conversations/claude-conversation-replica';
+import type { Agent, RendererMessage } from '@korus-dev/multi-agent-sdk/contracts';
+import { createClaudeConversationReplica, type ClaudeConversationReplica } from '@korus-dev/multi-agent-sdk/conversations/claude-conversation-replica';
 import type { ClaudeSdkMessage } from '../../../src/providers/claude/protocol';
-import type { HarnessEvent } from 'multi-agents-sdk/driver';
+import type { HarnessEvent } from '@korus-dev/multi-agent-sdk/driver';
 import { ClaudeConversationHost } from '../../../src/providers/claude/host';
 import { loadClaudeTranscriptHistory, type ClaudeTranscriptHistory, claudeTranscriptToRendererMessages } from '../../../src/providers/claude/transcript-history-adapter';
 
@@ -129,7 +129,7 @@ describe('Claude history paging', () => {
       ]).flat().map(row => JSON.stringify(row)),
       JSON.stringify({ type: 'assistant', uuid: 'final', message: { content: 'Final long-turn answer' } }),
     ].join('\n');
-    const turns: import('multi-agents-sdk/contracts').ClaudeConversationTurn[] = [];
+    const turns: import('@korus-dev/multi-agent-sdk/contracts').ClaudeConversationTurn[] = [];
     const messages = claudeTranscriptToRendererMessages(source, agent.id, session.sessionId, undefined, undefined, false, undefined, turns);
     const home = await mkdtemp(path.join(os.tmpdir(), 'claude-long-turn-'));
     const project = path.join(home, '-synthetic'); await mkdir(project);
@@ -244,7 +244,7 @@ describe('Claude history paging', () => {
     const messages = claudeTranscriptToRendererMessages(transcript(1, '工具🙂\\\"\n'.repeat(700_000)), agent.id, session.sessionId);
     expect(Buffer.byteLength(JSON.stringify(messages[1]))).toBeGreaterThan(8 * 1024 * 1024);
     const driver = new ClaudeConversationHost({ startTurn: vi.fn(), close: async () => {} }, async () => ({ backendSession: session, messages }));
-    let snapshot!: import('multi-agents-sdk/contracts').ClaudeConversationSnapshot;
+    let snapshot!: import('@korus-dev/multi-agent-sdk/contracts').ClaudeConversationSnapshot;
     driver.onEvent((frame) => { if (frame.type === 'claude.conversationSnapshotChanged') snapshot = frame.payload.snapshot; });
     try {
       await driver.loadConversation(agent);
@@ -344,7 +344,7 @@ describe('Claude history paging', () => {
     const message: RendererMessage = { id: 'long-turn', agentId: agent.id, turnId: 'turn', role: 'assistant', status: 'complete', createdAt: '2026-01-01T00:00:00Z', parts };
     expect(Buffer.byteLength(JSON.stringify(message))).toBeGreaterThan(100 * 1024);
     const driver = new ClaudeConversationHost({ startTurn: vi.fn(), close: async () => {} }, async () => ({ backendSession: session, messages: [message] }));
-    let snapshot!: import('multi-agents-sdk/contracts').ClaudeConversationSnapshot;
+    let snapshot!: import('@korus-dev/multi-agent-sdk/contracts').ClaudeConversationSnapshot;
     driver.onEvent((frame) => { if (frame.type === 'claude.conversationSnapshotChanged') snapshot = frame.payload.snapshot; });
     try {
       await driver.loadConversation(agent);
@@ -359,7 +359,7 @@ describe('Claude history paging', () => {
     const message: RendererMessage = { id: 'mixed', agentId: agent.id, turnId: 'turn', role: 'assistant', status: 'complete', createdAt: '2026-01-01T00:00:00Z',
       parts: [{ type: 'text', text: 'Looking at it' }, ordinary(1), huge, ordinary(2)] };
     const driver = new ClaudeConversationHost({ startTurn: vi.fn(), close: async () => {} }, async () => ({ backendSession: session, messages: [message] }));
-    let snapshot!: import('multi-agents-sdk/contracts').ClaudeConversationSnapshot;
+    let snapshot!: import('@korus-dev/multi-agent-sdk/contracts').ClaudeConversationSnapshot;
     driver.onEvent((frame) => { if (frame.type === 'claude.conversationSnapshotChanged') snapshot = frame.payload.snapshot; });
     try {
       await driver.loadConversation(agent);

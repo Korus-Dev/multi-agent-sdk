@@ -1,5 +1,5 @@
 import { validateMcpPolicy } from '../../mcp-policy';
-import { notifyListeners } from 'codex-sdk';
+import { notifyListeners } from '@korus-dev/codex-sdk';
 import type { HarnessDiagnostic } from '../../diagnostics';
 import { CodexImageGeneration } from './image-generation';
 import { promptContentDispatchText } from '../../core/surface';

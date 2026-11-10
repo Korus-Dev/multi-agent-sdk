@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { CodexSurfaceAuthentication } from 'multi-agents-sdk/surface';
+import type { CodexSurfaceAuthentication } from '@korus-dev/multi-agent-sdk/surface';
 import {
   createThreadRuntime,
   initialSurfaceSnapshot,

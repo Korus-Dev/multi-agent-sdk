@@ -58,7 +58,7 @@ export class CursorSession {
     try {
       if (options.signal.aborted) throw new Error('Cursor session startup cancelled.');
       session.connection.start();
-      const initialized = await session.connection.request('initialize', { protocolVersion: 1, clientInfo: { name: options.client?.name ?? 'multi-agents-sdk', version: options.client?.version ?? '1' }, clientCapabilities: { _meta: { parameterizedModelPicker: true } } });
+      const initialized = await session.connection.request('initialize', { protocolVersion: 1, clientInfo: { name: options.client?.name ?? 'multi-agent-sdk', version: options.client?.version ?? '1' }, clientCapabilities: { _meta: { parameterizedModelPicker: true } } });
       if (!record(initialized) || initialized.protocolVersion !== 1 || !Array.isArray(initialized.authMethods) || !initialized.authMethods.some(method => record(method) && method.id === 'cursor_login')) throw new Error('Unsupported Cursor ACP handshake.');
       if (!record(initialized.agentCapabilities) || !record(initialized.agentCapabilities.sessionCapabilities) || !record(initialized.agentCapabilities.sessionCapabilities.list)) throw new Error('Cursor ACP lacks session/list support required for safe cancellation.');
       await session.connection.request('authenticate', { methodId: 'cursor_login' });

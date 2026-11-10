@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CodexAppServerClient, type v2 } from '../../../codex-sdk/src/protocol';
+import { CodexAppServerClient, type v2 } from '@korus-dev/codex-sdk/protocol';
 import { CodexSurface } from '../../src/providers/codex';
 import { promptsFromSummaryTurns } from '../../src/providers/codex/codex-surface-prompt-history';
 import { MockCodexAppServer, turn } from './helpers/codex-surface-fixture';

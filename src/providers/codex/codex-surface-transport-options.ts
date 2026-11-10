@@ -1,6 +1,6 @@
 import { isAbsolute } from 'node:path';
 import type { CodexAppServerTransportOptions, CodexSurfaceOptions } from './codex-surface-contracts';
-import type { CodexAppServerUnixSocketTransportOptions } from 'codex-sdk';
+import type { CodexAppServerUnixSocketTransportOptions } from '@korus-dev/codex-sdk';
 
 export function isUnixSocketTransportOptions(
   options: CodexAppServerTransportOptions,

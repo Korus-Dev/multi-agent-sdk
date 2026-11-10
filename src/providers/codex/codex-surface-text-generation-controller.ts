@@ -1,5 +1,5 @@
 import { normalizeMcpServers, mcpServerConfig } from './codex-surface-mcp';
-import type { CodexAppServerClient, ServerNotification, v2 } from 'codex-sdk';
+import type { CodexAppServerClient, ServerNotification, v2 } from '@korus-dev/codex-sdk';
 import type { CodexSurfaceSnapshot } from '../../core/surface';
 import type {
   CodexGeneratedText,

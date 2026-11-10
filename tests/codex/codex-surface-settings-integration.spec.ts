@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CodexAppServerClient } from '../../../codex-sdk/src/protocol';
+import { CodexAppServerClient } from '@korus-dev/codex-sdk/protocol';
 import { CodexSurface } from '../../src/providers/codex';
-import type { CodexSurfaceEvent } from 'multi-agents-sdk/surface';
+import type { CodexSurfaceEvent } from '@korus-dev/multi-agent-sdk/surface';
 import {
   configRequirements, MockCodexAppServer, createSurface, lastRequest, resumeResponse,
   testGoal, testModel, thread, threadSettings, turn,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { v2 } from '../../../codex-sdk/src/protocol';
+import type { v2 } from '@korus-dev/codex-sdk/protocol';
 import { surfaceSubagentToolCall } from '../../src/providers/codex/codex-surface-subagents';
 
 describe('surfaceSubagentToolCall', () => {

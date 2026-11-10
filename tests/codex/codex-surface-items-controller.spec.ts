@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CodexSurfaceSnapshot, SurfaceMessage } from 'multi-agents-sdk/surface';
+import type { CodexSurfaceSnapshot, SurfaceMessage } from '@korus-dev/multi-agent-sdk/surface';
 import {
   CodexSurfaceItemsController,
   type CodexSurfaceItemsHost,

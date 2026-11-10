@@ -1,7 +1,7 @@
 import type {
   CodexServerRequestResponder,
   ServerRequest,
-} from 'codex-sdk';
+} from '@korus-dev/codex-sdk';
 import type {
   CodexSurfaceClientRequest,
   CodexSurfaceClientRequestResponse,

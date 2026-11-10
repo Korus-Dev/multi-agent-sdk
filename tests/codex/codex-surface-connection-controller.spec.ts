@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CodexSurfaceSnapshot } from 'multi-agents-sdk/surface';
-import { RpcRemoteError } from '../../../codex-sdk/src/protocol';
+import type { CodexSurfaceSnapshot } from '@korus-dev/multi-agent-sdk/surface';
+import { RpcRemoteError } from '@korus-dev/codex-sdk/protocol';
 import {
   CodexSurfaceConnectionController,
   type CodexSurfaceConnectionHost,

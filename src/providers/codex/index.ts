@@ -2,11 +2,11 @@ export {
   CodexAppServerStdioTransport,
   type CodexAppServerExit,
   type CodexAppServerStdioTransportOptions,
-} from 'codex-sdk';
+} from '@korus-dev/codex-sdk';
 export {
   CodexAppServerUnixSocketTransport,
   type CodexAppServerUnixSocketTransportOptions,
-} from 'codex-sdk';
+} from '@korus-dev/codex-sdk';
 export {
   codexRuntimePathEntries,
   discoverCodexExecutable,
@@ -15,7 +15,7 @@ export {
   type CodexExecutableDiscoveryDependencies,
   type CodexRuntime,
   type ResolveCodexRuntimeOptions,
-} from 'codex-sdk';
+} from '@korus-dev/codex-sdk';
 export {
   CodexSurface,
   createCodexSurface,

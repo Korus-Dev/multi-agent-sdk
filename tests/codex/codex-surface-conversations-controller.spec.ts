@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CodexSurfaceSnapshot, SurfaceMessage } from 'multi-agents-sdk/surface';
-import type { CodexAppServerClient, v2 } from '../../../codex-sdk/src/protocol';
+import type { CodexSurfaceSnapshot, SurfaceMessage } from '@korus-dev/multi-agent-sdk/surface';
+import type { CodexAppServerClient, v2 } from '@korus-dev/codex-sdk/protocol';
 import { initialAuthentication } from '../../src/providers/codex/codex-surface-authentication';
 import { CodexSurfaceConversationsController } from '../../src/providers/codex/codex-surface-conversations-controller';
 import { createThreadRuntime, initialSurfaceSnapshot } from '../../src/providers/codex/codex-surface-runtime';

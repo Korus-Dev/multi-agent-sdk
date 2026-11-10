@@ -1,4 +1,4 @@
-import type { v2 } from 'codex-sdk';
+import type { v2 } from '@korus-dev/codex-sdk';
 
 const prefix = '<attached_file>\n';
 const suffix = '\n</attached_file>';

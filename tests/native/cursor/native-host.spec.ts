@@ -10,14 +10,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 
 
-import type { BackendCodeReviewResult } from 'multi-agents-sdk/driver';
-import type { Agent } from 'multi-agents-sdk/contracts';
-import type { HarnessDriver, HarnessEvent } from 'multi-agents-sdk/driver';
+import type { BackendCodeReviewResult } from '@korus-dev/multi-agent-sdk/driver';
+import type { Agent } from '@korus-dev/multi-agent-sdk/contracts';
+import type { HarnessDriver, HarnessEvent } from '@korus-dev/multi-agent-sdk/driver';
 
 
 
-import { isCursorSnapshot, isCursorEvent } from 'multi-agents-sdk/conversations/cursor-guards';
-import type { CursorConversationSnapshot } from 'multi-agents-sdk/contracts/cursor-conversation';
+import { isCursorSnapshot, isCursorEvent } from '@korus-dev/multi-agent-sdk/conversations/cursor-guards';
+import type { CursorConversationSnapshot } from '@korus-dev/multi-agent-sdk/contracts/cursor-conversation';
 
 
 

@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CodexAppServerClient, type v2 } from '../../../codex-sdk/src/protocol';
+import { CodexAppServerClient, type v2 } from '@korus-dev/codex-sdk/protocol';
 import { CodexSurface } from '../../src/providers/codex';
-import { createCodexConversationReplica } from 'multi-agents-sdk/core';
-import type { CodexSurfaceEvent, SurfaceMessage } from 'multi-agents-sdk/surface';
+import { createCodexConversationReplica } from '@korus-dev/multi-agent-sdk/core';
+import type { CodexSurfaceEvent, SurfaceMessage } from '@korus-dev/multi-agent-sdk/surface';
 import { MockCodexAppServer, createSurface, deferred, lastRequest, resumeResponse, thread, turn } from './helpers/codex-surface-fixture';
 
 function historyTurn(id: string, index: number): v2.Turn {

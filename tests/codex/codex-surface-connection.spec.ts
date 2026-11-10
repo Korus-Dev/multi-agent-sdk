@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CodexAppServerClient, type CodexRequestSettledInfo, type v2 } from '../../../codex-sdk/src/protocol';
+import { CodexAppServerClient, type CodexRequestSettledInfo, type v2 } from '@korus-dev/codex-sdk/protocol';
 import { CodexSurface } from '../../src/providers/codex';
 import type { HarnessDiagnostic } from '../../src/diagnostics';
-import type { CodexSurfaceEvent } from 'multi-agents-sdk/surface';
+import type { CodexSurfaceEvent } from '@korus-dev/multi-agent-sdk/surface';
 import { configRequirements, MockCodexAppServer, createSurface, deferred, lastRequest, pluginSummary, requestsFor, resumeResponse, thread, turn } from './helpers/codex-surface-fixture';
 
 describe('CodexSurface', () => {

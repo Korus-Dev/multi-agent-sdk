@@ -1,5 +1,5 @@
 import { normalizePromptContent } from '../../core/surface';
-import type { CodexAppServerClient } from 'codex-sdk';
+import type { CodexAppServerClient } from '@korus-dev/codex-sdk';
 import type {
   CodexConversationSummary,
   CodexSurfaceSnapshot,

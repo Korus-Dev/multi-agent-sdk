@@ -7,8 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AcpSession } from '../../../src/providers/antigravity/session';
 import { AntigravityHost } from '../../../src/providers/antigravity/host';
 
-import type { Agent } from 'multi-agents-sdk/contracts';
-import type { HarnessEvent } from 'multi-agents-sdk/driver';
+import type { Agent } from '@korus-dev/multi-agent-sdk/contracts';
+import type { HarnessEvent } from '@korus-dev/multi-agent-sdk/driver';
 
 
 
@@ -18,7 +18,7 @@ import type { HarnessEvent } from 'multi-agents-sdk/driver';
 import { sessionMcpServer as nativeSessionMcpServer } from '../../../src/acp/mcp-bridge';
 const product = { name: 'CPA workbench', mcpServerName: 'accounting' };
 const sessionMcpServer = (url: string) => nativeSessionMcpServer(url, product.mcpServerName);
-import type { ExecutionObservation, UsageCost } from 'multi-agents-sdk/contracts/usage';
+import type { ExecutionObservation, UsageCost } from '@korus-dev/multi-agent-sdk/contracts/usage';
 
 
 import usageFixture from './fixtures/usage-capability.json';
@@ -30,8 +30,8 @@ import authorshipFixture from './fixtures/authorship-capability.json';
 let root: string;
 const sessions: AcpSession[] = [];
 const fixtureRuntime = () => ({ command: path.join(root, 'runtime'), harness: path.join(root, 'harness'), args: [] });
-vi.mock('multi-agents-sdk/runtime', async importOriginal => ({
-  ...await importOriginal<typeof import('multi-agents-sdk/runtime')>(),
+vi.mock('@korus-dev/multi-agent-sdk/runtime', async importOriginal => ({
+  ...await importOriginal<typeof import('@korus-dev/multi-agent-sdk/runtime')>(),
   withDiscoveredRuntimePath: () => ({ ...process.env }),
 }));
 beforeEach(async () => {

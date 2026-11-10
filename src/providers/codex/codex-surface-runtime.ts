@@ -9,7 +9,7 @@ import type {
   CodexSurfaceTurn,
   SurfaceMessage,
 } from '../../core/surface';
-import type { ThreadHistoryMode } from 'codex-sdk/protocol/generated/v2/ThreadHistoryMode';
+import type { ThreadHistoryMode } from '@korus-dev/codex-sdk/protocol/generated/v2/ThreadHistoryMode';
 
 export type ThreadRuntimeState = {
   threadId: string;

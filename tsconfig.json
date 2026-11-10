@@ -26,22 +26,22 @@
     "outDir": "dist",
     "sourceMap": true,
     "paths": {
-      "multi-agents-sdk/core": [
+      "@korus-dev/multi-agent-sdk/core": [
         "./src/core/index.ts"
       ],
-      "multi-agents-sdk/surface": [
+      "@korus-dev/multi-agent-sdk/surface": [
         "./src/core/surface.ts"
       ],
-      "multi-agents-sdk/surface-bridge": [
+      "@korus-dev/multi-agent-sdk/surface-bridge": [
         "./src/core/surface-bridge.ts"
       ],
-      "multi-agents-sdk/events": [
+      "@korus-dev/multi-agent-sdk/events": [
         "./src/core/typed-event-bus.ts"
       ],
-      "multi-agents-sdk/contracts/*": [
+      "@korus-dev/multi-agent-sdk/contracts/*": [
         "./src/contracts/*"
       ],
-      "multi-agents-sdk/conversations/*": [
+      "@korus-dev/multi-agent-sdk/conversations/*": [
         "./src/conversations/*"
       ]
     }
