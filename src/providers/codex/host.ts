@@ -22,8 +22,10 @@ export type CodexHostOptions<Context extends Agent = Agent> = {
 };
 function defaultFormatPrompt(prompt: string, content?: SendPromptOptions['content'], _native?: boolean): string { return content === undefined ? prompt : promptContentDispatchText(content, prompt); }
 function scopedMcpServers(scope: HarnessPromptScope) { return (scope.mcpServers ?? []).map(server => ({ name: server.name, transport: { type: 'http' as const, url: server.url }, ...(server.enabledTools ? { enabledTools: [...server.enabledTools] } : {}), ...(server.approval === 'auto' ? { toolApprovalMode: 'auto' as const } : {}), ...(server.required === undefined ? {} : { required: server.required }) })); }
-function nativeApprovalPreset(defaults: import('../../contracts').BackendDefaults | undefined): ApprovalPreset {
-  if (defaults?.kind !== 'codex') return 'ask-for-approval';
+function nativeApprovalPreset(defaults: import('../../contracts').BackendDefaults | undefined): ApprovalPreset | undefined {
+  if (defaults?.kind !== 'codex') return undefined;
+  // Missing caller policy inherits the native thread; it is not an approval override.
+  if (defaults.approvalPreset === undefined && defaults.approvalPolicy === undefined && defaults.sandboxMode === undefined && defaults.approvalsReviewer === undefined) return undefined;
   if (defaults.approvalPreset) return defaults.approvalPreset;
   if (defaults.approvalPolicy === 'never' && defaults.sandboxMode === 'danger-full-access') return 'full-access';
   return defaults.approvalPolicy === 'on-request' && ['auto_review','guardian_subagent'].includes(defaults.approvalsReviewer ?? '') ? 'approve-for-me' : 'ask-for-approval';
@@ -182,7 +184,7 @@ export class CodexSurfaceAgentAdapter<Context extends Agent = Agent> {
   private conversationConfiguration(context: Context, scope?: HarnessPromptScope) { return this.options.conversationConfiguration?.(context, scope) ?? { ...agentCwd(context), extensionContext: this.extensionContext(context, scope), mcpServers: scope ? scopedMcpServers(scope) : undefined }; }
   private syncTitle(context: Context): boolean { return this.options.shouldSyncTitle?.(context) ?? Boolean(context.name?.trim()); }
   private displayName(context: Context): string { return this.options.displayName?.(context) ?? context.name?.trim() ?? context.id; }
-  private approvalPreset(defaults: import('../../contracts').BackendDefaults | undefined): ApprovalPreset { return this.options.approvalPresetFromDefaults?.(defaults) ?? nativeApprovalPreset(defaults); }
+  private approvalPreset(defaults: import('../../contracts').BackendDefaults | undefined): ApprovalPreset | undefined { return this.options.approvalPresetFromDefaults?.(defaults) ?? nativeApprovalPreset(defaults); }
   async start(): Promise<void> {
     await this.surface.connect();
   }
@@ -2270,9 +2272,10 @@ function runtimeStatus(snapshot: CodexSurfaceSnapshot, detail?: (status: 'connec
 }
 
 function effectiveApprovalPreset(
-  requested: ApprovalPreset,
+  requested: ApprovalPreset | undefined,
   available: readonly ApprovalPreset[],
 ): ApprovalPreset | null {
+  if (requested === undefined) return null;
   if (available.includes(requested)) return requested;
   return (['approve-for-me', 'ask-for-approval', 'full-access'] as const)
     .find((preset) => available.includes(preset)) ?? null;

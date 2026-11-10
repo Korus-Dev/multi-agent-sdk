@@ -5,7 +5,7 @@ import { expect, it, vi } from 'vitest';
 import { CodexAppServerClient } from '@korus-dev/codex-sdk';
 import { createHarnessDriver } from '../../src';
 import type { HarnessDriver, HarnessEvent, Session } from '../../src';
-import { MockCodexAppServer, resumeResponse, thread, turn } from '../codex/helpers/codex-surface-fixture';
+import { MockCodexAppServer, requestsFor, resumeResponse, thread, turn } from '../codex/helpers/codex-surface-fixture';
 import { createQueryHarness } from '../native/claude/sdk-query-fixture';
 import { writeAntigravityRuntimeFixture } from '../native/antigravity/session-fixture';
 
@@ -30,6 +30,28 @@ it('Codex: CPA consumer observes native messages and completion through neutral 
     expect(driver.readSession(session).busy).toBe(false);
     expect(events.some(e => e.type === 'session.changed')).toBe(true);
     expect(input).toEqual(original);
+  } finally { await driver.close(); }
+});
+
+it('Codex: resuming and loading a native full-access chat never writes a default permission policy', async () => {
+  const transport = new MockCodexAppServer({
+    'thread/resume': () => ({ ...resumeResponse(thread('retained-access', false)), approvalPolicy: 'never', sandbox: { type: 'dangerFullAccess' } }),
+    'thread/settings/update': () => ({}),
+  });
+  const driver = createHarnessDriver('codex', { client: { name: 'cpa' }, codex: { surface: { client: new CodexAppServerClient(transport) } } });
+  const session = driver.open({ id: 'restored', folder: '/accounting' });
+  try {
+    const ref = driver.restoreRef({ provider: 'codex', data: { backend: 'codex', threadId: 'retained-access' } });
+    await driver.resumeConversation(session, { ref, storageState: 'active' });
+    await driver.loadConversation(session);
+    expect(driver.readSession(session).permission).toBe('full-access');
+    const resumes = requestsFor(transport, 'thread/resume');
+    expect(resumes.length).toBeGreaterThan(0);
+    for (const request of resumes) {
+      expect(request).toMatchObject({ params: { threadId: 'retained-access' } });
+      expect('params' in request && request.params).not.toHaveProperty('approvalPolicy');
+    }
+    expect(requestsFor(transport, 'thread/settings/update')).toEqual([]);
   } finally { await driver.close(); }
 });
 

@@ -7,6 +7,27 @@ describe(`Codex SDK → ${product.name} backend lifecycle`, () => {
   const setup = () => { const fixture = codexSdkFixture(); fixtures.push(fixture); return fixture; };
   afterEach(async () => { await Promise.all(fixtures.splice(0).map(({ driver }) => driver.close())); vi.useRealTimers(); });
 
+  it.each([undefined, { kind: 'codex' as const }])('preserves loaded permissions when the caller has no permission preference: %j', async backendDefaults => {
+    const { driver, conversation, events } = setup();
+    const native = conversation('conversation-a');
+    native.setSnapshot({ approvalPresets: ['ask-for-approval', 'approve-for-me', 'full-access'], approvalPreset: 'full-access' });
+    const agent = { ...sdkAgent(), backendDefaults };
+    await driver.loadConversation(agent);
+    expect(native.handle.updateSettings).not.toHaveBeenCalled();
+    expect(events.filter(event => event.type === 'codex.conversationSnapshotChanged').at(-1)).toMatchObject({ payload: { snapshot: { approvalPreset: 'full-access' } } });
+    await driver.resumeConversation(agent, { ref: { backend: 'codex', threadId: 'conversation-a' }, storageState: 'active' });
+    expect(native.handle.updateSettings).not.toHaveBeenCalled();
+  });
+
+  it.each(['caller', 'host'] as const)('keeps explicit %s permission policy on load', async policy => {
+    const fixture = codexSdkFixture(undefined, policy === 'host' ? { approvalPresetFromDefaults: () => 'ask-for-approval' } : {});
+    fixtures.push(fixture);
+    const native = fixture.conversation('conversation-a');
+    native.setSnapshot({ approvalPresets: ['ask-for-approval', 'approve-for-me', 'full-access'], approvalPreset: 'full-access' });
+    await fixture.driver.loadConversation({ ...sdkAgent(), ...(policy === 'caller' ? { backendDefaults: { kind: 'codex', approvalPreset: 'ask-for-approval' } as const } : {}) });
+    expect(native.handle.updateSettings).toHaveBeenCalledExactlyOnceWith({ approvalPreset: 'ask-for-approval' });
+  });
+
   it('returns the public canonical user-message binding for a shared submission', async () => {
     const { driver, conversation } = setup();
     const message = { id: 'public-client-message-id', role: 'user' as const, status: 'complete' as const, turnId: 'shared-turn', parts: [{ type: 'text' as const, text: 'Identical prompt' }] };
