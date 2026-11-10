@@ -88,7 +88,7 @@ it.each(['codex', 'claude'] as const)('%s disposal releases native ownership and
 });
 it('preserves scope classification across restoration and supports authoritative hydration', async () => {
   const { driver, native } = fixture(); const main = driver.open({ id: 'main', folder: '/ledger' });
-  const scope = await driver.executeScopedPrompt(main, input); const saved = driver.serializeSession(scope.session);
+  const scope = await driver.executeScopedPrompt(main, input); const saved = driver.getSessionData(scope.session);
   await driver.release(scope.session);
   const restored = driver.restoreSession({ id: 'restored', folder: '/ledger' }, saved);
   expect(await driver.loadConversation(restored)).toBe(true);
@@ -161,7 +161,7 @@ it('Claude preserves unknown pending requests and prunes only explicit native an
 });
 it('rejects restoring a saved child while main release is pending', async () => {
   const { driver, native } = fixture(); const main = driver.open({ id: 'main', folder: '/ledger' });
-  const scope = await driver.executeScopedPrompt(main, input); const saved = driver.serializeSession(scope.session);
+  const scope = await driver.executeScopedPrompt(main, input); const saved = driver.getSessionData(scope.session);
   await driver.release(scope.session);
   let finish!: () => void; native.releaseConversation.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
   const releasing = driver.release(main);

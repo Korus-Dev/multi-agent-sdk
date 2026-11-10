@@ -101,6 +101,7 @@ export function codexSdkFixture(closeRuntime?: () => Promise<void>, options: Cod
     listModels: vi.fn<CodexSurface['listModels']>().mockResolvedValue([]),
     listSkills: vi.fn<CodexSurface['listSkills']>().mockResolvedValue([]),
     readConversationSummary: vi.fn<CodexSurface['readConversationSummary']>(),
+    readConversationMessages: vi.fn<CodexSurface['readConversationMessages']>(),
     generateText: vi.fn<CodexSurface['generateText']>(),
     refreshAccount: vi.fn<CodexSurface['refreshAccount']>(),
     startChatGptLogin: vi.fn<CodexSurface['startChatGptLogin']>(),

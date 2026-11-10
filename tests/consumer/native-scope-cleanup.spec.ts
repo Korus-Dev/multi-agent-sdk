@@ -20,7 +20,7 @@ it('repeated Codex scoped execution/disposal removes adapter ownership and subsc
     return sdkSnapshot(nativeId);
   });
   const driver = adaptHarnessDriver('codex', fixture.driver);
-  const main = driver.restoreSession({ id: 'main', folder: '/repo' }, JSON.stringify({ version: 1, provider: 'codex', type: 'session', data: { kind: 'codex', threadId: 'main-native' } }));
+  const main = driver.restoreSession({ id: 'main', folder: '/repo' }, { provider: 'codex', role: 'main', data: { kind: 'codex', threadId: 'main-native' } });
   const ownership = fixture.adapter as unknown as { sessionsByAgentId: Map<string, unknown>; agentIdsByThreadId: Map<string, string> };
   try {
     await driver.loadConversation(main);

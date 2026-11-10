@@ -1,3 +1,5 @@
+import { isAbsolute } from 'node:path';
+import { cursorRuntime } from './providers/cursor/runtime';
 import type { AgentBackend } from './contracts';
 import type { HarnessContext, HarnessDriver, HarnessEvent, HarnessPromptScope } from './driver';
 import type { HarnessMcpEndpoint } from './generation';
@@ -17,6 +19,8 @@ import { sessionMcpServer } from './acp/mcp-bridge';
 /** Shared app ports; provider-specific transport configuration stays in the named adapter options. */
 export type HarnessOptions<Context extends HarnessContext = HarnessContext> = {
   client: { name: string; title?: string; version?: string; metadataDirectory?: string };
+  /** Provider configuration/data home; omitted preserves native standard-home discovery. */
+  home?: string;
   stateDirectory?: () => string;
   instructions?: (context: Context) => string | undefined;
   mcpServers?: (context: Context) => readonly HarnessMcpEndpoint[];
@@ -32,6 +36,11 @@ type CodexContext<Context> = { context: Context; scope?: HarnessPromptScope };
  * @deprecated Prefer createNativeHarnessDriver from /native; the root factory is neutral.
  */
 export function createHarnessDriver<Context extends HarnessContext = HarnessContext>(backend: AgentBackend, options: HarnessOptions<Context>): HarnessDriver<Context, HarnessEvent> {
+  const home = options.home?.trim();
+  if (options.home !== undefined && (!home || !isAbsolute(home))) throw new Error('Runtime home must be a nonempty absolute path.');
+  const previousClaudeHome = process.env.CLAUDE_CONFIG_DIR;
+  // One Claude home per application process; close before switching profiles.
+  if (home && backend === 'claude') process.env.CLAUDE_CONFIG_DIR = home;
   const endpoints = (context: Context) => {
     const servers = options.mcpServers?.(context) ?? [];
     validateMcpPolicy(servers, backend);
@@ -39,6 +48,7 @@ export function createHarnessDriver<Context extends HarnessContext = HarnessCont
   };
   const bridges = (context: Context) => endpoints(context).map(server => sessionMcpServer(server.url, server.name, server.enabledTools ? [...server.enabledTools] : undefined));
   if (backend === 'cursor') return new CursorHost({ ...options.cursor,
+    ...(home ? { runtime: cursorRuntime({ isolated: true, homePath: home, environmentHome: home }, options.cursor?.runtime?.environment) } : {}),
     stateDirectory: options.stateDirectory ?? options.cursor?.stateDirectory,
     instructions: options.instructions ?? options.cursor?.instructions,
     formatPrompt: options.formatPrompt ?? options.cursor?.formatPrompt,
@@ -46,13 +56,15 @@ export function createHarnessDriver<Context extends HarnessContext = HarnessCont
     sessionOptions: { ...options.cursor?.sessionOptions, client: options.client },
   });
   if (backend === 'antigravity') return new AntigravityHost({ ...options.antigravity,
+    ...(home ? { home: () => home } : {}),
     stateDirectory: options.stateDirectory ?? options.antigravity?.stateDirectory,
     instructions: options.instructions ?? options.antigravity?.instructions,
     formatPrompt: options.formatPrompt ?? options.antigravity?.formatPrompt,
     ...(options.mcpServers ? { mcpServers: bridges } : {}),
     client: { ...options.antigravity?.client, ...options.client },
   });
-  if (backend === 'claude') return new ClaudeConversationHost(options.claude?.transport ?? new ClaudeAgentSdkTransport({ ...options.claude?.transportOptions, client: { ...options.claude?.transportOptions?.client, ...options.client } }), undefined, {
+  if (backend === 'claude') {
+    const driver = new ClaudeConversationHost(options.claude?.transport ?? new ClaudeAgentSdkTransport({ ...options.claude?.transportOptions, client: { ...options.claude?.transportOptions?.client, ...options.client } }), undefined, {
     ...options.claude?.host,
     configurePrompt: context => {
       const defaults = options.claude?.host?.configurePrompt?.(context) ?? {};
@@ -69,8 +81,24 @@ export function createHarnessDriver<Context extends HarnessContext = HarnessCont
       };
     },
   });
+    if (!home) return driver;
+    const close = driver.close.bind(driver);
+    let closed = false;
+    driver.close = async () => {
+      if (closed) return;
+      await close();
+      closed = true;
+      if (home && process.env.CLAUDE_CONFIG_DIR === home) {
+        if (previousClaudeHome === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+        else process.env.CLAUDE_CONFIG_DIR = previousClaudeHome;
+      }
+    };
+    return driver;
+  }
   if (backend !== 'codex') throw new Error(`Unsupported harness: ${backend}`);
-  const surfaceOptions = options.codex?.surface ?? {};
+  const nativeSurfaceOptions = options.codex?.surface ?? {};
+  if (home && nativeSurfaceOptions.codexHome && home !== nativeSurfaceOptions.codexHome) throw new Error('Runtime home conflicts with codex.surface.codexHome.');
+  const surfaceOptions = { ...nativeSurfaceOptions, ...(home ? { codexHome: home } : {}) };
   const surface = createCodexSurface({ ...surfaceOptions, autoSelectFirstConversation: false,
     clientInfo: surfaceOptions.clientInfo ?? { name: options.client.name, title: options.client.title ?? options.client.name, version: options.client.version ?? '1' },
     extensions: [...surfaceOptions.extensions ?? [], { configureConversation: ({ extensionContext }) => {

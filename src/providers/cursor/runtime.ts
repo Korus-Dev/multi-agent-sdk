@@ -18,7 +18,7 @@ export function cursorVersion(value: unknown): number | null {
 }
 /** Captured per host: setup changes cannot redirect an in-flight account operation. */
 export type CursorRuntime = Readonly<{ homePath: string; isolated: boolean; environment: NodeJS.ProcessEnv }>;
-export function cursorRuntime(home?: { isolated: boolean; homePath: string }, environment = withDiscoveredRuntimePath(undefined)): CursorRuntime {
+export function cursorRuntime(home?: { isolated: boolean; homePath: string; environmentHome?: string }, environment = withDiscoveredRuntimePath(undefined)): CursorRuntime {
   const isolated = home?.isolated === true;
   const homePath = home?.homePath ?? cursorHome();
   const env = { ...environment };
@@ -28,7 +28,7 @@ export function cursorRuntime(home?: { isolated: boolean; homePath: string }, en
   // Compatibility for saved or in-flight private contexts; setup cannot create new ones.
   if (isolated) {
     const userHome = homedir();
-    const privateHome = path.dirname(homePath);
+    const privateHome = home?.environmentHome ?? path.dirname(homePath);
     env.HOME = privateHome;
     env.USERPROFILE = privateHome;
     env.XDG_CONFIG_HOME = path.join(privateHome, '.config');

@@ -18,7 +18,7 @@ describe(`Codex SDK → ${product.name} subagent ownership`, () => {
   afterEach(async () => { await Promise.all(fixtures.splice(0).map(({ driver }) => driver.close())); });
 
   it('projects child identity and completion only to its root owner', async () => {
-    const { driver, conversation, surface, events, emit } = setup();
+    const { driver, adapter, conversation, surface, events, emit } = setup();
     surface.readConversationSummary.mockResolvedValue(sdkSummary('child', { parentConversationId: 'conversation-a', agentNickname: 'Scout', agentRole: 'reviewer' }));
     await driver.loadConversation(sdkAgent());
     await driver.loadConversation(sdkAgent('agent-b', 'conversation-b'));
@@ -40,7 +40,7 @@ describe(`Codex SDK → ${product.name} subagent ownership`, () => {
   });
 
   it('reads live child snapshots without inherited-history loads, but bounds cold historical children to the final message', async () => {
-    const { driver, conversation, surface, events, emit } = setup();
+    const { driver, adapter, conversation, surface, events, emit } = setup();
     surface.readConversationSummary.mockResolvedValue(sdkSummary('child'));
     await driver.loadConversation(sdkAgent());
     conversation('conversation-a').emit(spawn);
@@ -50,7 +50,7 @@ describe(`Codex SDK → ${product.name} subagent ownership`, () => {
     expect(live.map((item) => item.parts)).toStrictEqual([[{ type: 'text', text: 'first' }], [{ type: 'text', text: 'second' }]]);
     expect(conversation('child').handle.readHistory).not.toHaveBeenCalled();
     conversation('cold').handle.readHistory.mockResolvedValue({ conversationId: 'cold', messages: [message('inherited'), message('final')], threadStatus: { type: 'idle' } });
-    const cold = await driver.readConversationMessages({ backend: 'codex', threadId: 'cold' }, 'agent-a');
+    const cold = await adapter.readConversationMessages('cold', 'agent-a', { view: 'last' });
     expect(cold.map((item) => item.parts)).toStrictEqual([[{ type: 'text', text: 'final' }]]);
     expect(events).toContainEqual(expect.objectContaining({ type: 'subagent.statusChanged', agentId: 'agent-a', payload: { rootConversationId: 'conversation-a', conversationId: 'cold', status: 'completed' } }));
   });

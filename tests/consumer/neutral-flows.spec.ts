@@ -82,7 +82,7 @@ for (const provider of ['cursor', 'antigravity'] as const) it(`${provider}: fixt
       const generated = await host.generateText(session, { cwd: root, prompt: 'Summarize invoice categories', selectModel: options => ({ model: options[0]!.model }) });
       expect(generated.text.length).toBeGreaterThan(0);
     }
-    const saved = host.serializeSession(session);
+    const saved = host.getSessionData(session);
     expect(Object.keys(session)).toEqual([]);
     await host.release(session);
     const recovered = host.restoreSession({ id: 'tax', folder: root }, saved);
@@ -90,7 +90,7 @@ for (const provider of ['cursor', 'antigravity'] as const) it(`${provider}: fixt
     expect(text(host, recovered)).toContain('Check invoices');
     const summaries = await host.listConversations(recovered);
     expect(summaries.length).toBeGreaterThan(0);
-    const ref = host.restoreRef(host.serializeRef(summaries[0]!.ref));
+    const ref = host.restoreRef(host.getRefData(summaries[0]!.ref));
     expect(Object.keys(ref)).toEqual([]);
     await host.resumeConversation(recovered, { ref, storageState: summaries[0]!.storageState });
     const scoped = await host.executeScopedPrompt(recovered, { cwd: root, prompt: 'Verify totals', scope: { id: 'ledger', mcpServers: [] } });

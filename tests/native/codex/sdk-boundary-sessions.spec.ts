@@ -44,16 +44,16 @@ describe(`Codex SDK → ${product.name} session policy`, () => {
     expect(conversation('replacement').handle.load).toHaveBeenCalledOnce();
   });
 
-  it('lists current and archived conversations in the exact folder, hiding other attached agents', async () => {
+  it('lists other active conversations with an explicit workspace filter', async () => {
     const { driver, surface } = setup();
     surface.listConversations.mockResolvedValueOnce([sdkSummary('conversation-a'), sdkSummary('another-live')])
       .mockResolvedValueOnce([sdkSummary('old', { updatedAt: '2026-09-01T00:00:00Z' }), sdkSummary('recent')]);
-    const result = await driver.listConversations(sdkAgent(), { limit: 10, searchTerm: ' query ' });
+    const result = await driver.listConversations(sdkAgent(), { limit: 10, cwd: '/repo', searchTerm: ' query ' });
     expect(result.map(({ id, storageState }) => ({ id, storageState }))).toStrictEqual([
-      { id: 'conversation-a', storageState: 'active' }, { id: 'recent', storageState: 'archived' }, { id: 'old', storageState: 'archived' },
+      { id: 'conversation-a', storageState: 'active' }, { id: 'another-live', storageState: 'active' },
     ]);
     expect(surface.listConversations.mock.calls).toStrictEqual([
-      [{ cwd: '/repo', limit: 10, searchTerm: 'query' }], [{ cwd: '/repo', limit: 10, searchTerm: 'query', archived: true }],
+      [{ cwd: '/repo', limit: 10, searchTerm: 'query' }],
     ]);
   });
 

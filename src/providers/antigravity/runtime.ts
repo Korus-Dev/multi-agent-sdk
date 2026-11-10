@@ -1,3 +1,4 @@
+import { homedir } from 'node:os';
 import path from 'node:path';
 import { resolveRuntimeExecutable, withDiscoveredRuntimePath } from '../../runtime/discovery';
 import { defaultRuntimeDirectory } from '../../runtime/paths';
@@ -11,7 +12,7 @@ export function managedRuntimeDirectory(dataDirectory = defaultRuntimeDirectory(
 }
 
 function runtimeDirectory(dataDirectory: string): string { return path.join(dataDirectory, 'antigravity', acpVersion); }
-export function antigravityHome(dataDirectory = defaultRuntimeDirectory()): string { return process.env.GEMINI_HOME || path.join(dataDirectory, 'antigravity-home'); }
+export function antigravityHome(dataDirectory?: string): string { return process.env.GEMINI_HOME || (dataDirectory ? path.join(dataDirectory, 'antigravity-home') : path.join(homedir(), '.gemini')); }
 
 /** Explicit host paths override managed/PATH discovery. A missing explicit path never falls back. */
 export type AcpRuntimeConfiguration = { command?: string; harnessPath?: string };

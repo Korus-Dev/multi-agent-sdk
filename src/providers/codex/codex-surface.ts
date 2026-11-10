@@ -1,3 +1,4 @@
+import { readCodexMessages } from './codex-read-messages';
 import { CodexOriginalHistoryImages } from './codex-original-history-images';
 import { CodexOriginalHistoryUsage } from './codex-original-history-usage';
 import { ConversationContentTransport } from './conversation-content-transport';
@@ -644,6 +645,12 @@ export class CodexSurface {
 
   async listConversations(options: ListCodexConversationsOptions = {}): Promise<CodexConversationSummary[]> {
     return this.conversations.list(options);
+  }
+
+  /** Read-only history, including archived threads; leaves runtime and archive state untouched. */
+  async readConversationMessages(conversationId: string): Promise<SurfaceMessage[]> {
+    await this.ensureConnected();
+    return readCodexMessages(this.client, conversationId);
   }
 
   /** Reads one conversation's metadata without loading its turns or runtime. */

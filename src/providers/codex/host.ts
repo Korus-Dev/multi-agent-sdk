@@ -718,16 +718,16 @@ export class CodexSurfaceAgentAdapter<Context extends Agent = Agent> {
     };
   }
 
-  async readConversationMessages(threadId: string, agentId: string): Promise<Message[]> {
+  async readConversationMessages(threadId: string, agentId: string, options: { view?: 'full' | 'last' } = {}): Promise<Message[]> {
     await this.start();
     const owner = this.subagentOwners.get(threadId);
     if (owner?.agentId === agentId && this.liveSubagentConversationIds.has(threadId)) {
       return historicalSurfaceMessages(this.surface.conversation(threadId).getSnapshot().messages, agentId);
     }
-    const history = await this.surface.conversation(threadId).readHistory();
-    const messages = historicalSurfaceMessages(history.messages, agentId);
+    const history = options.view === 'last' ? await this.surface.conversation(threadId).readHistory() : undefined;
+    const messages = historicalSurfaceMessages(history?.messages ?? await this.surface.readConversationMessages(threadId), agentId);
     const session = this.sessionsByAgentId.get(agentId);
-    if (session && session.handle.id !== threadId) {
+    if (history && session && session.handle.id !== threadId) {
       const status = subagentStatusFromHistory(history.threadStatus, messages);
       if (status) {
         this.subagentOwners.set(threadId, {
@@ -742,7 +742,7 @@ export class CodexSurfaceAgentAdapter<Context extends Agent = Agent> {
         );
       }
     }
-    return session && session.handle.id !== threadId ? messages.slice(-1) : messages;
+    return options.view === 'last' && session && session.handle.id !== threadId ? messages.slice(-1) : messages;
   }
 
   async readConversationSummary(agent: Context, threadId: string): Promise<ConversationSummary> {
@@ -772,25 +772,18 @@ export class CodexSurfaceAgentAdapter<Context extends Agent = Agent> {
     return { hasOlder: page.hasOlder };
   }
 
-  async listConversations(agent: Context, input: ConversationListInput = {}): Promise<ConversationSummary[]> {
+  async listConversations(_agent: Context, input: ConversationListInput = {}): Promise<ConversationSummary[]> {
+    await this.start();
     const limit = input.limit ?? 100;
     const options = {
-      ...agentCwd(agent),
+      ...(input.cwd ? { cwd: input.cwd } : {}),
       limit,
       ...(input.searchTerm?.trim() ? { searchTerm: input.searchTerm.trim() } : {}),
     };
-    const [active, archived] = await Promise.all([
-      this.surface.listConversations(options),
-      this.surface.listConversations({ ...options, archived: true }),
-    ]);
-    const currentThreadId = codexThreadId(agent);
-    const conversations = [
-      ...active.filter((conversation) => conversation.id === currentThreadId).map((conversation) => ({ conversation, storageState: 'active' as const })),
-      ...archived.map((conversation) => ({ conversation, storageState: 'archived' as const })),
-    ].sort((left, right) => {
-      if (left.storageState !== right.storageState) return left.storageState === 'active' ? -1 : 1;
-      return right.conversation.updatedAt.localeCompare(left.conversation.updatedAt);
-    });
+    const storageState = input.archived === true ? 'archived' as const : 'active' as const;
+    const entries = await this.surface.listConversations({ ...options, ...(input.archived === undefined ? {} : { archived: input.archived }) });
+    const conversations = entries.map(conversation => ({ conversation, storageState }))
+      .sort((left, right) => right.conversation.updatedAt.localeCompare(left.conversation.updatedAt));
     for (const { conversation } of conversations) {
       this.conversationSummaries.set(conversation.id, conversation);
       const owner = this.subagentOwners.get(conversation.id);
@@ -799,7 +792,7 @@ export class CodexSurfaceAgentAdapter<Context extends Agent = Agent> {
         this.emitSubagentIdentity(session, conversation);
       }
     }
-    return conversations.map(({ conversation, storageState }) => conversationSummary(conversation, storageState));
+    return conversations.slice(0, limit).map(({ conversation, storageState }) => conversationSummary(conversation, storageState));
   }
 
   async resumeConversation(agent: Context, target: ConversationResumeTarget) {
@@ -810,9 +803,6 @@ export class CodexSurfaceAgentAdapter<Context extends Agent = Agent> {
     if (targetWasArchived) await this.surface.unarchiveConversation(threadId);
     try {
       await this.bindAndLoad(agent, threadId);
-      if (previousThreadId && previousThreadId !== threadId) {
-        await this.surface.archiveConversation(previousThreadId);
-      }
     } catch (error) {
       if (previousThreadId && previousThreadId !== threadId) {
         await this.bindAndLoad(agent, previousThreadId).catch(() => undefined);

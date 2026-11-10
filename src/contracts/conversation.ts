@@ -65,6 +65,10 @@ export type BackendConversationRef =
 export type ConversationStorageState = 'active' | 'archived';
 
 export type ConversationListInput = {
+  /** Native archived conversations; omitted/false lists normal active conversations. */
+  archived?: boolean;
+  /** Optional workspace filter; omitted lists across workspaces. */
+  cwd?: string | null;
   searchTerm?: string;
   limit?: number;
 };

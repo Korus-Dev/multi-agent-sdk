@@ -22,6 +22,10 @@ declare const refBrand: unique symbol;
 /** Driver-owned handle: callers cannot inspect or construct native session identity. */
 export type Session = { readonly [sessionBrand]: true };
 export type ConversationRef = { readonly [refBrand]: true };
+/** Plain restoration data. Consumers own serialization and storage. */
+export type ConversationRefData = { provider: HarnessProvider; data: import('./contracts').BackendConversationRef };
+export type SessionData = { provider: HarnessProvider; data: import('./contracts').BackendSession; defaults?: HarnessDefaults; role: 'main' | 'scope'; parentId?: string };
+
 export type HarnessContext = { id: string; folder: string | null; name?: string | null; defaults?: HarnessDefaults };
 export type HarnessDefaults = { model?: string; reasoningEffort?: string; serviceTier?: string | null; permission?: string };
 export type HarnessCapabilities = Omit<BackendCapabilities, 'approvalPresets' | 'permissionModes'> & { permissions: { id: string; dangerous?: boolean }[] };
@@ -81,11 +85,12 @@ export type HarnessDriver = {
   readConversationMessages(session: Session, ref: ConversationRef): Promise<Message[]>;
   readConversationContent(session: Session, input: Omit<import('./contracts').ConversationContentInput, 'sessionId'>): Promise<import('./contracts').ConversationContentChunk>;
   open(context: HarnessContext): Session;
-  /** Persist as an opaque string in caller storage; contains native session metadata. */
-  serializeSession(session: Session): string;
-  restoreSession(context: HarnessContext, serialized: string): Session;
-  serializeRef(ref: ConversationRef): string;
-  restoreRef(serialized: string): ConversationRef;
+  /** Detached native restoration data; the consumer owns serialization and storage. */
+  getSessionData(session: Session): SessionData;
+  getConversationRef(session: Session): ConversationRef | null;
+  restoreSession(context: HarnessContext, data: SessionData): Session;
+  getRefData(ref: ConversationRef): ConversationRefData;
+  restoreRef(data: ConversationRefData): ConversationRef;
   getCapabilities(session: Session): HarnessCapabilities;
   readSession(session: Session): SessionState;
   sendPrompt(session: Session, prompt: string, options?: PromptOptions): Promise<Admission>;

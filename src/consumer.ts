@@ -18,7 +18,7 @@ type Binding = { kind: 'main' | 'scope'; parent?: Session; operation?: 'executin
 export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriver<NativeContext, NativeEvent>): HarnessDriver {
   const bindings = new Map<Session, Binding>();
   const byId = new Map<string, Session>();
-  const refs = new Map<ConversationRef, BackendConversationRef>();
+  const refs = new WeakMap<ConversationRef, BackendConversationRef>();
   const listeners = new Set<(event: HarnessEvent) => void>();
   const emit = (event: HarnessEvent) => { for (const listener of listeners) { try { listener(event); } catch (error) { process.emitWarning(error instanceof Error ? error : String(error)); } } };
   const get = (session: Session) => { const b = bindings.get(session); if (!b) throw new Error('Session does not belong to this driver.'); return b; };
@@ -113,17 +113,16 @@ export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriv
     if (mode && !capabilities(session).permissions.some(p => p.id === mode)) { bindings.delete(session); byId.delete(input.id); throw new Error('Unsupported permission option.'); }
     return session;
   };
-  const decode = (serialized: string, type: 'session' | 'ref'): Record<string, unknown> => {
-    const value = JSON.parse(serialized);
-    if (!value || value.version !== 1 || value.provider !== provider || value.type !== type || !value.data || typeof value.data !== 'object') throw new Error('Invalid persisted harness handle.');
-    const data = value.data;
+  const validate = (value: { provider: string; data: object }, type: 'session' | 'ref'): Record<string, unknown> => {
+    if (!value || typeof value !== 'object' || value.provider !== provider || !value.data || typeof value.data !== 'object') throw new Error('Invalid persisted harness handle.');
+    const data = value.data as Record<string, unknown>;
     const identity = provider === 'codex' ? data.threadId : data.sessionId;
     if (typeof identity !== 'string' || !identity || (type === 'session' ? data.kind : data.backend) !== provider) throw new Error('Invalid persisted harness identity.');
-    if (type === 'session' && provider === 'claude' && !['stdio', 'websocket'].includes(data.transport)) throw new Error('Invalid Claude transport.');
+    if (type === 'session' && provider === 'claude' && !['stdio', 'websocket'].includes(String(data.transport))) throw new Error('Invalid Claude transport.');
     if (type === 'ref' && provider !== 'codex' && data.folder !== null && typeof data.folder !== 'string') throw new Error('Invalid persisted folder.');
     return data;
   };
-  const encode = (type: 'session' | 'ref', data: unknown) => JSON.stringify({ version: 1, provider, type, data });
+  const reference = (data: BackendConversationRef): ConversationRef => { const ref = Object.freeze({}) as ConversationRef; refs.set(ref, structuredClone(data)); return ref; };
   return {
     getRuntimeStatus() { const { detail, capabilities: _capabilities, ...status } = native.getRuntimeStatus(); return { ...status, ...(typeof detail === 'string' ? { detail } : {}) }; },
     async authenticate(action) { const state = await (native.authenticate?.(action) ?? unavailable('Authentication')); return { connected: state.connected, native: state }; },
@@ -136,11 +135,15 @@ export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriv
     setConversationTitle: (session, title) => native.setConversationTitle?.(main(session).context, title) ?? unavailable('Conversation title'),
     async setGoal(session, objective) {
       const result = await (native.setGoal?.(main(session).context, objective) ?? unavailable('Goals'));
-      return { ...admitted(session, result), ...(result.goal ? { goal: result.goal } : {}) };
+      const admission = admitted(session, result);
+      if (result.goal) { get(session).state.goal = structuredClone(result.goal); changed(session); }
+      return { ...admission, ...(result.goal ? { goal: result.goal } : {}) };
     },
     async clearGoal(session) {
       const result = await (native.clearGoal?.(main(session).context) ?? unavailable('Goals'));
-      return { ...admitted(session, result), ...(result.cleared === undefined ? {} : { cleared: result.cleared }) };
+      const admission = admitted(session, result);
+      if (result.cleared === true) { get(session).state.goal = null; changed(session); }
+      return { ...admission, ...(result.cleared === undefined ? {} : { cleared: result.cleared }) };
     },
     async steerPrompt(session, prompt, options) { return admitted(session, await (native.steerPrompt?.(main(session).context, prompt, options) ?? unavailable('Steering'))); },
     async deleteTurn(session, turnId) { return turnAction(session, await (native.deleteTurn?.(main(session).context, turnId) ?? unavailable('Turn deletion'))); },
@@ -160,17 +163,17 @@ export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriv
       const sessionId = binding.kind === 'codex' ? binding.threadId : binding.sessionId;
       return native.readConversationContent?.(context, { ...input, sessionId }) ?? unavailable('Conversation content');
     },
-    serializeSession(session) {
+    getSessionData(session) {
       const binding = get(session); const data = binding.context.backendSession;
       if (!data) throw new Error('Session has not been admitted.');
       if (binding.nativeDisposed || binding.operation === 'disposing' || binding.operation === 'releasing') throw new Error('Scope disposal has already started.');
       const parentId = binding.parent ? get(binding.parent).context.id : undefined;
-      return JSON.stringify({ ...JSON.parse(encode('session', data)), defaults: consumerContext(binding.context).defaults, role: binding.kind, ...(parentId ? { parentId } : {}) });
+      return structuredClone({ provider, data, defaults: consumerContext(binding.context).defaults, role: binding.kind, ...(parentId ? { parentId } : {}) });
     },
-    restoreSession(context, serialized) {
-      const data = decode(serialized, 'session'); const saved = JSON.parse(serialized);
+    restoreSession(context, saved) {
+      const data = validate(saved, 'session');
       if (saved.role !== undefined && saved.role !== 'main' && saved.role !== 'scope') throw new Error('Invalid persisted session role.');
-      const parent = saved.role === 'scope' ? byId.get(saved.parentId) : undefined;
+      const parent = saved.role === 'scope' ? byId.get(saved.parentId ?? '') : undefined;
       if (saved.role === 'scope' && (!parent || get(parent).kind !== 'main')) throw new Error('Restore the main scope parent first.');
       if (parent) main(parent);
       const session = open({ ...context, defaults: context.defaults ?? saved.defaults });
@@ -178,8 +181,14 @@ export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriv
       if (parent) { binding.kind = 'scope'; binding.parent = parent; }
       return session;
     },
-    serializeRef(ref) { const data = refs.get(ref); if (!data) throw new Error('Unknown conversation reference.'); return encode('ref', data); },
-    restoreRef(serialized) { const data = decode(serialized, 'ref'); const ref = Object.freeze({}) as ConversationRef; refs.set(ref, data as BackendConversationRef); return ref; },
+    getRefData(ref) { const data = refs.get(ref); if (!data) throw new Error('Unknown conversation reference.'); return structuredClone({ provider, data }); },
+    restoreRef(saved) { return reference(validate(saved, 'ref') as BackendConversationRef); },
+    getConversationRef(session) {
+      const context = interactive(session).context; const data = context.backendSession;
+      if (!data) return null;
+      return reference(data.kind === 'codex' ? { backend: 'codex', threadId: data.threadId }
+        : { backend: data.kind, sessionId: data.sessionId, folder: context.folder });
+    },
     open, getCapabilities: capabilities, readSession: session => structuredClone(get(session).state),
     async sendPrompt(session, prompt, options) { return admitted(session, await native.sendPrompt(main(session).context, prompt, options)); },
     async interrupt(session, expectedTurnId) { return admitted(session, await native.interrupt(interactive(session).context, expectedTurnId)); },
@@ -287,7 +296,7 @@ export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriv
       } finally { b.operation = undefined; }
     },
     onEvent(listener) { listeners.add(listener); return () => { listeners.delete(listener); }; },
-    async close() { try { await native.close(); } finally { unsubscribe(); offUsage?.(); offRequests?.(); listeners.clear(); bindings.clear(); byId.clear(); refs.clear(); } },
+    async close() { try { await native.close(); } finally { unsubscribe(); offUsage?.(); offRequests?.(); listeners.clear(); bindings.clear(); byId.clear(); } },
   };
 }
 

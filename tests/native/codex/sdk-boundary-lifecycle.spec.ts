@@ -101,14 +101,14 @@ describe(`Codex SDK → ${product.name} backend lifecycle`, () => {
     expect(conversation('conversation-a').listenerCount()).toBe(0);
   });
 
-  it('restores an archived target before displacing the attached conversation', async () => {
+  it('restores an archived target without archiving the previous conversation', async () => {
     const { driver, surface, conversation } = setup();
     const order: string[] = [];
     surface.unarchiveConversation.mockImplementation(async (id) => { order.push(`restore:${id}`); return sdkSnapshot(id); });
     conversation('archived').handle.load.mockImplementation(async () => { order.push('load:archived'); return sdkSnapshot('archived'); });
     surface.archiveConversation.mockImplementation(async (id) => { order.push(`archive:${id}`); return sdkSnapshot(id); });
     await expect(driver.resumeConversation(sdkAgent(), { ref: { backend: 'codex', threadId: 'archived' }, storageState: 'archived' })).resolves.toMatchObject({ backendSession: { kind: 'codex', threadId: 'archived' } });
-    expect(order).toStrictEqual(['restore:archived', 'load:archived', 'archive:conversation-a']);
+    expect(order).toStrictEqual(['restore:archived', 'load:archived']);
   });
 
   it('rolls back failed restoration and keeps subsequent prompts on the previous conversation', async () => {
