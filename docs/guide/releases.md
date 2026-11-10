@@ -11,4 +11,4 @@ Releases are explicit operations. Validation and a prepared workflow do not publ
 
 The manual workflow validates the requested version against both manifests, reruns all checks, checks production dependency advisories, and publishes with OIDC provenance. It has no npm token secret and never runs on ordinary pushes or pull requests. Publishing is serialized and restricted to `main`.
 
-GitHub Pages can host the VitePress output from `docs/.vitepress/dist`; the site uses `/multi-agent-sdk/` as its base. The docs workflow builds on relevant pushes and deploys only when manually dispatched. Select GitHub Actions as the Pages source before dispatching it. Hosting configuration and repository visibility remain maintainer-controlled.
+The [documentation site](https://korus-dev.github.io/multi-agent-sdk/) is built with VitePress and hosted on GitHub Pages. The docs workflow builds and deploys on relevant pushes to `main`, and can also be dispatched manually on `main`. It publishes `docs/.vitepress/dist` using `/multi-agent-sdk/` as the site base.

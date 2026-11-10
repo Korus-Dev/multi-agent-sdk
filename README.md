@@ -2,6 +2,8 @@
 
 A unified TypeScript interface for building apps on **Codex, Claude, Cursor, and Antigravity**. Send prompts, stream conversation state, answer approvals, and restore native conversations through one Node.js API.
 
+[Documentation](https://korus-dev.github.io/multi-agent-sdk/) · [API reference](https://korus-dev.github.io/multi-agent-sdk/api/)
+
 Public types can be imported directly from `@korus-dev/multi-agent-sdk` with `import type`.
 
 Each adapter preserves its provider's conversation state and settings. Capabilities describe what that provider supports; usage fields remain unknown when the runtime does not report them.
@@ -37,7 +39,7 @@ try {
 // At application shutdown: unsubscribe(); await driver.close();
 ```
 
-For a complete command-line lifecycle, run the [chat example](examples/chat.ts):
+For a complete command-line lifecycle, run the [chat example](https://github.com/Korus-Dev/multi-agent-sdk/blob/main/examples/chat.ts):
 
 ```sh
 node --experimental-strip-types examples/chat.ts codex 'Explain this project'
@@ -45,15 +47,15 @@ node --experimental-strip-types examples/chat.ts codex 'Explain this project'
 
 | Need | Start here |
 | --- | --- |
-| Install and connect | [Setup](docs/guide/installation.md) · [First conversation](docs/guide/quick-start.md) |
-| Restore chats and load history | [Sessions and history](docs/guide/sessions.md) |
-| Approvals, MCP, and scoped work | [Tools and permissions](docs/guide/tools.md) |
-| Streaming, requests, and accounting | [State and events](docs/guide/events.md) |
-| Native adapters and renderer bridges | [API reference](docs/api/index.md) · [Codex surface](docs/api/codex.md) |
+| Install and connect | [Setup](https://korus-dev.github.io/multi-agent-sdk/guide/installation.html) · [First conversation](https://korus-dev.github.io/multi-agent-sdk/guide/quick-start.html) |
+| Restore chats and load history | [Sessions and history](https://korus-dev.github.io/multi-agent-sdk/guide/sessions.html) |
+| Approvals, MCP, and scoped work | [Tools and permissions](https://korus-dev.github.io/multi-agent-sdk/guide/tools.html) |
+| Streaming, requests, and accounting | [State and events](https://korus-dev.github.io/multi-agent-sdk/guide/events.html) |
+| Native adapters and renderer bridges | [API reference](https://korus-dev.github.io/multi-agent-sdk/api/) · [Codex surface](https://korus-dev.github.io/multi-agent-sdk/api/codex.html) |
 | Build a conversation UI | [Agent UI SDK](https://github.com/Korus-Dev/agent-ui-sdk) |
 | Integrate the raw Codex protocol | [Codex SDK](https://github.com/Korus-Dev/codex-sdk) |
 
-The host owns storage, application workflows, authorization, and attachment retention. The SDK owns provider integration and conversation projection. See the detailed [consumer contract](docs/consumer-contract.md).
+The host owns storage, application workflows, authorization, and attachment retention. The SDK owns provider integration and conversation projection. See the detailed [consumer contract](https://korus-dev.github.io/multi-agent-sdk/consumer-contract.html).
 
 ## Development
 
@@ -63,7 +65,7 @@ npm run check
 npm run dev:docs
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for local dependency source mode, tests, package validation, and release preparation.
+See the [development guide](https://korus-dev.github.io/multi-agent-sdk/guide/development.html) for local dependency source mode, tests, package validation, and release preparation.
 
 ## License
 
