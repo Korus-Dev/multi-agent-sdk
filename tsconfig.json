@@ -17,14 +17,8 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "types": [
-      "node",
-      "vitest/globals"
+      "node"
     ],
-    "declaration": true,
-    "emitDeclarationOnly": true,
-    "rootDir": "src",
-    "outDir": "dist",
-    "sourceMap": true,
     "paths": {
       "@korus-dev/multi-agent-sdk": [
         "./src/index.ts"

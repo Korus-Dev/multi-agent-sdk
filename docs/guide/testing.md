@@ -70,3 +70,14 @@ generates.
 A test change is done when the claimed regression was red, the public boundary
 is green, no existing scenario proves the same risk, coverage remains above its
 current thresholds without filler, and the affected `check` command passes.
+
+## Agent test runs
+
+During development, agents run tests only with `npm run test:ai -- <name-or-path>`
+or `npm run test:ai` for the whole unit suite. Do not call `vitest`, `npx vitest`,
+or `npm test` directly. `npm run check` remains the final handoff gate;
+`test:ai` is for iteration.
+
+Off-limits to agents without explicit authorization: tests that launch installed
+native providers or use live accounts, browser/Playwright suites, and publishing.
+Mocked/scripted provider fixtures in the unit suite do not launch real providers.

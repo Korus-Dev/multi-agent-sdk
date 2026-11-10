@@ -15,7 +15,6 @@ jobs:
   publish:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    environment: npm
     permissions:
       contents: read
       id-token: write
@@ -28,17 +27,22 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-          cache: npm
+          package-manager-cache: false
           registry-url: https://registry.npmjs.org
       - name: Validate committed release version
         env:
           RELEASE_VERSION: ${{ inputs.version }}
-        run: node scripts/check-release.mjs
-      - run: npm ci
+        run: |
+          node --input-type=module -e "import fs from 'node:fs'; if (JSON.parse(fs.readFileSync('package.json', 'utf8')).version !== process.env.RELEASE_VERSION) throw new Error('Requested version must match package.json');"
+      - run: npm ci --ignore-scripts
       - run: npm run check
       - run: npm audit --omit=dev --audit-level=high
+      - name: Pack release
+        run: |
+          mkdir -p release-package
+          npm pack --ignore-scripts --pack-destination release-package
       - name: Publish with OIDC provenance
-        run: npm publish --access public --provenance
+        run: npm publish release-package/*.tgz --ignore-scripts --access public --provenance
   release:
     needs: publish
     runs-on: ubuntu-latest

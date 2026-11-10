@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.25.0 (unreleased)
+## 0.25.0 (2026-11-10)
 
 - Unified Node.js harness API for Codex, Claude, Cursor, and Antigravity.
 - Opaque sessions and conversation references with consumer-owned restoration data.

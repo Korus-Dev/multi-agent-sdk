@@ -39,7 +39,7 @@ try {
 // At application shutdown: unsubscribe(); await driver.close();
 ```
 
-For a complete command-line lifecycle, run the [chat example](https://github.com/Korus-Dev/multi-agent-sdk/blob/main/examples/chat.ts):
+From the repository root, run the complete [chat example](https://korus-dev.github.io/multi-agent-sdk/guide/quick-start.html):
 
 ```sh
 node --experimental-strip-types examples/chat.ts codex 'Explain this project'
@@ -60,7 +60,7 @@ The host owns storage, application workflows, authorization, and attachment rete
 ## Development
 
 ```sh
-npm ci
+npm ci --ignore-scripts
 npm run check
 npm run dev:docs
 ```

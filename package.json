@@ -1,9 +1,38 @@
 {
+  "name": "@korus-dev/multi-agent-sdk",
   "version": "0.25.0",
-  "type": "module",
+  "description": "Unified native coding-agent harness interface and adapters.",
   "license": "Apache-2.0",
+  "author": "Nicolas Bonamy",
+  "homepage": "https://korus-dev.github.io/multi-agent-sdk/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Korus-Dev/multi-agent-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Korus-Dev/multi-agent-sdk/issues"
+  },
+  "keywords": [
+    "agents",
+    "codex",
+    "claude",
+    "cursor",
+    "acp",
+    "mcp",
+    "typescript"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "files": [
     "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
     "prompt.js",
     "prompt.d.ts",
     "surface-bridge.js",
@@ -11,27 +40,23 @@
     "native.js",
     "native.d.ts",
     "codex.js",
-    "codex.d.ts",
-    "docs/**/*.md",
-    "examples",
-    "README.md",
-    "LICENSE"
+    "codex.d.ts"
   ],
   "scripts": {
     "build": "vite build && node scripts/typecheck.mjs plain -p tsconfig.build.json",
     "typecheck": "node scripts/typecheck.mjs plain --noEmit",
+    "typecheck:tests": "node scripts/typecheck.mjs plain -p tsconfig.tests.json --noEmit",
     "test": "vitest run",
+    "test:ai": "vitest --run --silent --reporter=./tests/reporter/silent.ts",
     "test:coverage": "vitest run --coverage",
+    "check:package": "node scripts/check-package.mjs",
+    "build:docs": "npm run typecheck:examples && vitepress build docs",
     "prepack": "npm run build",
     "check": "npm run typecheck && npm run typecheck:tests && npm run test:coverage && npm run build && npm run check:package && npm run build:docs",
-    "check:package": "node scripts/check-package.mjs",
     "dev:docs": "vitepress dev docs --port 5175",
-    "build:docs": "npm run typecheck:examples && vitepress build docs",
     "preview:docs": "vitepress preview docs --port 4175",
-    "typecheck:examples": "tsc -p tsconfig.examples.json --noEmit",
-    "typecheck:tests": "node scripts/typecheck.mjs plain -p tsconfig.tests.json --noEmit"
+    "typecheck:examples": "tsc -p tsconfig.examples.json --noEmit"
   },
-  "name": "@korus-dev/multi-agent-sdk",
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "0.3.322",
     "@anthropic-ai/sdk": "1.8.0",
@@ -41,10 +66,6 @@
     "yauzl": "3.4.0",
     "zod": "4.6.7"
   },
-  "engines": {
-    "node": ">=22.19.0"
-  },
-  "description": "Unified native coding-agent harness interface and adapters.",
   "devDependencies": {
     "@types/node": "25.9.5",
     "@types/yauzl": "2.10.3",
@@ -58,26 +79,6 @@
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/Korus-Dev/multi-agent-sdk.git"
-  },
-  "author": "Nicolas Bonamy",
-  "homepage": "https://korus-dev.github.io/multi-agent-sdk/",
-  "bugs": {
-    "url": "https://github.com/Korus-Dev/multi-agent-sdk/issues"
-  },
-  "keywords": [
-    "agents",
-    "codex",
-    "claude",
-    "cursor",
-    "acp",
-    "mcp",
-    "typescript"
-  ],
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "overrides": {
     "vitepress": {
       "vite": "6.4.6"
