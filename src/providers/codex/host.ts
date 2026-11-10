@@ -8,6 +8,8 @@ export type CodexHostOptions<Context extends Agent = Agent> = {
   /** Structured measurements; no application environment flags or log formatting. */
   onDiagnostic?: (record: HarnessDiagnostic) => void;
   onListenerError?: (error: unknown) => void;
+  /** Existing conversations keep provider settings; defaults still apply to creation. */
+  inheritNativeSettings?: boolean;
   defaultModel?: { model: string; reasoningEffort?: string };
   extensionContext?: (context: Context, scope?: HarnessPromptScope) => unknown;
   conversationConfiguration?: (context: Context, scope?: HarnessPromptScope) => import('./codex-surface-contracts').CodexConversationLoadOptions;
@@ -1247,6 +1249,7 @@ export class CodexSurfaceAgentAdapter<Context extends Agent = Agent> {
     snapshot: CodexConversationSnapshot,
     requestedDefaults: Context['backendDefaults'],
   ): Promise<CodexConversationSnapshot> {
+    if (this.options.inheritNativeSettings) return snapshot;
     const settings: UpdateCodexConversationSettings = {};
     if (requestedDefaults?.userSelectedModel && requestedDefaults.model) {
       const modelId = snapshot.models.find(model => model.model === requestedDefaults.model || model.id === requestedDefaults.model)?.id ?? requestedDefaults.model;

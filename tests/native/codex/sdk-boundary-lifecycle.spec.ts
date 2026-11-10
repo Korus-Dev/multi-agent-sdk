@@ -28,6 +28,20 @@ describe(`Codex SDK → ${product.name} backend lifecycle`, () => {
     expect(native.handle.updateSettings).toHaveBeenCalledExactlyOnceWith({ approvalPreset: 'ask-for-approval' });
   });
 
+  it('inherits existing native settings while keeping defaults for new conversations when the host requests it', async () => {
+    const fixture = codexSdkFixture(undefined, { inheritNativeSettings: true, approvalPresetFromDefaults: () => 'full-access' });
+    fixtures.push(fixture);
+    const session = fixture.conversation('conversation-a');
+    session.setSnapshot({ approvalPresets: ['ask-for-approval', 'full-access'], approvalPreset: 'ask-for-approval', selectedModelId: 'native-model', selectedReasoningEffort: 'low' });
+    const agent = { ...sdkAgent(), backendDefaults: { kind: 'codex', model: 'saved-model', reasoningEffort: 'high', serviceTier: 'fast', userSelectedModel: true } as const };
+    await fixture.driver.loadConversation(agent);
+    expect(session.handle.updateSettings).not.toHaveBeenCalled();
+    expect(fixture.events.filter(event => event.type === 'conversation.settingsUpdated').at(-1)).toMatchObject({ payload: { settings: { model: 'native-model', reasoningEffort: 'low', approvalPreset: 'ask-for-approval' } } });
+    fixture.surface.createConversation.mockResolvedValue(sdkSnapshot('new'));
+    await fixture.driver.sendPrompt({ ...agent, id: 'new-agent', backendSession: undefined }, 'New conversation');
+    expect(fixture.surface.createConversation).toHaveBeenCalledWith(expect.objectContaining({ model: 'saved-model', reasoningEffort: 'high', serviceTier: 'fast' }), expect.anything());
+  });
+
   it('returns the public canonical user-message binding for a shared submission', async () => {
     const { driver, conversation } = setup();
     const message = { id: 'public-client-message-id', role: 'user' as const, status: 'complete' as const, turnId: 'shared-turn', parts: [{ type: 'text' as const, text: 'Identical prompt' }] };

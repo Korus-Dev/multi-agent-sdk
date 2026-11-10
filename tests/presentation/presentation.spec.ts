@@ -8,9 +8,9 @@ import { codexConversationSnapshot as codex } from './codex-conversation-fixture
 describe('native conversation presentation', () => {
   it('handles absent snapshots and projects shared identity, requests and plans without changing native state', () => {
     for (const project of [projectCodexConversation, projectClaudeConversation, projectCursorConversation, projectAntigravityConversation]) expect(project(null)).toBeNull();
-    const snapshot = codex([], { turnIds: ['last'], executionPlan: { turnId: 'last', steps: [{ step: 'Done', status: 'completed' }], explanation: 'Ready', markdown: 'Done', updatedAt: 'today' } });
+    const snapshot = codex([], { approvalPreset: 'ask-for-approval', selectedModelId: 'terra', selectedReasoningEffort: 'high', selectedServiceTier: 'fast', turnIds: ['last'], executionPlan: { turnId: 'last', steps: [{ step: 'Done', status: 'completed' }], explanation: 'Ready', markdown: 'Done', updatedAt: 'today' } });
     const original = structuredClone(snapshot);
-    expect(projectCodexConversation(snapshot)).toMatchObject({ latestTurnId: 'last', clientRequests: [], approvals: [], goal: null, plan: { kind: 'execution', status: 'completed', explanation: 'Ready' } });
+    expect(projectCodexConversation(snapshot)).toMatchObject({ latestTurnId: 'last', clientRequests: [], approvals: [], goal: null, permission: 'ask-for-approval', selection: { model: 'terra', reasoningEffort: 'high', serviceTier: 'fast' }, plan: { kind: 'execution', status: 'completed', explanation: 'Ready' } });
     expect(snapshot).toEqual(original);
     expect(projectCodexConversation(codex([], { executionPlan: { ...snapshot.executionPlan!, steps: [] } }))?.plan?.status).toBe('inProgress');
     expect(projectCodexConversation(codex())?.plan).toBeNull();

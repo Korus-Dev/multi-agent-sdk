@@ -1,5 +1,5 @@
 import type { CodexConversationSnapshot } from '../core/surface';
-import type { ClaudeConversationSnapshot, CursorConversationSnapshot, AntigravityConversationSnapshot, ThreadPlan } from '../contracts';
+import type { ClaudeConversationSnapshot, CursorConversationSnapshot, AntigravityConversationSnapshot, ThreadPlan, BackendSession } from '../contracts';
 import { claudePaneClientRequests } from './claude-pane-client-requests';
 import { providerPaneClientRequests } from './provider-pane-client-requests';
 type NativeSnapshot = CodexConversationSnapshot | ClaudeConversationSnapshot | CursorConversationSnapshot | AntigravityConversationSnapshot;
@@ -9,12 +9,21 @@ export type ConversationPresentation = Pick<NativeSnapshot,
   'messages' | 'turns' | 'activeTurnId' | 'busy' | 'error' | 'historyLoading' | 'historyState' | 'contextUsage' | 'answeredClientRequestIds'
 > & {
   latestTurnId: string | null;
+  selection?: { model?: string | null; reasoningEffort?: string | null; serviceTier?: string | null };
+  permission?: string | null;
   clientRequests: NonNullable<CodexConversationSnapshot['clientRequests']>;
   approvals?: CodexConversationSnapshot['approvals'];
   goal?: CodexConversationSnapshot['goal'];
   plan?: ThreadPlan | null;
 };
 type Project<S> = (snapshot: S | null | undefined) => ConversationPresentation | null;
+/** Settings evidence carried by native session identity, without caller defaults. */
+export function projectSessionSelection(session: BackendSession | null | undefined): ConversationPresentation['selection'] {
+  return session?.kind === 'claude' && session.model
+    ? { model: session.model, reasoningEffort: session.reasoningEffort ?? null }
+    : undefined;
+}
+
 function common(snapshot: NativeSnapshot) {
   return {
     messages: snapshot.messages, turns: snapshot.turns, activeTurnId: snapshot.activeTurnId,
@@ -27,6 +36,8 @@ export const projectCodexConversation: Project<CodexConversationSnapshot> = snap
   if (!snapshot) return null;
   const executionPlan = snapshot.executionPlan;
   return {
+    selection: { model: snapshot.models.find(model => model.id === snapshot.selectedModelId)?.model ?? snapshot.selectedModelId, reasoningEffort: snapshot.selectedReasoningEffort, serviceTier: snapshot.selectedServiceTier },
+    permission: snapshot.approvalPreset,
     ...common(snapshot), latestTurnId: snapshot.turnIds.at(-1) ?? null,
     clientRequests: snapshot.clientRequests, approvals: snapshot.approvals, goal: snapshot.goal,
     plan: executionPlan ? {
