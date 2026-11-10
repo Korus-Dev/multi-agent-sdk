@@ -1,4 +1,4 @@
-export { ClaudeConversationHost } from './host';
+export { ClaudeHost } from './host';
 export type { ClaudeHostOptions, ClaudeHistoryLoader } from './host';
 export { ClaudeAgentSdkTransport } from './agent-sdk-transport';
 export type * from './transport';

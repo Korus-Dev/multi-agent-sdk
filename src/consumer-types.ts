@@ -7,10 +7,10 @@ export type { AgentRequest, AgentRequestResponse, AgentRequestOutcome } from './
 export type { ExecutionObservation, RequestObservation } from './contracts/usage';
 export type { HarnessMcpEndpoint, HarnessTextGenerationInput, HarnessTextGenerationResult } from './generation';
 /** Provider-authored catalog metadata is optional; portable selection uses model/id. */
-export type ModelOption = Omit<import('./contracts').BackendModelOption, 'displayName'> & { displayName?: string };
-export type SkillSummary = import('./contracts').BackendSkillSummary;
-export type PluginSummary = Omit<import('./contracts').BackendPluginSummary, 'displayName'> & { displayName?: string };
-export type RuntimeStatus = Omit<import('./contracts').BackendRuntimeStatus, 'detail' | 'capabilities'> & { detail?: string };
+export type ModelOption = Omit<import('./contracts/index').BackendModelOption, 'displayName'> & { displayName?: string };
+export type SkillSummary = import('./contracts/index').BackendSkillSummary;
+export type PluginSummary = Omit<import('./contracts/index').BackendPluginSummary, 'displayName'> & { displayName?: string };
+export type RuntimeStatus = Omit<import('./contracts/index').BackendRuntimeStatus, 'detail' | 'capabilities'> & { detail?: string };
 /** Provider-specific account/login detail is an explicit native escape hatch. */
 export type Authentication = { connected: boolean; native: import('./contracts/authentication').ProviderAuthentication };
 export type SessionStatus = { type: 'idle' | 'working' | 'awaitingInput' | 'error'; detail?: string; message?: string; native?: import('./contracts/status').AgentStatus };
@@ -23,8 +23,8 @@ declare const refBrand: unique symbol;
 export type Session = { readonly [sessionBrand]: true };
 export type ConversationRef = { readonly [refBrand]: true };
 /** Plain restoration data. Consumers own serialization and storage. */
-export type ConversationRefData = { provider: HarnessProvider; data: import('./contracts').BackendConversationRef };
-export type SessionData = { provider: HarnessProvider; data: import('./contracts').BackendSession; defaults?: HarnessDefaults; role: 'main' | 'scope'; parentId?: string };
+export type ConversationRefData = { provider: HarnessProvider; data: import('./contracts/index').BackendConversationRef };
+export type SessionData = { provider: HarnessProvider; data: import('./contracts/index').BackendSession; defaults?: HarnessDefaults; role: 'main' | 'scope'; parentId?: string };
 
 export type HarnessContext = { id: string; folder: string | null; name?: string | null; defaults?: HarnessDefaults };
 export type HarnessDefaults = { model?: string; reasoningEffort?: string; serviceTier?: string | null; permission?: string };
@@ -54,9 +54,9 @@ export type SessionState = {
   historyLoading?: boolean;
   historyState?: HistoryState;
   requests: AgentRequest[]; error: string | null;
-  title: string | null; goal: import('./contracts').ThreadGoal | null;
-  contextUsage: import('./contracts').AgentContextUsage | null;
-  plan: import('./contracts').ThreadPlan | null;
+  title: string | null; goal: import('./contracts/index').ThreadGoal | null;
+  contextUsage: import('./contracts/index').AgentContextUsage | null;
+  plan: import('./contracts/index').ThreadPlan | null;
 };
 export type HarnessEvent =
   | { type: 'session.changed'; session: Session; state: SessionState }
@@ -70,14 +70,14 @@ export type HarnessEvent =
 export type HarnessDriver = {
   getRuntimeStatus(): RuntimeStatus;
   authenticate(action: AuthenticationAction): Promise<Authentication>;
-  getAccountRateLimits(): Promise<import('./contracts').AccountRateLimits | null>;
+  getAccountRateLimits(): Promise<import('./contracts/index').AccountRateLimits | null>;
   listModels(session: Session): Promise<ModelOption[]>;
   listSkills(session: Session, forceReload?: boolean): Promise<SkillSummary[]>;
   listPlugins(session: Session): Promise<PluginSummary[]>;
   generateText(session: Session, input: import('./generation').HarnessTextGenerationInput): Promise<import('./generation').HarnessTextGenerationResult>;
   generateImage(session: Session, input: import('./generation').HarnessImageGenerationInput, signal?: AbortSignal): Promise<import('./generation').HarnessImageGenerationResult>;
   setConversationTitle(session: Session, title: string): Promise<void>;
-  setGoal(session: Session, objective: string): Promise<Admission & { goal?: import('./contracts').ThreadGoal }>;
+  setGoal(session: Session, objective: string): Promise<Admission & { goal?: import('./contracts/index').ThreadGoal }>;
   clearGoal(session: Session): Promise<Admission & { cleared?: boolean }>;
   steerPrompt(session: Session, prompt: string, options?: PromptOptions): Promise<Admission>;
   deleteTurn(session: Session, turnId: string): Promise<TurnActionResult>;
@@ -88,7 +88,7 @@ export type HarnessDriver = {
   archiveConversation(session: Session): Promise<void>;
   deleteConversation(session: Session): Promise<void>;
   readConversationMessages(session: Session, ref: ConversationRef): Promise<Message[]>;
-  readConversationContent(session: Session, input: Omit<import('./contracts').ConversationContentInput, 'sessionId'>): Promise<import('./contracts').ConversationContentChunk>;
+  readConversationContent(session: Session, input: Omit<import('./contracts/index').ConversationContentInput, 'sessionId'>): Promise<import('./contracts/index').ConversationContentChunk>;
   open(context: HarnessContext): Session;
   /** Detached native restoration data; the consumer owns serialization and storage. */
   getSessionData(session: Session): SessionData;

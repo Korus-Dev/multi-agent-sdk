@@ -1,6 +1,7 @@
+import type { SendMessageOptions } from './ui';
 import type { ExecutionSelectionOverrides } from './execution';
 import type { PromptPart } from './prompt';
-import type { SurfaceMessageQuestionPart } from './ui';
+import type { ConversationMessageQuestionPart } from './ui';
 
 export type ThreadGoalStatus = 'active' | 'paused' | 'blocked' | 'usageLimited' | 'budgetLimited' | 'complete';
 
@@ -290,7 +291,7 @@ export type MessageMedia = {
 export type MessagePart =
   | { type: 'attachment'; attachment: MessageAttachment }
   | { type: 'media'; media: MessageMedia; itemId?: string }
-  | SurfaceMessageQuestionPart
+  | ConversationMessageQuestionPart
   | { type: 'reasoning'; summary: string; itemId: string; summaryIndex: number }
   | { type: 'text'; text: string; itemId?: string; phase?: 'commentary' | 'partial_answer' | 'final_answer' }
   | {
@@ -468,3 +469,39 @@ export type RendererToolPart = ToolPart;
 export type RendererToolPartUpdate = ToolPartUpdate;
 /** @deprecated Use Message. */
 export type RendererMessage = Message;
+
+
+
+export type ConversationQueuedPrompt = {
+  id: string;
+  text: string;
+  options?: SendMessageOptions;
+};
+
+
+
+export type ConversationTurnGitDiff = {
+  turnId: string;
+  addedLines: number;
+  removedLines: number;
+  diff?: string;
+  updatedAt: string;
+};
+
+
+export type ConversationHistoryReason = 'fork' | 'load' | 'resume' | 'rollback' | 'resync' | 'details' | 'images';
+
+
+export type FileActivityAction = 'read' | 'edit' | 'create';
+
+
+export type FileActivityStatus = 'running' | 'completed' | 'failed';
+
+
+export type ConversationExecutionPlan = {
+  turnId: string;
+  explanation: string | null;
+  steps: readonly ThreadPlanStep[];
+  markdown: string;
+  updatedAt: string;
+};

@@ -90,8 +90,3 @@ export function trimPromptContent(content: readonly PromptPart[]): PromptPart[] 
   }
   return parts;
 }
-
-/** @deprecated Use PromptMention. */
-export type CodexPromptMention = PromptMention;
-/** @deprecated Use PromptPart. */
-export type CodexPromptPart = PromptPart;

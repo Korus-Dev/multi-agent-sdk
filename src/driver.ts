@@ -51,7 +51,7 @@ export type HarnessDriver<Context = HarnessSessionContext, Event = unknown, Hist
   readonly backend: string;
   authenticate?(request: import('./contracts/authentication').ProviderAuthenticationAction): Promise<import('./contracts/authentication').ProviderAuthentication>;
   getRuntimeStatus(): BackendRuntimeStatus;
-  getAccountRateLimits?(): Promise<import('./contracts').AccountRateLimits | null>;
+  getAccountRateLimits?(): Promise<import('./contracts/index').AccountRateLimits | null>;
   getCapabilities(agent: Context): BackendCapabilities;
   sendPrompt(agent: Context, prompt: string, options?: SendPromptOptions): Promise<HarnessSendResult>;
   executeScopedPrompt?(agent: Context, input: HarnessScopedPromptInput): Promise<HarnessScopedPromptResult>;

@@ -1,2342 +1,1415 @@
-import { validateMcpPolicy } from '../../mcp-policy';
-import { notifyListeners } from '@korus-dev/codex-sdk';
-import type { HarnessDiagnostic } from '../../diagnostics';
-import { CodexImageGeneration } from './image-generation';
-import { promptContentDispatchText } from '../../core/surface';
-import type { HarnessPromptScope } from '../../driver';
-export type CodexHostOptions<Context extends Agent = Agent> = {
-  /** Structured measurements; no application environment flags or log formatting. */
-  onDiagnostic?: (record: HarnessDiagnostic) => void;
-  onListenerError?: (error: unknown) => void;
-  /** Existing conversations keep provider settings; defaults still apply to creation. */
-  inheritNativeSettings?: boolean;
-  defaultModel?: { model: string; reasoningEffort?: string };
-  extensionContext?: (context: Context, scope?: HarnessPromptScope) => unknown;
-  conversationConfiguration?: (context: Context, scope?: HarnessPromptScope) => import('./codex-surface-contracts').CodexConversationLoadOptions;
-  shouldSyncTitle?: (context: Context) => boolean;
-  displayName?: (context: Context) => string;
-  retainedSessions?: (context: Context) => readonly BackendSession[];
-  approvalPresetFromDefaults?: (defaults: import('../../contracts').BackendDefaults | undefined) => ApprovalPreset;
-  formatPrompt?: typeof defaultFormatPrompt;
-  statusFromSnapshot?: typeof statusFromSnapshot;
-  runtimeStatusDetail?: (status: 'connecting' | 'running' | 'notConfigured') => import('../../contracts').AppText;
-  images?: import('./image-generation').CodexImageGenerationOptions;
-};
-function defaultFormatPrompt(prompt: string, content?: SendPromptOptions['content'], _native?: boolean): string { return content === undefined ? prompt : promptContentDispatchText(content, prompt); }
-function scopedMcpServers(scope: HarnessPromptScope) { return (scope.mcpServers ?? []).map(server => ({ name: server.name, transport: { type: 'http' as const, url: server.url }, ...(server.enabledTools ? { enabledTools: [...server.enabledTools] } : {}), ...(server.approval === 'auto' ? { toolApprovalMode: 'auto' as const } : {}), ...(server.required === undefined ? {} : { required: server.required }) })); }
-function nativeApprovalPreset(defaults: import('../../contracts').BackendDefaults | undefined): ApprovalPreset | undefined {
-  if (defaults?.kind !== 'codex') return undefined;
-  // Missing caller policy inherits the native thread; it is not an approval override.
-  if (defaults.approvalPreset === undefined && defaults.approvalPolicy === undefined && defaults.sandboxMode === undefined && defaults.approvalsReviewer === undefined) return undefined;
-  if (defaults.approvalPreset) return defaults.approvalPreset;
-  if (defaults.approvalPolicy === 'never' && defaults.sandboxMode === 'danger-full-access') return 'full-access';
-  return defaults.approvalPolicy === 'on-request' && ['auto_review','guardian_subagent'].includes(defaults.approvalsReviewer ?? '') ? 'approve-for-me' : 'ask-for-approval';
-}
-import { providerSafetyBlockMessage, type ProviderSafetyReviewTarget } from '../../contracts/safety-review';
-
+import { readCodexMessages } from './codex-read-messages';
+import { CodexOriginalHistoryImages } from './codex-original-history-images';
+import { CodexOriginalHistoryUsage } from './codex-original-history-usage';
 import { ConversationContentTransport } from './conversation-content-transport';
-
-
-import { normalizePromptContent } from '../../core/surface';
-import type { ExecutionObservation } from '../../contracts/usage';
-import { codexExecutionConsumption } from './execution-usage';
-import { codexRequestCoverage } from './request-usage';
-import { bankedResetsFromSurface } from './banked-resets';
-import { randomUUID } from 'node:crypto';
-import { isBankedResetResult, isUseBankedResetInput, type BankedResetResult, type UseBankedResetInput } from '../../contracts/banked-resets';
-
-import os from 'node:os';
-import { approvalAgentRequest, approvalOutcome, requestFromClientRequest, agentResponseFromClientResponse } from '../../conversations/agent-request';
-import path from 'node:path';
-import { pathToFileURL } from 'node:url';
-import type {
-  Agent,
-  AgentStatus,
-  ApprovalPreset,
-  BackendModelOption,
-  BackendPluginSummary,
-  BackendRuntimeStatus,
-  BackendSession,
-  BackendSkillSummary,
-  ClientRequestResponse,
-  ConversationListInput,
-  ConversationResumeTarget,
-  ConversationSummary,
-  DevicePairingSession,
-  DevicePairingStatus,
-  Message,
-  MessagePart,
-  ToolPart,
-  PairedDevice,
-  SendPromptOptions,
-  CodexAuthentication, SubagentActivityChange,
-  SubagentIdentityChange,
-  SubagentOperationChange,
-  SubagentStatusChange
-} from '../../contracts/index';
-import type { HarnessScopedPromptInput, HarnessScopedPromptResult, HarnessEvent } from '../../driver';
-import type { HarnessTextGenerationInput, HarnessTextGenerationResult } from '../../generation';
-import { codexBackendCapabilities } from '../../capabilities';
-
-
-
-
-import type { CodexConversation, CodexSurface } from './index';
-
-
-import { safetyReviewFromSnapshot, statusFromSnapshot } from './status';
-import type {
-  CodexConversationEvent,
-  CodexConversationSummary,
-  CodexConversationSnapshot,
-  CodexSurfaceEvent,
-  CodexSurfaceRateLimits,
-  CodexSurfaceReviewTarget,
-  CodexSurfaceSnapshot,
-  CodexSurfaceSkill,
-  CodexSurfaceTurnStatus,
-  CodexSurfaceThreadStatus,
-  SendCodexMessageOptions,
-  UpdateCodexConversationSettings,
-  SurfaceMessage,
-  SurfaceMessagePart,
-  SurfaceMessageToolPart,
-} from '../../core/surface';
 import {
-  invokeCodexConversationBridgeOperation,
-  subscribeCodexConversationReplicaBridge,
-} from '../../core/surface-bridge';
+  CodexAppServerClient,
+  type ServerNotification,
+  type v2,
+} from '@korus-dev/codex-sdk';
+import { notifyListeners } from '@korus-dev/codex-sdk';
+import type {
+  CodexConversationSummary,
+  CodexConversationEvent,
+  CodexConversationHistory,
+  CodexConversationHistoryPage,
+  CodexConversationSnapshot,
+  ApprovalDecision,
+  ApprovalScope,
+  CodexChatGptDeviceCodeLogin,
+  CodexChatGptLogin,
+  ClientRequestResponse,
+  CodexHostEvent,
+  HostEventOrigin,
+  ModelDescriptor,
+  CodexRateLimits,
+  CodexAccountUsage,
+  ConsumeCodexRateLimitResetCreditOptions,
+  CodexRateLimitResetCreditResult,
+  ReadCodexRateLimitsOptions,
+  CodexHostSnapshot,
+  Skill,
+  CreateCodexConversationOptions,
+  ListCodexConversationsOptions,
+  ListCodexModelsOptions,
+  SendMessageOptions,
+  StartCodexRealtimeOptions,
+  StartCodexLiveChatOptions,
+  StartCodexReviewOptions,
+  ConversationMessage,
+  UpdateConversationSettings,
+  CodexHostStatePatch,
+  CodexVersionedHostSnapshot,
+} from '../../core/codex-host';
+import { diffCodexHostState } from '../../core/host-bridge';
+import {
+  CodexAppServerStdioTransport,
+} from '@korus-dev/codex-sdk';
+import {
+  CodexAppServerUnixSocketTransport,
+} from '@korus-dev/codex-sdk';
+import {
+  errorMessage,
+  normalizedConversationId,
+} from './host-prompts';
+import { startCodexRealtimeSession } from './host-realtime-session';
+import type {
+  CodexConversation,
+  CodexConversationForkResult,
+  CodexConversationHostOptions,
+  CodexConversationLoadOptions,
+  CodexRealtimeSession,
+  CodexConfigRequirements,
+  CodexHostOptions,
+  CodexRemoteControlClientPage,
+  CodexRemoteControlPairing,
+  CodexRemoteControlPairingStatus,
+  CodexRemoteControlStatus,
+  HarnessTextGenerationResult,
+  ForkCodexConversationOptions,
+  GenerateCodexTextOptions,
+  ListCodexSkillsOptions,
+} from './host-contracts';
+import {
+  initialHostSnapshot,
+  type ThreadRuntimePatch,
+  type ThreadRuntimeState,
+} from './host-runtime';
+import {
+  initialAuthentication,
+  hostAuthenticationIdentityKey,
+} from './host-authentication';
+import { hostAccountUsage, hostRateLimits } from './host-data';
+import {
+  isUnixSocketTransportOptions,
+  hostTransportOptions,
+} from './host-transport-options';
+import { CodexHostAuthenticationController } from './host-authentication-controller';
+import { createCodexConversationHandle } from './codex-conversation-handle';
+import { CodexHostItemsController } from './host-items-controller';
+import { CodexHostClientRequestsController } from './host-client-requests-controller';
+import { CodexHostCatalogController } from './host-catalog-controller';
+import { CodexHostApprovalsController } from './host-approvals-controller';
+import { CodexHostExtensionsController } from './host-extensions-controller';
+import { CodexHostConversationsController } from './host-conversations-controller';
+import { CodexHostConversationSettingsController } from './host-conversation-settings-controller';
+import { CodexHostTurnActionsController } from './host-turn-actions-controller';
+import { CodexHostMessagesController } from './host-messages-controller';
+import { CodexHostLifecycleController } from './host-lifecycle-controller';
+import { CodexHostNotificationsController } from './host-notifications-controller';
+import { CodexHostRuntimeController } from './host-runtime-controller';
+import { CodexHostConnectionController } from './host-connection-controller';
+import { CodexHostForkController } from './host-fork-controller';
+import { CodexMarkdownImageHydrator } from './codex-markdown-images';
+import {
+  readPromptHistory,
+} from './host-prompt-history';
+import { CodexHostTextGenerationController } from './host-text-generation-controller';
+import { CodexHostUsageController } from './host-usage-controller';
 
-type AdapterListener = (event: HarnessEvent) => void;
-type ThreadBackendEvent<Event extends HarnessEvent = HarnessEvent> = Event extends HarnessEvent
-  ? Omit<Event, 'agentId' | 'backend' | 'threadId' | 'conversationId'>
+export type {
+  CodexAppServerTransportOptions,
+  CodexConversation,
+  CodexConversationDefaults,
+  CodexConversationForkResult,
+  CodexConversationHostOptions,
+  CodexConversationLoadOptions,
+  CodexDynamicTool,
+  CodexDynamicToolCall,
+  CodexDynamicToolContent,
+  CodexDynamicToolResult,
+  CodexRealtimeSession,
+  CodexConfigRequirements,
+  CodexHostExtension,
+  CodexHostOptions,
+  CodexRemoteControlClient,
+  CodexRemoteControlClientPage,
+  CodexRemoteControlPairing,
+  CodexRemoteControlPairingStatus,
+  CodexRemoteControlStatus,
+  CodexThreadStartExtension,
+  HarnessTextGenerationResult,
+  ForkCodexConversationOptions,
+  GenerateCodexTextOptions,
+  ListCodexSkillsOptions,
+} from './host-contracts';
+
+export type {
+  CodexMcpServerDefinition,
+  CodexMcpServerTransport,
+  CodexMcpServerToolApprovalMode,
+} from './host-mcp';
+
+type StateListener = (snapshot: CodexHostSnapshot) => void;
+type StatePatchListener = (patch: CodexHostStatePatch) => void;
+type ConversationStateListener = (snapshot: CodexConversationSnapshot) => void;
+type HostEventListener = (event: CodexHostEvent) => void;
+type ConversationEventListener = (event: CodexConversationEvent) => void;
+type HostEventInput = CodexHostEvent extends infer Event
+  ? Event extends CodexHostEvent
+    ? Omit<Event, 'seq' | 'occurredAt' | 'origin'>
+    : never
   : never;
 
-const AGENT_HISTORY_CACHE_TTL_MS = 15 * 60 * 1_000;
-const SESSION_HANDOFF_TARGET_CHARACTERS = 4_000;
-const SESSION_HANDOFF_MAX_CHARACTERS = 6_000;
-const SESSION_HANDOFF_TIMEOUT_MS = 8 * 60 * 1_000;
-const SESSION_HANDOFF_MODEL = 'gpt-5.6-luna';
-const SESSION_HANDOFF_REASONING_EFFORT = 'low';
-
-function selectedCodexModel(snapshot: CodexConversationSnapshot): string | null {
-  const selected = snapshot.models.find(
-    (model) =>
-      model.id === snapshot.selectedModelId ||
-      model.model === snapshot.selectedModelId,
-  ) ?? snapshot.models.find((model) => model.isDefault) ?? snapshot.models[0];
-  return selected?.model ?? snapshot.selectedModelId;
-}
-const SESSION_HANDOFF_PROMPT = `Prepare a handoff for a fresh continuation of this coding session.
-
-Return only a concise Markdown handoff. Do not call tools, modify files, spawn agents, ask questions, or continue the implementation.
-
-Summarize the full session from beginning to end, not only its recent messages. Cover every meaningful activity in chronological order, including completed work, discarded approaches, discoveries, decisions, implementation, fixes, validation, user feedback, and changes in direction. Give earlier activities concise but sufficient coverage, then give substantially more detail to the most recent activity so work can continue without rediscovery. An activity means a coherent body of work, not an individual message or turn.
-
-End with the current objective and status, constraints, unresolved problems, precise next steps, and important user preferences. Preserve exact identifiers, paths, commands, errors, and commit hashes when they matter. Aim for about ${SESSION_HANDOFF_TARGET_CHARACTERS} characters and never exceed ${SESSION_HANDOFF_MAX_CHARACTERS} characters.`;
-
-type AgentConversation<Context extends Agent = Agent> = {
-  agent: Context;
-  handle: CodexConversation;
-  images: ConversationContentTransport;
-  suppressEvents: boolean;
-  unsubscribe: () => void;
-};
-
-type SubagentOwner = {
-  agentId: string;
-  rootConversationId: string;
-};
-
-export class CodexSurfaceAgentAdapter<Context extends Agent = Agent> {
-  private readonly imageGeneration: CodexImageGeneration;
-  private readonly listeners = new Set<AdapterListener>();
-  private readonly usageListeners = new Set<(observation:ExecutionObservation)=>void>();
-  private readonly sessionsByAgentId = new Map<string, AgentConversation<Context>>();
-  private readonly submissions = new Map<string, Promise<void>>();
-  private readonly sessionInitializations = new Map<string, Promise<AgentConversation<Context>>>();
-  private readonly historyHydratedAtByAgentId = new Map<string, number>();
-  private readonly agentIdsByThreadId = new Map<string, string>();
-  private readonly approvalOwners = new Map<string, AgentConversation<Context>>();
-  private readonly clientRequestOwners = new Map<string, AgentConversation<Context>>();
-  private readonly subagentOwners = new Map<string, SubagentOwner>();
-  private readonly conversationSummaries = new Map<string, CodexConversationSummary>();
-  private readonly lastSubagentIdentityByConversationId = new Map<string, string>();
-  private readonly subagentIdentityLoads = new Map<string, Promise<void>>();
-  private readonly liveSubagentConversationIds = new Set<string>();
-  private readonly conversationRevisionsByAgentId = new Map<string, number>();
-  private readonly unsubscribeSurface: () => void;
+export class CodexHost {
+  private readonly client: CodexAppServerClient;
+  private readonly listeners = new Set<StateListener>();
+  private readonly patchListeners = new Set<StatePatchListener>();
+  private stateVersion = 0;
+  private readonly eventListeners = new Set<HostEventListener>();
+  private readonly conversationListeners = new Map<string, Set<ConversationStateListener>>();
+  private readonly conversationHandles = new Map<string, CodexConversation>();
+  private readonly extensions: CodexHostExtensionsController;
+  private readonly authentication: CodexHostAuthenticationController;
+  private readonly items: CodexHostItemsController;
+  private readonly clientRequests: CodexHostClientRequestsController;
+  private readonly catalog: CodexHostCatalogController;
+  private readonly approvals: CodexHostApprovalsController;
+  private readonly conversations: CodexHostConversationsController;
+  private readonly conversationSettings: CodexHostConversationSettingsController;
+  private readonly turnActions: CodexHostTurnActionsController;
+  private readonly messagesController: CodexHostMessagesController;
+  private readonly lifecycle: CodexHostLifecycleController;
+  private readonly originalImages?: CodexOriginalHistoryImages;
+  private readonly originalUsage?: CodexOriginalHistoryUsage;
+  private readonly usageRefreshes = new Map<string, { again: boolean }>();
+  private readonly forks: CodexHostForkController;
+  private readonly notifications: CodexHostNotificationsController;
+  private readonly runtimeState: CodexHostRuntimeController;
+  private readonly markdownImages: CodexMarkdownImageHydrator;
+  private readonly connection: CodexHostConnectionController;
+  private readonly textGeneration: CodexHostTextGenerationController;
+  private readonly unsubscribeDisconnect: () => void;
+  private readonly unsubscribeNotification: () => void;
+  private readonly unsubscribeToolInputRequests: () => void;
+  private readonly unsubscribeMcpElicitationRequests: () => void;
+  private eventSequence = 0;
+  private readonly usage = new CodexHostUsageController();
+  private accountGeneration = 0;
+  private readonly pendingMarkdownImageHydrations = new Set<string>();
   private closed = false;
-  private accountRevision = 0;
-  private accountIdentity = '';
-  private readonly resetReadCancellations = new Set<() => void>();
-  private resetCreditTokens = new Map<string, { token: string; idempotencyKey?: string; uncertain?: boolean }>();
+  private state: CodexHostSnapshot = initialHostSnapshot(initialAuthentication());
 
-  constructor(
-    private readonly surface: CodexSurface,
-    private readonly closeSurface: () => Promise<void> = () => surface.close(),
-    private readonly options: CodexHostOptions<Context> = {},
+  constructor(private readonly options: CodexHostOptions = {}) {
+    this.extensions = new CodexHostExtensionsController(
+      options.extensions ?? [],
+      options.mcpServers ?? [],
+      (threadId) => this.lifecycle.hostOptions(threadId),
+    );
+    const transportOptions = hostTransportOptions(options);
+    this.client = options.client ?? new CodexAppServerClient(
+      isUnixSocketTransportOptions(transportOptions)
+        ? new CodexAppServerUnixSocketTransport(transportOptions)
+        : new CodexAppServerStdioTransport(transportOptions),
+      { onListenerError: options.onListenerError, onRequestSettled: options.onRequestSettled },
+    );
+    this.originalImages = options.originalHistoryImages ? new CodexOriginalHistoryImages(this.client) : undefined;
+    this.originalUsage = options.originalHistoryUsage ? new CodexOriginalHistoryUsage(this.client) : undefined;
+    this.markdownImages = new CodexMarkdownImageHydrator(this.client);
+    this.authentication = new CodexHostAuthenticationController(this.client, {
+      bootstrapHostData: (force) => this.connection.bootstrapHostData(force),
+      clearAuthenticatedHostData: () => this.connection.clearAuthenticatedHostData(),
+      getSnapshot: () => this.getSnapshot(),
+      patchAuthentication: (patch, origin) => this.connection.patchAuthentication(patch, origin),
+      reportError: (error) => this.patch({ error: errorMessage(error) }),
+    });
+    this.items = new CodexHostItemsController({
+      assistantMessageForTurn: (threadId, turnId) => this.assistantMessageForTurn(threadId, turnId),
+      emitConversationActivity: (threadId, origin) => this.emitConversationActivity(threadId, origin),
+      emitEvent: (origin, input) => this.emitEvent(origin, input),
+      emitSummaryUpserted: (summary, reason, origin) => this.emitSummaryUpserted(summary, reason, origin),
+      getState: () => this.state,
+      markRuntimeTurnActive: (runtime, turnId) => this.markRuntimeTurnActive(runtime, turnId),
+      messageContainingTool: (threadId, turnId, itemId) => (
+        this.messageContainingTool(threadId, turnId, itemId)
+      ),
+      patch: (patch) => this.patch(patch),
+      patchRuntime: (threadId, patch) => this.patchRuntime(threadId, patch),
+      requireRuntime: (threadId) => this.requireRuntime(threadId),
+      sendNextQueuedPrompt: (threadId) => { void this.messagesController.sendNextQueuedPrompt(threadId); },
+    });
+    this.approvals = new CodexHostApprovalsController(this.client, {
+      activeConversationId: () => this.state.activeConversationId,
+      createRuntime: (threadId, patch) => this.createRuntime(threadId, patch),
+      emitConversationActivity: (threadId, origin) => this.emitConversationActivity(threadId, origin),
+      emitEvent: (origin, input) => this.emitEvent(origin, input),
+      markRuntimeTurnActive: (runtime, turnId) => this.markRuntimeTurnActive(runtime, turnId),
+      maybeClearWaitingBusy: (threadId) => this.clientRequests.maybeClearWaitingBusy(threadId),
+      patch: (patch) => this.patch(patch),
+      patchConversationStatus: (threadId, status) => this.patchConversationStatus(threadId, status),
+      patchRuntime: (threadId, patch) => this.patchRuntime(threadId, patch),
+    });
+    this.clientRequests = new CodexHostClientRequestsController({
+      activeConversationId: () => this.state.activeConversationId,
+      answerAsyncQuestion: (threadId, prompt, displayText) => (
+        this.messagesController.answerAsyncQuestion(threadId, prompt, displayText)
+      ),
+      emitConversationActivity: (threadId, origin) => this.emitConversationActivity(threadId, origin),
+      emitEvent: (origin, input) => this.emitEvent(origin, input),
+      hasPendingApproval: (threadId) => this.approvals.hasForThread(threadId),
+      markRuntimeTurnActive: (runtime, turnId) => this.markRuntimeTurnActive(runtime, turnId),
+      messageContainingTool: (threadId, turnId, itemId) => (
+        this.messageContainingTool(threadId, turnId, itemId)
+      ),
+      patchRuntime: (threadId, patch) => this.patchRuntime(threadId, patch),
+      requireRuntime: (threadId) => this.requireRuntime(threadId),
+    });
+    this.runtimeState = new CodexHostRuntimeController(
+      this.approvals,
+      this.clientRequests,
+      {
+        emitEvent: (origin, input) => this.emitEvent(origin, input),
+        getState: () => this.state,
+        notifyConversationListeners: (threadId) => this.notifyConversationListeners(threadId),
+        patch: (patch, conversationId) => this.patch(patch, conversationId),
+        schedulePluginRefresh: () => this.catalog.schedulePluginRefresh(),
+      },
+    );
+    this.conversationSettings = new CodexHostConversationSettingsController(
+      this.client,
+      {
+        approvalMode: options.approvalMode,
+        approvalPreset: options.approvalPreset,
+        permissionMode: options.permissionMode,
+      },
+      {
+        createConversation: async () => { await this.createConversation(); },
+        emitConversationSettings: (threadId, origin) => this.emitConversationSettings(threadId, origin),
+        emitEvent: (origin, input) => this.emitEvent(origin, input),
+        emitSummaryUpserted: (summary, reason, origin) => this.emitSummaryUpserted(summary, reason, origin),
+        ensureConnected: () => this.ensureConnected(),
+        ensureThreadReady: (threadId) => this.ensureThreadReady(threadId),
+        getSnapshot: () => this.getSnapshot(),
+        getState: () => this.state,
+        patch: (patch) => this.patch(patch),
+        patchRuntime: (threadId, patch) => this.patchRuntime(threadId, patch),
+        snapshotForRuntime: (runtime) => this.snapshotForRuntime(runtime),
+      },
+    );
+    this.turnActions = new CodexHostTurnActionsController(this.client, {
+      createConversation: async () => { await this.createConversation(); },
+      emitConversationActivity: (threadId, origin) => this.emitConversationActivity(threadId, origin),
+      emitEvent: (origin, input) => this.emitEvent(origin, input),
+      emitHistoryReplaced: (threadId, reason, origin) => this.emitHistoryReplaced(threadId, reason, origin),
+      emitSummaryUpserted: (summary, reason, origin) => this.emitSummaryUpserted(summary, reason, origin),
+      ensureThreadReady: (threadId) => this.ensureThreadReady(threadId),
+      loadTurnHistory: (threadId, turnId) => this.conversations.loadTurnHistory(threadId, turnId),
+      getSnapshot: () => this.getSnapshot(),
+      getState: () => this.state,
+      hydrateCompleteHistory: (threadId, options) => this.conversations.hydrateCompleteHistory(threadId, options),
+      patch: (patch) => this.patch(patch),
+      patchConversationStatus: (threadId, status, origin) => this.patchConversationStatus(threadId, status, origin),
+      patchConversationTurnCount: (threadId, count, origin) => this.patchConversationTurnCount(threadId, count, origin),
+      patchRuntime: (threadId, patch) => this.patchRuntime(threadId, patch),
+      sendMessageToThread: (threadId, prompt, options) => this.messagesController.sendToThread(threadId, prompt, options),
+    });
+    this.messagesController = new CodexHostMessagesController(this.client, {
+      loadSkillsForThread: async threadId => {
+        const runtime = this.requireRuntime(threadId);
+        await this.catalog.listSkills({ ...(runtime.cwd ? { cwd: runtime.cwd } : {}) });
+      },
+      clearGoalForThread: (threadId) => this.conversationSettings.clearGoalForThread(threadId),
+      compactForThread: (threadId) => this.turnActions.compactForThread(threadId),
+      createConversation: async () => { await this.createConversation(); },
+      emitConversationActivity: (threadId, origin) => this.emitConversationActivity(threadId, origin),
+      emitEvent: (origin, input) => this.emitEvent(origin, input),
+      ensureConnected: () => this.ensureConnected(),
+      ensureThreadReady: (threadId) => this.ensureThreadReady(threadId),
+      getSnapshot: () => this.getSnapshot(),
+      getState: () => this.state,
+      patchConversationStatus: (threadId, status, origin) => this.patchConversationStatus(threadId, status, origin),
+      patchConversationTurnCount: (threadId, count, origin) => this.patchConversationTurnCount(threadId, count, origin),
+      patchRuntime: (threadId, patch) => this.patchRuntime(threadId, patch),
+      requireRuntime: (threadId) => this.requireRuntime(threadId),
+      setGoal: (objective) => this.conversationSettings.setGoal(objective),
+      setGoalForThread: (threadId, objective) => this.conversationSettings.setGoalForThread(threadId, objective),
+      snapshotForRuntime: (runtime) => this.snapshotForRuntime(runtime),
+      startReview: (options) => this.turnActions.startReview(options),
+      startReviewForThread: (threadId, options) => this.turnActions.startReviewForThread(threadId, options),
+      updateSettings: (settings) => this.conversationSettings.update(settings),
+      updateSettingsForThread: (threadId, settings) => this.conversationSettings.updateForThread(threadId, settings),
+    });
+    this.catalog = new CodexHostCatalogController(this.client, options.cwd, {
+      authenticationBlocksBootstrap: () => this.authentication.blocksBootstrap(),
+      emitConversationSkills: (threadId, origin) => this.emitConversationSkills(threadId, origin),
+      emitEvent: (origin, input) => this.emitEvent(origin, input),
+      ensureConnected: () => this.ensureConnected(),
+      getState: () => this.state,
+      isClosed: () => this.closed,
+      patch: (patch) => this.patch(patch),
+      patchRuntime: (threadId, patch) => this.patchRuntime(threadId, patch),
+      preferredApprovalPreset: () => this.conversationSettings.preferredApprovalPreset(),
+      runtimes: () => this.runtimeState.values(),
+    });
+    this.conversations = new CodexHostConversationsController(
+      this.client,
+      options.conversationLimit,
+      {
+        emitHistoryReplaced: (threadId, reason, origin) => this.emitHistoryReplaced(threadId, reason, origin),
+        emitHistoryPrepended: (threadId, messages, origin) => this.emitHistoryPrepended(threadId, messages, origin),
+        emitSummaryUpserted: (summary, reason, origin) => this.emitSummaryUpserted(summary, reason, origin),
+        ensureConnected: () => this.ensureConnected(),
+        getSnapshot: () => this.getSnapshot(),
+        getState: () => this.state,
+        patch: (patch) => this.patch(patch),
+        patchRuntime: (threadId, patch) => this.patchRuntime(threadId, patch),
+        removeThread: (threadId, reason, origin) => this.removeThread(threadId, reason, origin),
+        requireRuntime: (threadId) => this.requireRuntime(threadId),
+        runtime: (threadId) => this.runtimeState.get(threadId),
+        schedulePluginRefresh: (force) => this.catalog.schedulePluginRefresh(force),
+      },
+      this.originalImages,
+    );
+    this.lifecycle = new CodexHostLifecycleController(
+      this.client,
+      options,
+      this.catalog,
+      this.extensions,
+      this.conversationSettings,
+      this.conversations,
+      {
+        activateRuntime: (runtime) => this.activateRuntime(runtime),
+        createRuntime: (threadId, patch) => this.createRuntime(threadId, patch),
+        emitConversationActivity: (threadId, origin) => this.emitConversationActivity(threadId, origin),
+        emitConversationPermissions: (threadId, origin) => this.emitConversationPermissions(threadId, origin),
+        emitConversationSettings: (threadId, origin) => this.emitConversationSettings(threadId, origin),
+        emitConversationSkills: (threadId, origin) => this.emitConversationSkills(threadId, origin),
+        emitHistoryReplaced: (threadId, reason, origin) => this.emitHistoryReplaced(threadId, reason, origin),
+        emitSelected: (conversationId) => this.emitEvent('action', {
+          type: 'conversation.selected',
+          payload: { conversationId },
+        }),
+        emitSummaryUpserted: (summary, reason, origin) => this.emitSummaryUpserted(summary, reason, origin),
+        ensureConnected: () => this.ensureConnected(),
+        getSnapshot: () => this.getSnapshot(),
+        getState: () => this.state,
+        observeEmptyConversation: (threadId) => this.usage.observeEmptyConversation(threadId),
+        patch: (patch) => this.patch(patch),
+        patchRuntime: (threadId, patch) => this.patchRuntime(threadId, patch),
+        requireRuntime: (threadId) => this.requireRuntime(threadId),
+        runtime: (threadId) => this.runtimeState.get(threadId),
+        runtimeProjection: (runtime) => this.runtimeProjection(runtime),
+        snapshotForRuntime: (runtime) => this.snapshotForRuntime(runtime),
+      },
+      this.originalImages,
+    );
+    this.forks = new CodexHostForkController(
+      this.client,
+      options.loadingStrategy,
+      this.catalog,
+      this.extensions,
+      {
+        createRuntime: (threadId, patch) => this.createRuntime(threadId, patch),
+        emitConversationActivity: (threadId) => this.emitConversationActivity(threadId, 'action'),
+        emitConversationPermissions: (threadId) => this.emitConversationPermissions(threadId, 'action'),
+        emitConversationSettings: (threadId) => this.emitConversationSettings(threadId, 'action'),
+        emitConversationSkills: (threadId) => this.emitConversationSkills(threadId, 'action'),
+        emitHistoryReplaced: (threadId) => this.emitHistoryReplaced(threadId, 'fork', 'action'),
+        emitSummaryUpserted: (summary) => this.emitSummaryUpserted(summary, 'created', 'action'),
+        getState: () => this.state,
+        hydrateOriginalImages: (threadId, path) => this.conversations.hydrateOriginalImages(threadId, path),
+        hydrateCompleteHistory: (threadId) => this.conversations.hydrateCompleteHistory(threadId),
+        patch: (patch) => this.patch(patch),
+        rememberHostOptions: (threadId, hostOptions) => (
+          this.lifecycle.rememberHostOptions(threadId, hostOptions)
+        ),
+        requireRuntime: (threadId) => this.requireRuntime(threadId),
+        snapshotForRuntime: (runtime) => this.snapshotForRuntime(runtime),
+      },
+      this.originalImages,
+    );
+    this.connection = new CodexHostConnectionController(
+      this.client,
+      options,
+      this.authentication,
+      this.approvals,
+      this.catalog,
+      this.clientRequests,
+      this.conversations,
+      this.items,
+      this.lifecycle,
+      this.runtimeState,
+      {
+        clearConversationHandles: () => this.conversationHandles.clear(),
+        clearPendingForThread: (threadId, reason, eventReason) => (
+          this.clearPendingForThread(threadId, reason, eventReason)
+        ),
+        closed: () => this.closed,
+        emitAuthenticationChanged: (authentication, origin) => this.emitEvent(origin, {
+          type: 'authentication.changed',
+          payload: { authentication: structuredClone(authentication) },
+        }),
+        emitHostStatus: (origin) => this.emitHostStatus(origin),
+        getSnapshot: () => this.getSnapshot(),
+        getState: () => this.state,
+        patch: (patch) => this.patch(patch),
+      },
+    );
+    this.notifications = new CodexHostNotificationsController(
+      this.authentication,
+      this.approvals,
+      this.catalog,
+      this.clientRequests,
+      this.conversations,
+      this.items,
+      {
+        clearPendingForThread: (threadId, reason, eventReason) => (
+          this.clearPendingForThread(threadId, reason, eventReason)
+        ),
+        createRuntime: (threadId, patch) => this.createRuntime(threadId, patch),
+        emitConversationActivity: (threadId, origin) => this.emitConversationActivity(threadId, origin),
+        emitConversationPermissions: (threadId, origin) => this.emitConversationPermissions(threadId, origin),
+        emitConversationSettings: (threadId, origin) => this.emitConversationSettings(threadId, origin),
+        emitConversationSkills: (threadId, origin) => this.emitConversationSkills(threadId, origin),
+        emitEvent: (origin, input) => this.emitEvent(origin, input),
+        emitSummaryUpserted: (summary, reason, origin) => this.emitSummaryUpserted(summary, reason, origin),
+        getState: () => this.state,
+        markRuntimeTurnActive: (runtime, turnId) => this.markRuntimeTurnActive(runtime, turnId),
+        patch: (patch) => this.patch(patch),
+        patchConversationStatus: (threadId, status, origin) => this.patchConversationStatus(threadId, status, origin),
+        patchConversationTurnCount: (threadId, count) => this.patchConversationTurnCount(threadId, count),
+        patchRuntime: (threadId, patch) => this.patchRuntime(threadId, patch),
+        removeThread: (threadId, reason) => this.removeThread(threadId, reason),
+        requireRuntime: (threadId) => this.requireRuntime(threadId),
+        runtime: (threadId) => this.runtimeState.get(threadId),
+        runtimes: () => this.runtimeState.values(),
+        sendNextQueuedPrompt: (threadId) => { void this.messagesController.sendNextQueuedPrompt(threadId); },
+        snapshotForRuntime: (runtime) => this.snapshotForRuntime(runtime),
+        unknownNotification: (notification) => this.handleUnknownNotification(notification),
+      },
+    );
+    this.textGeneration = new CodexHostTextGenerationController(
+      this.client,
+      options.cwd,
+      {
+        ensureConnected: () => this.ensureConnected(),
+        getSnapshot: () => this.getSnapshot(),
+      },
+    );
+    this.unsubscribeNotification = this.client.onNotification((notification) => {
+      if (notification.method === 'account/updated' || notification.method === 'account/login/completed') {
+        this.accountGeneration += 1;
+        this.clearUsage();
+      }
+      if (!this.textGeneration.handleNotification(notification)) this.notifications.handle(notification);
+    });
+    this.unsubscribeDisconnect = this.client.onDisconnect((error) => {
+      this.accountGeneration += 1;
+      this.clearUsage();
+      this.textGeneration.close(error);
+      this.connection.handleDisconnect(error);
+    });
+    this.unsubscribeToolInputRequests = this.client.onServerRequest(
+      'item/tool/requestUserInput',
+      (request, responder) => this.clientRequests.handleToolInputRequest(request, responder),
+    );
+    this.unsubscribeMcpElicitationRequests = this.client.onServerRequest(
+      'mcpServer/elicitation/request',
+      (request, responder) => this.clientRequests.handleMcpElicitationRequest(request, responder),
+    );
+    this.client.onServerRequest('item/tool/call', async (request, responder) => {
+      await this.extensions.handleDynamicToolCall(request, responder);
+    });
+    this.client.onServerRequest('account/chatgptAuthTokens/refresh', (_request, responder) => {
+      responder.reject({ code: -32601, message: 'ChatGPT token refresh must be provided by the host application' });
+    });
+    this.client.onServerRequest('attestation/generate', (_request, responder) => {
+      responder.reject({ code: -32601, message: 'Client attestation must be provided by the host application' });
+    });
+    this.client.onServerRequest('currentTime/read', (_request, responder) => {
+      responder.resolve({ currentTimeAt: Math.floor(Date.now() / 1000) });
+    });
+  }
+
+  connect(): Promise<CodexHostSnapshot> {
+    return this.connection.connect();
+  }
+
+  /** Runs one non-persisted Codex turn without changing visible host state. */
+  generateText(prompt: string, options: GenerateCodexTextOptions = {}): Promise<HarnessTextGenerationResult> {
+    return this.textGeneration.generate(prompt, options);
+  }
+
+  async refreshAccount(): Promise<CodexHostSnapshot> {
+    this.accountGeneration += 1;
+    return this.connection.refreshAccount();
+  }
+
+  /** Reads fresh account limits; errors leave the last successful snapshot intact. */
+  async readRateLimits(options?: ReadCodexRateLimitsOptions): Promise<CodexRateLimits> {
+    return this.requestForAccount(() => this.client.request('account/rateLimits/read', options), response => {
+      const rateLimits = hostRateLimits(response);
+      this.patch({ rateLimits });
+      this.emitEvent('action', { type: 'rateLimits.changed', payload: { rateLimits: structuredClone(rateLimits) } });
+      return structuredClone(rateLimits);
+    });
+  }
+
+  /** Account-wide, on-demand usage; never collects thread estimates or changes host state. */
+  async readAccountUsage(): Promise<CodexAccountUsage> {
+    return this.requestForAccount(() => this.client.request('account/usage/read', {}), hostAccountUsage);
+  }
+
+  /** One explicit reset attempt; never retries or infers refreshed limits. */
+  async consumeRateLimitResetCredit(options: ConsumeCodexRateLimitResetCreditOptions): Promise<CodexRateLimitResetCreditResult> {
+    if (!options || typeof options.idempotencyKey !== 'string' || !options.idempotencyKey.trim()
+      || (options.creditId !== undefined && (typeof options.creditId !== 'string' || !options.creditId.trim()))) {
+      throw new TypeError('Reset-credit options require non-empty identifiers');
+    }
+    const params = { idempotencyKey: options.idempotencyKey,
+      ...(options.creditId === undefined ? {} : { creditId: options.creditId }) };
+    return this.requestForAccount(() => this.client.request('account/rateLimitResetCredit/consume', params), result => {
+      switch (result?.outcome) {
+        case 'reset': case 'alreadyRedeemed': case 'nothingToReset': case 'noCredit':
+          return { outcome: result.outcome };
+        default: throw new Error('Invalid reset-credit outcome');
+      }
+    });
+  }
+
+  async startChatGptLogin(): Promise<CodexChatGptLogin> {
+    this.accountGeneration += 1;
+    return this.connection.startChatGptLogin();
+  }
+
+  async startChatGptDeviceCodeLogin(): Promise<CodexChatGptDeviceCodeLogin> {
+    this.accountGeneration += 1;
+    return this.connection.startChatGptDeviceCodeLogin();
+  }
+
+  /** Reads the app-server's current remote-control connection state. */
+  async readRemoteControlStatus(): Promise<CodexRemoteControlStatus> {
+    return this.connection.readRemoteControlStatus();
+  }
+
+  /** Enables the app-server's official remote-control connection. */
+  async enableRemoteControl(
+    options: v2.RemoteControlEnableParams = {},
+  ): Promise<CodexRemoteControlStatus> {
+    return this.connection.enableRemoteControl(options);
+  }
+
+  /** Disables the app-server's official remote-control connection. */
+  async disableRemoteControl(
+    options: v2.RemoteControlDisableParams = {},
+  ): Promise<CodexRemoteControlStatus> {
+    return this.connection.disableRemoteControl(options);
+  }
+
+  /** Starts a one-time remote-control pairing flow. Treat the returned code as opaque. */
+  async startRemoteControlPairing(
+    options: v2.RemoteControlPairingStartParams = {},
+  ): Promise<CodexRemoteControlPairing> {
+    return this.connection.startRemoteControlPairing(options);
+  }
+
+  /** Checks whether a remote-control pairing code has been claimed. */
+  async readRemoteControlPairingStatus(
+    options: v2.RemoteControlPairingStatusParams = {},
+  ): Promise<CodexRemoteControlPairingStatus> {
+    return this.connection.readRemoteControlPairingStatus(options);
+  }
+
+  /** Lists devices paired with a remote-control environment. */
+  async listRemoteControlClients(
+    options: v2.RemoteControlClientsListParams,
+  ): Promise<CodexRemoteControlClientPage> {
+    return this.connection.listRemoteControlClients(options);
+  }
+
+  /** Revokes one device from a remote-control environment. */
+  async revokeRemoteControlClient(
+    options: v2.RemoteControlClientsRevokeParams,
+  ): Promise<v2.RemoteControlClientsRevokeResponse> {
+    return this.connection.revokeRemoteControlClient(options);
+  }
+
+  /** Reads managed app-server requirements, including allowRemoteControl. */
+  async readConfigRequirements(): Promise<CodexConfigRequirements | null> {
+    return this.connection.readConfigRequirements();
+  }
+
+  async cancelLogin(loginId = this.state.authentication.login.loginId ?? ''): Promise<CodexHostSnapshot> {
+    return this.connection.cancelLogin(loginId);
+  }
+
+  async logout(): Promise<CodexHostSnapshot> {
+    this.accountGeneration += 1;
+    return this.connection.logout();
+  }
+
+
+  async refreshConversations(): Promise<CodexHostSnapshot> {
+    return this.conversations.refresh();
+  }
+
+  async listConversations(options: ListCodexConversationsOptions = {}): Promise<CodexConversationSummary[]> {
+    return this.conversations.list(options);
+  }
+
+  /** Read-only history, including archived threads; leaves runtime and archive state untouched. */
+  async readConversationMessages(conversationId: string): Promise<ConversationMessage[]> {
+    await this.ensureConnected();
+    return readCodexMessages(this.client, conversationId);
+  }
+
+  /** Reads one conversation's metadata without loading its turns or runtime. */
+  async readConversationSummary(conversationId: string): Promise<CodexConversationSummary> {
+    return this.conversations.readSummary(conversationId);
+  }
+
+  async archiveConversation(conversationId: string): Promise<CodexHostSnapshot> {
+    return this.conversations.archive(conversationId);
+  }
+
+  async deleteConversation(conversationId: string): Promise<CodexHostSnapshot> {
+    return this.conversations.delete(conversationId);
+  }
+
+  async unarchiveConversation(conversationId: string): Promise<CodexHostSnapshot> {
+    return this.conversations.unarchive(conversationId);
+  }
+
+  async listModels(options: ListCodexModelsOptions = {}): Promise<ModelDescriptor[]> {
+    return this.catalog.listModels(options);
+  }
+
+  async listSkills(options: ListCodexSkillsOptions = {}): Promise<Skill[]> {
+    return this.catalog.listSkills(options);
+  }
+
+  async createConversation(
+    options: CreateCodexConversationOptions = {},
+    hostOptions: CodexConversationHostOptions = {},
+  ): Promise<CodexHostSnapshot> {
+    return this.lifecycle.create(options, hostOptions);
+  }
+
+  /** Forks the latest completed source conversation without selecting the new conversation. */
+  async forkConversation(
+    sourceConversationId: string,
+    options: ForkCodexConversationOptions = {},
+    hostOptions: CodexConversationHostOptions = {},
+  ): Promise<CodexConversationForkResult> {
+    const sourceThreadId = normalizedConversationId(sourceConversationId);
+    await this.ensureThreadReady(sourceThreadId);
+    const inheritedHostOptions = this.lifecycle.hostOptions(sourceThreadId) ?? {};
+    const conversationId = await this.forks.fork(sourceThreadId, options, {
+      ...inheritedHostOptions,
+      ...hostOptions,
+    });
+    return this.conversationForkResult(conversationId);
+  }
+
+  /** Forks after a completed turn without selecting the new conversation. */
+  async forkConversationAtTurn(
+    sourceConversationId: string,
+    turnId: string,
+    options: ForkCodexConversationOptions = {},
+    hostOptions: CodexConversationHostOptions = {},
+  ): Promise<CodexConversationForkResult> {
+    const sourceThreadId = normalizedConversationId(sourceConversationId);
+    await this.ensureThreadReady(sourceThreadId);
+    const inheritedHostOptions = this.lifecycle.hostOptions(sourceThreadId) ?? {};
+    const conversationId = await this.forks.forkTurn(sourceThreadId, turnId, options, {
+      ...inheritedHostOptions,
+      ...hostOptions,
+    });
+    return this.conversationForkResult(conversationId);
+  }
+
+  async selectConversation(conversationId: string): Promise<CodexHostSnapshot> {
+    return this.lifecycle.select(conversationId);
+  }
+
+  /**
+   * Releases one conversation from this host's in-memory state without
+   * changing the corresponding app-server thread. The summary remains in the
+   * conversation catalog; `conversation(id).load()` or `readHistory()` can
+   * hydrate it again later.
+   */
+  forgetConversation(conversationId: string): void {
+    const threadId = normalizedConversationId(conversationId);
+    const wasActive = this.state.activeConversationId === threadId;
+    this.runtimeState.forget(threadId);
+    this.lifecycle.forget(threadId);
+    this.originalImages?.forget(threadId);
+    this.conversations.forget(threadId);
+    this.items.forget(threadId);
+    this.conversationHandles.delete(threadId);
+    this.conversationListeners.delete(threadId);
+    if (!wasActive) return;
+    this.patch({
+      activeConversationId: null,
+      activeTurnId: null,
+      turns: [],
+      messages: [],
+      answeredClientRequestIds: [],
+      approvals: [],
+      contextUsage: null,
+      goal: null,
+      turnGitDiff: null,
+      threadStatus: null,
+      queuedPrompts: [],
+      busy: false,
+      historyLoading: false,
+      historyState: {
+        loadingStrategy: 'lazy',
+        hasOlder: false,
+        loadingOlder: false,
+        fullyLoaded: false,
+      },
+      error: null,
+    });
+  }
+
+  /** Main-process content reader. Every read is bound to the current runtime. */
+  async readConversationContent(conversationId: string, contentId: string, offset: number) {
+    if (!/^[a-f0-9]{64}$/.test(contentId) || !Number.isSafeInteger(offset) || offset < 0) throw new Error('Invalid conversation content request.');
+    const runtime = this.runtimeState.get(conversationId);
+    if (!runtime?.hydrated || this.closed) throw new Error('Conversation content is no longer available.');
+    const reference = `conversation-image:${encodeURIComponent(conversationId)}:${contentId}`;
+    const owns = () => !this.closed && this.runtimeState.get(conversationId) === runtime && runtime.messages.some(m => m.parts.some(p => p.type === 'media' && p.media.url === reference));
+    if (this.originalImages && owns()) {
+      const result = await this.originalImages.read(conversationId, contentId, offset);
+      if (!owns()) throw new Error('Conversation content is no longer available.');
+      return result;
+    }
+    return new ConversationContentTransport(conversationId).read({ messages: runtime.messages }, contentId, offset);
+  }
+
+  async readConversationHistory(conversationId = this.state.activeConversationId ?? ''): Promise<CodexConversationHistory> {
+    return this.lifecycle.readHistory(conversationId);
+  }
+
+  /** Reads a bounded user-only prompt list without hydrating conversation history. */
+  async readConversationPromptHistory(
+    conversationId = this.state.activeConversationId ?? '',
   ) {
-    this.imageGeneration = new CodexImageGeneration(surface, options.images);
-    this.accountIdentity = JSON.stringify(surface.getSnapshot().authentication.account);
-    this.unsubscribeSurface = surface.onEvent((event) => this.handleSurfaceEvent(event));
+    await this.ensureConnected();
+    return readPromptHistory(this.client, conversationId);
   }
 
-  private extensionContext(context: Context, scope?: import('../../driver').HarnessPromptScope): unknown { return this.options.extensionContext?.(context, scope) ?? context; }
-  private conversationConfiguration(context: Context, scope?: HarnessPromptScope) { return this.options.conversationConfiguration?.(context, scope) ?? { ...agentCwd(context), extensionContext: this.extensionContext(context, scope), mcpServers: scope ? scopedMcpServers(scope) : undefined }; }
-  private syncTitle(context: Context): boolean { return this.options.shouldSyncTitle?.(context) ?? Boolean(context.name?.trim()); }
-  private displayName(context: Context): string { return this.options.displayName?.(context) ?? context.name?.trim() ?? context.id; }
-  private approvalPreset(defaults: import('../../contracts').BackendDefaults | undefined): ApprovalPreset | undefined { return this.options.approvalPresetFromDefaults?.(defaults) ?? nativeApprovalPreset(defaults); }
-  async start(): Promise<void> {
-    await this.surface.connect();
+  async loadTurnHistory(turnId: string, conversationId = this.state.activeConversationId ?? ''): Promise<CodexConversationSnapshot> {
+    await this.ensureThreadReady(conversationId);
+    await this.conversations.loadTurnHistory(conversationId, turnId);
+    return this.getConversationSnapshot(conversationId);
   }
 
-  async getBankedResets(): Promise<import('../../contracts/banked-resets').BankedResets> {
-    // Feature-detect the narrow public seam for older published SDKs.
-    const surface = this.surface as CodexSurface & {
-      readRateLimits?: (options: { excludeResetCreditDetails: boolean }) => Promise<CodexSurfaceRateLimits>;
-      consumeRateLimitResetCredit?: (options: { idempotencyKey: string; creditId?: string }) => Promise<BankedResetResult>;
-    };
-    if (!surface.readRateLimits) return { status: 'unsupported' };
-    const account = surface.getSnapshot().authentication.account;
-    if (account?.type !== 'chatgpt') return { status: account ? 'unsupported' : 'signedOut' };
-    const identity = JSON.stringify(account);
-    if (identity !== this.accountIdentity) { this.accountIdentity = identity; ++this.accountRevision; this.resetCreditTokens.clear(); }
-    const expected = this.accountRevision;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let cancel: (() => void) | undefined;
-    try {
-      const limits = await Promise.race([
-        surface.readRateLimits({ excludeResetCreditDetails: false }),
-        new Promise<never>((_resolve, reject) => {
-          cancel = () => reject(new Error('Banked reset account changed'));
-          this.resetReadCancellations.add(cancel);
-          timer = setTimeout(() => reject(new Error('Banked reset read timed out')), 15_000);
-        }),
-      ]);
-      if (this.closed || expected !== this.accountRevision || JSON.stringify(surface.getSnapshot().authentication.account) !== JSON.stringify(account)) {
-        throw new Error('Banked reset account changed');
-      }
-      const nextTokens = new Map<string, { token: string; idempotencyKey?: string; uncertain?: boolean }>();
-      const result = bankedResetsFromSurface(limits, typeof surface.consumeRateLimitResetCredit === 'function' ? id => {
-        const entry = this.resetCreditTokens.get(id) ?? { token: randomUUID() };
-        nextTokens.set(id, entry);
-        return entry.token;
-      } : undefined);
-      for (const [id, entry] of this.resetCreditTokens) {
-        if (entry.uncertain && !nextTokens.has(id)) nextTokens.set(id, entry);
-      }
-      this.resetCreditTokens = nextTokens;
-      return result;
-    } finally { clearTimeout(timer); if (cancel) this.resetReadCancellations.delete(cancel); }
+  async loadOlderConversationHistory(
+    conversationId = this.state.activeConversationId ?? '',
+  ): Promise<CodexConversationHistoryPage> {
+    return this.conversations.loadOlderHistory(normalizedConversationId(conversationId));
   }
 
-  async useBankedReset(input: UseBankedResetInput): Promise<BankedResetResult> {
-    if (!isUseBankedResetInput(input)) throw new Error('Reset confirmation is required');
-    const surface = this.surface as CodexSurface & {
-      consumeRateLimitResetCredit?: (options: { idempotencyKey: string; creditId?: string }) => Promise<BankedResetResult>;
-    };
-    if (!surface.consumeRateLimitResetCredit) throw new Error('Reset redemption is unsupported');
-    const account = surface.getSnapshot().authentication.account;
-    if (this.closed || account?.type !== 'chatgpt' || JSON.stringify(account) !== this.accountIdentity) {
-      this.resetCreditTokens.clear();
-      throw new Error('Banked reset account changed');
-    }
-    const selected = [...this.resetCreditTokens].find(([, entry]) => entry.token === input.redemptionToken);
-    if (!selected) throw new Error('Banked reset selection expired. Refresh and try again.');
-    const [creditId, entry] = selected;
-    // Retain the logical attempt after an uncertain response, including UI reloads.
-    entry.idempotencyKey ??= input.idempotencyKey;
-    entry.uncertain = true;
-    const expected = this.accountRevision;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let cancel: (() => void) | undefined;
-    try {
-      const result = await Promise.race([
-        surface.consumeRateLimitResetCredit({ creditId, idempotencyKey: entry.idempotencyKey }),
-        new Promise<never>((_resolve, reject) => {
-          cancel = () => reject(new Error('Banked reset account changed'));
-          this.resetReadCancellations.add(cancel);
-          timer = setTimeout(() => reject(new Error('Banked reset outcome is uncertain')), 15_000);
-        }),
-      ]);
-      if (this.closed || expected !== this.accountRevision || JSON.stringify(surface.getSnapshot().authentication.account) !== JSON.stringify(account)) {
-        throw new Error('Banked reset account changed');
-      }
-      if (!isBankedResetResult(result)) throw new Error('Invalid banked reset outcome');
-      entry.uncertain = false;
-      if (result.outcome === 'nothingToReset' || result.outcome === 'noCredit') delete entry.idempotencyKey;
-      return result;
-    } finally { clearTimeout(timer); if (cancel) this.resetReadCancellations.delete(cancel); }
+  async renameConversation(title: string): Promise<CodexHostSnapshot> {
+    const threadId = this.state.activeConversationId;
+    if (!threadId) throw new Error('There is no active conversation');
+    await this.conversationSettings.rename(threadId, title);
+    return this.getSnapshot();
   }
 
-  async getAuthentication(): Promise<CodexAuthentication> {
-    return authenticationFromSurface((await this.surface.refreshAccount()).authentication);
+  async updateConversationSettings(settings: UpdateConversationSettings): Promise<CodexHostSnapshot> {
+    return this.conversationSettings.update(settings);
   }
 
-  async startChatGptLogin() {
-    return this.surface.startChatGptLogin();
+  async setGoal(objective: string, tokenBudget?: number | null): Promise<CodexHostSnapshot> {
+    return this.conversationSettings.setGoal(objective, tokenBudget);
   }
 
-  async startChatGptDeviceCodeLogin() {
-    return this.surface.startChatGptDeviceCodeLogin();
+  async clearGoal(): Promise<CodexHostSnapshot> {
+    return this.conversationSettings.clearGoal();
   }
 
-  async cancelChatGptLogin(loginId?: string): Promise<CodexAuthentication> {
-    return authenticationFromSurface((await this.surface.cancelLogin(loginId)).authentication);
+  async sendMessage(prompt: string, options: SendMessageOptions = {}): Promise<CodexHostSnapshot> {
+    return this.messagesController.send(prompt, options);
   }
 
-  async logout(): Promise<CodexAuthentication> {
-    return authenticationFromSurface((await this.surface.logout()).authentication);
+  async continueInterruptedTurn(): Promise<CodexHostSnapshot> {
+    return this.messagesController.continueInterruptedTurn();
   }
 
-  async getRemoteControlStatus(): Promise<DevicePairingStatus> {
-    const status = await this.surface.readRemoteControlStatus();
-    const requirements = await this.surface.readConfigRequirements();
-    return {
-      ...status,
-      allowRemoteControl: requirements?.allowRemoteControl ?? null,
-    };
+  async compactConversation(): Promise<CodexHostSnapshot> {
+    return this.turnActions.compact();
   }
 
-  async enableRemoteControl(): Promise<DevicePairingStatus> {
-    const status = await this.surface.enableRemoteControl();
-    const requirements = await this.surface.readConfigRequirements();
-    return {
-      ...status,
-      allowRemoteControl: requirements?.allowRemoteControl ?? null,
-    };
+  async startReview(options: StartCodexReviewOptions = {}): Promise<CodexHostSnapshot> {
+    return this.turnActions.startReview(options);
   }
 
-  async disableRemoteControl(): Promise<DevicePairingStatus> {
-    const status = await this.surface.disableRemoteControl();
-    const requirements = await this.surface.readConfigRequirements();
-    return {
-      ...status,
-      allowRemoteControl: requirements?.allowRemoteControl ?? null,
-    };
+  async steerMessage(
+    prompt: string,
+    options: SendMessageOptions = {},
+  ): Promise<CodexHostSnapshot> {
+    return this.messagesController.steer(prompt, options);
   }
 
-  async startDevicePairing(): Promise<DevicePairingSession> {
-    const pairing = await this.surface.startRemoteControlPairing({ manualCode: true });
-    return {
-      pairingCode: pairing.pairingCode,
-      manualPairingCode: pairing.manualPairingCode,
-      environmentId: pairing.environmentId,
-      expiresAt: epochTimestampToIso(pairing.expiresAt),
-    };
+  async interrupt(): Promise<CodexHostSnapshot> {
+    return this.turnActions.interrupt();
   }
 
-  async checkDevicePairing(session: DevicePairingSession): Promise<boolean> {
-    const result = await this.surface.readRemoteControlPairingStatus(
-      session.pairingCode
-        ? { pairingCode: session.pairingCode }
-        : { manualPairingCode: session.manualPairingCode ?? null },
-    );
-    return result.claimed;
+  async deleteTurn(turnId: string): Promise<CodexHostSnapshot> {
+    return this.turnActions.deleteTurn(turnId);
   }
 
-  async listPairedDevices(environmentId: string): Promise<PairedDevice[]> {
-    const clients = await this.surface.listRemoteControlClients({ environmentId, limit: 100 });
-    return clients.data.map((client) => ({
-      clientId: client.clientId,
-      displayName: client.displayName,
-      deviceType: client.deviceType,
-      platform: client.platform,
-      osVersion: client.osVersion,
-      deviceModel: client.deviceModel,
-      appVersion: client.appVersion,
-      lastSeenAt: client.lastSeenAt === null ? null : epochTimestampToIso(client.lastSeenAt),
-    }));
+  async editTurn(turnId: string, content: string, options?: SendMessageOptions): Promise<CodexHostSnapshot> {
+    return this.turnActions.editTurn(turnId, content, options);
   }
 
-  async revokePairedDevice(environmentId: string, clientId: string): Promise<void> {
-    await this.surface.revokeRemoteControlClient({ environmentId, clientId });
+  async retryTurn(turnId: string): Promise<CodexHostSnapshot> {
+    return this.turnActions.retryTurn(turnId);
   }
 
-  getRuntimeStatus(): BackendRuntimeStatus {
-    return runtimeStatus(this.surface.getSnapshot(), this.options.runtimeStatusDetail);
+  /** Forks after an active-conversation turn and selects the new conversation. */
+  async forkTurn(turnId: string): Promise<CodexHostSnapshot> {
+    const conversationId = this.state.activeConversationId;
+    if (!conversationId) throw new Error('There is no active conversation');
+    const result = await this.forkConversationAtTurn(conversationId, turnId);
+    return result.conversation.select();
   }
 
-  getCapabilities(agent?: Context) {
-    const session = agent ? this.sessionsByAgentId.get(agent.id) : undefined;
-    const presets = session?.handle.getSnapshot().approvalPresets
-      ?? this.surface.getSnapshot().approvalPresets;
-    return {
-      ...codexBackendCapabilities,
-      approvalPresets: presets.length > 0 ? [...presets] : codexBackendCapabilities.approvalPresets,
-    };
+  async deleteQueuedPrompt(promptId: string): Promise<CodexHostSnapshot> {
+    return this.messagesController.deleteQueuedPrompt(promptId);
   }
 
-  async listModels(): Promise<BackendModelOption[]> {
-    const models = await this.surface.listModels({ includeHidden: false, forceReload: true });
-    const preferred = models.find(model => model.model === this.options.defaultModel?.model);
-    return models.map((model) => ({
-      ...model,
-      ...(preferred ? { isDefault: model === preferred } : {}),
-      ...(model === preferred && model.supportedReasoningEfforts?.some(effort => effort.reasoningEffort === this.options.defaultModel?.reasoningEffort)
-        ? { defaultReasoningEffort: this.options.defaultModel?.reasoningEffort } : {}),
-      supportedReasoningEfforts: model.supportedReasoningEfforts?.map((effort) => ({ ...effort })),
-      serviceTiers: model.serviceTiers?.map((tier) => ({ ...tier })),
-    }));
+  async updateQueuedPrompt(promptId: string, prompt: string, options?: SendMessageOptions): Promise<CodexHostSnapshot> {
+    return this.messagesController.updateQueuedPrompt(promptId, prompt, options);
   }
 
-  async listSkills(agent: Context, forceReload = false): Promise<BackendSkillSummary[]> {
-    const skills = await this.surface.listSkills({ ...agentCwd(agent), forceReload });
-    return skills.map(backendSkillSummary);
+  async steerQueuedPrompt(promptId: string, prompt?: string, options?: SendMessageOptions): Promise<CodexHostSnapshot> {
+    return this.messagesController.steerQueuedPrompt(promptId, prompt, options);
   }
 
-  async listPlugins(): Promise<BackendPluginSummary[]> {
-    await this.start();
-    const snapshot = this.surface.getSnapshot();
-    if (snapshot.pluginCatalogStatus === 'loaded' || snapshot.pluginCatalogStatus === 'error') {
-      return snapshot.plugins.map((plugin) => ({ ...plugin }));
-    }
+  async respondToClientRequest(response: ClientRequestResponse): Promise<CodexHostSnapshot> {
+    await this.clientRequests.respond(undefined, response);
+    return this.getSnapshot();
+  }
 
-    return new Promise((resolve) => {
-      const unsubscribe = this.surface.onEvent((event) => {
-        if (event.type !== 'catalog.pluginsChanged' || event.payload.status === 'loading') return;
-        unsubscribe();
-        resolve(event.payload.plugins.map((plugin) => ({ ...plugin })));
-      });
-      const current = this.surface.getSnapshot();
-      if (current.pluginCatalogStatus === 'loaded' || current.pluginCatalogStatus === 'error') {
-        unsubscribe();
-        resolve(current.plugins.map((plugin) => ({ ...plugin })));
-      }
+  async resolveApproval(
+    approvalId: string,
+    decision: ApprovalDecision,
+    scope: ApprovalScope = 'once',
+  ): Promise<CodexHostSnapshot> {
+    await this.approvals.resolve(undefined, approvalId, decision, scope);
+    return this.getSnapshot();
+  }
+
+  conversation(conversationId: string): CodexConversation {
+    const id = normalizedConversationId(conversationId);
+    const existing = this.conversationHandles.get(id);
+    if (existing) return existing;
+    const handle = createCodexConversationHandle(id, {
+      clearGoal: () => this.conversationSettings.clearGoalForThread(id),
+      compact: () => this.turnActions.compactForThread(id),
+      continueInterruptedTurn: () => this.messagesController.continueInterruptedTurnForThread(id),
+      continueAfterSafetyReview: (options) => this.messagesController.continueInterruptedTurnForThread(id, options),
+      deleteTurn: (turnId) => this.turnActions.deleteTurnForThread(id, turnId),
+      deleteQueuedPrompt: (promptId) => this.messagesController.deleteQueuedPromptForThread(id, promptId),
+      updateQueuedPrompt: (promptId, prompt, options) => this.messagesController.updateQueuedPromptForThread(id, promptId, prompt, options),
+      editTurn: (turnId, content, options) => this.turnActions.editTurnForThread(id, turnId, content, options),
+      fork: (options, hostOptions) => this.forkConversation(id, options, hostOptions),
+      forkTurn: (turnId, options, hostOptions) => (
+        this.forkConversationAtTurn(id, turnId, options, hostOptions)
+      ),
+      getSnapshot: () => this.getConversationSnapshot(id),
+      interrupt: () => this.turnActions.interruptThread(id),
+      load: async (options) => { await this.ensureThreadReady(id, options); },
+      loadOlderHistory: () => this.loadOlderConversationHistory(id),
+      loadTurnHistory: async (turnId) => { await this.loadTurnHistory(turnId, id); },
+      onEvent: (listener) => this.onConversationEvent(id, listener),
+      onStateChange: (listener) => this.onConversationStateChange(id, listener),
+      readHistory: () => this.readConversationHistory(id),
+      readContent: (contentId, offset) => this.readConversationContent(id, contentId, offset),
+      readPromptHistory: () => this.readConversationPromptHistory(id),
+      rename: (title) => this.conversationSettings.rename(id, title),
+      resolveApproval: (approvalId, decision, scope = 'once') => (
+        this.approvals.resolve(id, approvalId, decision, scope)
+      ),
+      respondToClientRequest: (response) => this.clientRequests.respond(id, response),
+      retryTurn: (turnId) => this.turnActions.retryTurnForThread(id, turnId),
+      select: async () => { await this.selectConversation(id); },
+      sendMessage: (prompt, options) => this.messagesController.sendToThread(id, prompt, options),
+      setGoal: (objective, tokenBudget) => this.conversationSettings.setGoalForThread(id, objective, tokenBudget),
+      startRealtime: (options) => this.startRealtimeForThread(id, options),
+      startReview: (options) => this.turnActions.startReviewForThread(id, options),
+      steerMessage: (prompt, options) => this.messagesController.steerForThread(id, prompt, options),
+      steerQueuedPrompt: (promptId, prompt, options) => this.messagesController.steerQueuedPromptForThread(id, promptId, prompt, options),
+      updateSettings: (settings) => this.conversationSettings.updateForThread(id, settings),
     });
+    this.conversationHandles.set(id, handle);
+    return handle;
   }
 
-  async generateText(_agent: Context, input: HarnessTextGenerationInput): Promise<HarnessTextGenerationResult> {
-    input.signal?.throwIfAborted();
-    const servers = input.mcpServers ?? [];
-    validateMcpPolicy(servers, 'codex');
-    const selection = input.selectModel ? input.selectModel(await this.listModels()) : input.selection ?? {};
-    input.signal?.throwIfAborted();
-    return this.surface.generateText(input.prompt, {
-      ...(input.timeoutMs === null ? { timeoutMs: null } : {}),
-      ...(input.signal ? { signal: input.signal } : {}),
-      cwd: expandHome(input.cwd),
-      ...(selection.model ? { model: selection.model } : {}),
-      ...(selection.reasoningEffort ? { reasoningEffort: selection.reasoningEffort } : {}),
-      serviceTier: null,
-      ...(input.tools === true ? { tools: 'read-only' as const } : {}),
-      ...(input.attachments ? { attachments: input.attachments } : {}),
-      ...(servers.length ? {mcpServers: servers.map(server => ({name: server.name, transport: {type: 'http' as const, url: server.url}, enabledTools: [...server.enabledTools], ...(server.approval === 'auto' ? { toolApprovalMode: 'auto' as const } : {}), ...(server.required === undefined ? {} : { required: server.required })}))} : {}),
-      ...(input.developerInstructions ? { developerInstructions: input.developerInstructions } : {}),
-      ...(input.outputSchema ? { outputSchema: input.outputSchema } : {}),
+  async startLiveChat(
+    conversationId: string,
+    options: StartCodexLiveChatOptions,
+  ): Promise<{ sdp: string }> {
+    const { sdp, ...settings } = options;
+    const session = await this.startRealtimeForThread(conversationId, {
+      ...settings,
+      version: settings.version ?? 'v3',
+      outputModality: 'audio',
+      transport: { type: 'webrtc', sdp },
     });
+    return { sdp: session.remoteSdp! };
   }
 
-  generateImage(input: import('../../generation').HarnessImageGenerationInput, signal?: AbortSignal) {
-    return this.imageGeneration.generate(input, signal);
+  async stopLiveChat(conversationId: string): Promise<void> {
+    await this.client.request('thread/realtime/stop', { threadId: conversationId });
   }
 
-  async cancelScopedPrompt(agent: Context): Promise<void> {
-    const session = this.sessionsByAgentId.get(agent.id);
-    try {
-      if (session?.handle.getSnapshot().activeTurnId) await session.handle.interrupt();
-    } finally { this.releaseConversation(agent.id); }
-  }
-
-  async executeScopedPrompt(agent: Context, input: HarnessScopedPromptInput): Promise<HarnessScopedPromptResult> {
-    input.signal?.throwIfAborted();
-    validateMcpPolicy(input.scope.mcpServers ?? [], 'codex');
-    await this.start();
-    input.signal?.throwIfAborted();
-    if (input.session && input.session.kind !== 'codex') {
-      throw new Error('Codex cannot continue a non-Codex scoped conversation.');
-    }
-    const requestedAgent = { ...agent, folder: input.cwd, backendSession: input.session };
-    const scopedExtensionContext = this.extensionContext(requestedAgent, input.scope);
-    const session = await this.ensureSession(requestedAgent, scopedExtensionContext);
-    input.signal?.throwIfAborted();
-    const current = session.handle.getSnapshot();
-    if (current.busy || current.activeTurnId || current.queuedPrompts.length || current.approvals.length || current.clientRequests.length) throw new Error('Codex already has active work for this context.');
-    session.agent = agent;
-    const conversationId = session.handle.id;
-    const conversation = session.handle;
-    let targetTurnId: string | null = null;
-    const completedBeforeTarget = new Map<string, CodexSurfaceTurnStatus>();
-    let resolveCompletion: ((status: CodexSurfaceTurnStatus) => void) | null = null;
-    const completion = new Promise<CodexSurfaceTurnStatus>((resolve) => { resolveCompletion = resolve; });
-    const unsubscribe = conversation.onEvent((event) => {
-      if (event.type !== 'turn.completed') return;
-      if (event.turnId === targetTurnId) resolveCompletion?.(event.payload.status);
-      else completedBeforeTarget.set(event.turnId, event.payload.status);
-    });
-    try {
-      await conversation.load(this.conversationConfiguration(requestedAgent, input.scope));
-      input.signal?.throwIfAborted();
-      const beforeTurnIds = conversation.getSnapshot().turnIds;
-      const promptOptions = { ...scopedPromptOptions(agent), ...surfacePromptOptions(input.options) };
-      const started = Object.keys(promptOptions).length > 0
-        ? await conversation.sendMessage(input.prompt, promptOptions)
-        : await conversation.sendMessage(input.prompt);
-      input.signal?.throwIfAborted();
-      targetTurnId = resultTurnId(started, beforeTurnIds) ?? null;
-      if (!targetTurnId) throw new Error('Codex did not start the scoped turn.');
-      const immediate = completedBeforeTarget.get(targetTurnId)
-        ?? started.turns.find((turn) => turn.id === targetTurnId && turn.status !== 'inProgress')?.status;
-      const status = immediate ?? await completion;
-      input.signal?.throwIfAborted();
-      const snapshot = conversation.getSnapshot();
-      const completedFinalAnswer = sessionFinalAnswerText(snapshot.messages, targetTurnId);
-      if (status !== 'completed' && !(status === 'interrupted' && completedFinalAnswer)) {
-        throw new Error(`Scoped execution was ${status}.`);
-      }
-      return {
-        text: sessionHandoffText(snapshot.messages, targetTurnId),
-        session: { kind: 'codex', threadId: conversationId },
-      };
-    } finally {
-      unsubscribe();
-      if (!input.signal?.aborted) await conversation.load(this.conversationConfiguration(agent));
-    }
-  }
-
-  async disposeScopedSession(scopedSession: BackendSession): Promise<void> {
-    if (scopedSession.kind !== 'codex') throw new Error('Codex cannot dispose a non-Codex scoped conversation.');
-    await this.surface.archiveConversation(scopedSession.threadId);
-    this.surface.forgetConversation(scopedSession.threadId);
-  }
-
-  async sendPrompt(agent: Context, prompt: string, options: SendPromptOptions = {}) {
-    const session = await this.ensureSession(agent);
-    return this.serializeSubmission(session, async () => {
-      // The caller's mode selection persists through follow-ups and hydration. The
-      // SDK send option alone is a per-turn override and does not publish it.
-      if (typeof options.planMode === 'boolean' && options.planMode !== session.handle.getSnapshot().planMode) {
-        await session.handle.updateSettings({ planMode: options.planMode });
-      }
-      const beforeTurnIds = session.handle.getSnapshot().turnIds;
-      const snapshot = await session.handle.sendMessage((this.options.formatPrompt ?? defaultFormatPrompt)(prompt, options.content, true), surfacePromptOptions(options));
-      const turnId = resultTurnId(snapshot, beforeTurnIds);
-      const messages = snapshot.messages.filter(message => message.role === 'user' && message.turnId === turnId && message.kind !== 'steer');
-      return { threadId: session.handle.id, turnId, ...(messages.length === 1 ? { messageId: messages[0]!.id } : {}) };
-    });
-  }
-
-  async assertHandoffReady(agent: Context): Promise<void> {
-    const session = await this.ensureSession(agent);
-    const snapshot = session.handle.getSnapshot();
-    if (snapshot.activeTurnId || snapshot.busy || snapshot.queuedPrompts.length || snapshot.approvals.length || snapshot.clientRequests.length) {
-      throw new Error('Resolve the Codex turn, queue and requests before handing off.');
-    }
-  }
-
-  async replaceConversationWithSummary(agent: Context) {
-    const currentSession = await this.ensureSession(agent);
-    const currentSnapshot = currentSession.handle.getSnapshot();
-    if (currentSnapshot.activeTurnId || currentSnapshot.busy) {
-      throw new Error('Context must be idle before compressing its session.');
-    }
-
-    const defaults = agent.backendDefaults?.kind === 'codex'
-      ? { ...agent.backendDefaults }
-      : undefined;
-    const requestedPreset = this.approvalPreset(defaults);
-    const effectivePreset = effectiveApprovalPreset(requestedPreset, this.surface.getSnapshot().approvalPresets);
-    const handoff = await this.captureSessionHandoff(currentSession);
-    const previousThreadId = currentSession.handle.id;
-    const replacementSnapshot = await this.surface.createConversation({
-      ...agentCwd(agent),
-      threadSource: 'user',
-      ...(effectivePreset ? { approvalPreset: effectivePreset } : {}),
-      ...(defaults?.model ? { model: defaults.model } : {}),
-      ...(defaults?.reasoningEffort ? { reasoningEffort: defaults.reasoningEffort } : {}),
-      ...(defaults?.serviceTier !== undefined ? { serviceTier: defaults.serviceTier } : {}),
-    }, { extensionContext: this.extensionContext(agent) });
-    const replacementThreadId = replacementSnapshot.activeConversationId;
-    if (!replacementThreadId || replacementThreadId === previousThreadId) {
-      throw new Error('Codex did not create a replacement conversation.');
-    }
-
-    try {
-      await this.surface.conversation(replacementThreadId).sendMessage(sessionHandoffPrompt(handoff));
-      await this.surface.archiveConversation(previousThreadId);
-    } catch (error) {
-      await this.surface.archiveConversation(replacementThreadId).catch(() => undefined);
-      throw error;
-    }
-
-    this.bindRuntime(agent, replacementThreadId, true, false);
-    return { threadId: replacementThreadId };
-  }
-
-  async setConversationTitle(agent: Context, title: string): Promise<void> {
-    const session = await this.ensureSession(agent);
-    await this.renameSessionIfNeeded(session, title);
-  }
-
-  async setThreadGoal(agent: Context, objective: string) {
-    const session = await this.ensureSession(agent);
-    const snapshot = await invokeCodexConversationBridgeOperation(
-      this.surface, session.handle.id, 'setGoal', [objective],
-    );
-    if (!snapshot.goal) throw new Error('Codex did not return the updated goal.');
-    return { threadId: session.handle.id, goal: snapshot.goal };
-  }
-
-  async clearThreadGoal(agent: Context) {
-    const session = await this.ensureSession(agent);
-    await invokeCodexConversationBridgeOperation(
-      this.surface, session.handle.id, 'clearGoal', [],
-    );
-    return { threadId: session.handle.id, cleared: true };
-  }
-
-  async setApprovalPreset(agent: Context, preset: ApprovalPreset) {
-    const session = await this.ensureSession(agent);
-    const effective = effectiveApprovalPreset(preset, session.handle.getSnapshot().approvalPresets);
-    if (!effective) throw new Error('No approval preset satisfies the Codex app-server requirements.');
-    await invokeCodexConversationBridgeOperation(
-      this.surface, session.handle.id, 'updateConversationSettings', [{ approvalPreset: effective }],
-    );
-    return { threadId: session.handle.id, approvalPreset: effective };
-  }
-
-  async reviewThread(agent: Context, target: CodexSurfaceReviewTarget) {
-    const session = await this.ensureSession(agent);
-    const beforeTurnIds = session.handle.getSnapshot().turnIds;
-    const snapshot = await invokeCodexConversationBridgeOperation(
-      this.surface, session.handle.id, 'startReview', [{ target }],
-    );
-    return { threadId: session.handle.id, turnId: resultTurnId(snapshot, beforeTurnIds) };
-  }
-
-  async steerPrompt(agent: Context, prompt: string, options?: SendPromptOptions) {
-    const session = await this.ensureSession(agent);
-    return this.serializeSubmission(session, async () => {
-      const before = session.handle.getSnapshot();
-      const knownMessages = new Set(before.messages.map(message => message.id));
-      const snapshot = await session.handle.steerMessage((this.options.formatPrompt ?? defaultFormatPrompt)(prompt, options?.content, true), surfacePromptOptions(options));
-      const turnId = resultTurnId(snapshot, before.turnIds);
-      const messages = snapshot.messages.filter(message => message.role === 'user' && message.turnId === turnId && !knownMessages.has(message.id));
-      return { threadId: session.handle.id, turnId, ...(messages.length === 1 ? { messageId: messages[0]!.id } : {}) };
-    });
-  }
-
-  /** Keep owner and guest receipt capture isolated; the SDK owns message identity. */
-  private async serializeSubmission<T>(session: AgentConversation<Context>, submit: () => Promise<T>): Promise<T> {
-    const id = session.handle.id;
-    const operation = (this.submissions.get(id) ?? Promise.resolve()).then(() => {
-      if (this.closed || this.sessionsByAgentId.get(session.agent.id) !== session) throw new Error('Conversation is no longer active.');
-      return submit();
-    });
-    const settled = operation.then(() => {}, () => {});
-    this.submissions.set(id, settled);
-    try { return await operation; }
-    finally { if (this.submissions.get(id) === settled) this.submissions.delete(id); }
-  }
-
-  async interruptTurn(agent: Context, expectedTurnId?: string) {
-    const session = await this.ensureSession(agent);
-    const turnId = session.handle.getSnapshot().activeTurnId;
-    if (!turnId) throw new Error('No active Codex turn to interrupt.');
-    if (expectedTurnId && turnId !== expectedTurnId) throw new Error('The requested Codex task turn is no longer active.');
-    await invokeCodexConversationBridgeOperation(
-      this.surface, session.handle.id, 'interrupt', [],
-    );
-    return { threadId: session.handle.id, turnId };
-  }
-
-  releaseConversation(agentId: string): void {
-    this.sessionInitializations.delete(agentId);
-    const session = this.sessionsByAgentId.get(agentId);
-    if (!session) return;
-    session.unsubscribe();
-    this.sessionsByAgentId.delete(agentId);
-    this.historyHydratedAtByAgentId.delete(agentId);
-    if (this.agentIdsByThreadId.get(session.handle.id) === agentId) {
-      this.agentIdsByThreadId.delete(session.handle.id);
-    }
-    for (const [conversationId, owner] of this.subagentOwners) {
-      if (owner.agentId !== agentId) continue;
-      this.subagentOwners.delete(conversationId);
-      this.lastSubagentIdentityByConversationId.delete(conversationId);
-      this.subagentIdentityLoads.delete(conversationId);
-      this.liveSubagentConversationIds.delete(conversationId);
-    }
-    this.removePendingOwners(session);
-    this.surface.forgetConversation(session.handle.id);
-  }
-
-  async deleteTurn(agent: Context, turnId: string) {
-    const session = await this.ensureSession(agent);
-    const snapshot = await invokeCodexConversationBridgeOperation(
-      this.surface, session.handle.id, 'deleteTurn', [turnId],
-    );
-    return {
-      threadId: session.handle.id,
-      activeTurnId: snapshot.activeTurnId,
-    };
-  }
-
-  async editTurn(agent: Context, turnId: string, content: string, options?: Pick<SendPromptOptions, 'content'>) {
-    const session = await this.ensureSession(agent);
-    const snapshot = await invokeCodexConversationBridgeOperation(
-      this.surface, session.handle.id, 'editTurn', options ? [turnId, (this.options.formatPrompt ?? defaultFormatPrompt)(content, options.content, true), surfacePromptOptions(options)] : [turnId, content],
-    );
-    return {
-      threadId: session.handle.id,
-      activeTurnId: snapshot.activeTurnId,
-    };
-  }
-
-  async retryTurn(agent: Context, turnId: string) {
-    const session = await this.ensureSession(agent);
-    const snapshot = await invokeCodexConversationBridgeOperation(
-      this.surface, session.handle.id, 'retryTurn', [turnId],
-    );
-    return {
-      threadId: session.handle.id,
-      activeTurnId: snapshot.activeTurnId,
-    };
-  }
-
-  async continueInterruptedTurn(agent: Context, safetyReview?: ProviderSafetyReviewTarget) {
-    const session = await this.ensureSession(agent);
-    if (safetyReview) return this.serializeSubmission(session, async () => {
-      const current = session.handle.getSnapshot();
-      const review = safetyReviewFromSnapshot(current);
-      if (current.busy || !review?.canContinue || review.id !== safetyReview.id
-        || session.handle.id !== safetyReview.conversationId || review.turnId !== safetyReview.turnId) {
-        throw new Error('Provider safety continuation is unavailable or these findings have changed. Review the latest provider error.');
-      }
-      if (!session.handle.continueAfterSafetyReview) throw new Error('This SDK does not support provider safety review continuation.');
-      const after = await session.handle.continueAfterSafetyReview({ turnId: review.turnId, findings: current.turns.find(turn => turn.id === review.turnId)!.error!.misalignment! });
-      if (this.sessionsByAgentId.get(agent.id) !== session || codexThreadId(agent) !== safetyReview.conversationId) throw new Error('Conversation changed during safety review.');
-      this.emitStatus(session, (this.options.statusFromSnapshot ?? statusFromSnapshot)(after));
-      if (after.error || after.turns.at(-1)?.status === 'failed') throw new Error(after.error ?? after.turns.at(-1)?.error?.message ?? 'Continuation failed. Review the latest provider error.');
-      return { threadId: session.handle.id, activeTurnId: after.activeTurnId };
-    });
-    if (providerSafetyBlockMessage(session.handle.getSnapshot().turns.at(-1)?.error)
-      || providerSafetyBlockMessage(session.handle.getSnapshot().error)) throw new Error('Review the provider safety findings before continuing.');
-    const snapshot = await invokeCodexConversationBridgeOperation(
-      this.surface, session.handle.id, 'continueInterruptedTurn', [],
-    );
-    return {
-      threadId: session.handle.id,
-      activeTurnId: snapshot.activeTurnId,
-    };
-  }
-
-  async readConversationMessages(threadId: string, agentId: string, options: { view?: 'full' | 'last' } = {}): Promise<Message[]> {
-    await this.start();
-    const owner = this.subagentOwners.get(threadId);
-    if (owner?.agentId === agentId && this.liveSubagentConversationIds.has(threadId)) {
-      return historicalSurfaceMessages(this.surface.conversation(threadId).getSnapshot().messages, agentId);
-    }
-    const history = options.view === 'last' ? await this.surface.conversation(threadId).readHistory() : undefined;
-    const messages = historicalSurfaceMessages(history?.messages ?? await this.surface.readConversationMessages(threadId), agentId);
-    const session = this.sessionsByAgentId.get(agentId);
-    if (history && session && session.handle.id !== threadId) {
-      const status = subagentStatusFromHistory(history.threadStatus, messages);
-      if (status) {
-        this.subagentOwners.set(threadId, {
-          agentId,
-          rootConversationId: session.handle.id,
-        });
-        this.emitSubagentStatus(
-          session,
-          threadId,
-          status,
-          messages.at(-1)?.createdAt ?? new Date().toISOString(),
-        );
-      }
-    }
-    return options.view === 'last' && session && session.handle.id !== threadId ? messages.slice(-1) : messages;
-  }
-
-  async readConversationSummary(agent: Context, threadId: string): Promise<ConversationSummary> {
-    const session = await this.ensureSession(agent);
-    this.subagentOwners.set(threadId, {
-      agentId: agent.id,
-      rootConversationId: session.handle.id,
-    });
-    const summary = await this.surface.readConversationSummary(threadId);
-    this.conversationSummaries.set(summary.id, summary);
-    this.emitSubagentIdentity(session, summary);
-    return conversationSummary(summary);
-  }
-
-  async loadTurnHistory(agent: Context, turnId: string): Promise<void> {
-    const session = await this.ensureSession(agent);
-    await session.handle.loadTurnHistory(turnId);
-  }
-
-  async loadOlderHistory(agent: Context): Promise<{ hasOlder: boolean }> {
-    const session = await this.ensureSession(agent);
-    const loadOlderHistory = (session.handle as CodexConversation & {
-      loadOlderHistory?: () => Promise<{ hasOlder: boolean }>;
-    }).loadOlderHistory;
-    if (!loadOlderHistory) throw new Error('The Codex SDK does not support demand-paged conversation history.');
-    const page = await loadOlderHistory();
-    return { hasOlder: page.hasOlder };
-  }
-
-  async listConversations(_agent: Context, input: ConversationListInput = {}): Promise<ConversationSummary[]> {
-    await this.start();
-    const limit = input.limit ?? 100;
-    const options = {
-      ...(input.cwd ? { cwd: input.cwd } : {}),
-      limit,
-      ...(input.searchTerm?.trim() ? { searchTerm: input.searchTerm.trim() } : {}),
-    };
-    const storageState = input.archived === true ? 'archived' as const : 'active' as const;
-    const entries = await this.surface.listConversations({ ...options, ...(input.archived === undefined ? {} : { archived: input.archived }) });
-    const conversations = entries.map(conversation => ({ conversation, storageState }))
-      .sort((left, right) => right.conversation.updatedAt.localeCompare(left.conversation.updatedAt));
-    for (const { conversation } of conversations) {
-      this.conversationSummaries.set(conversation.id, conversation);
-      const owner = this.subagentOwners.get(conversation.id);
-      const session = owner ? this.sessionsByAgentId.get(owner.agentId) : undefined;
-      if (session && session.handle.id === owner?.rootConversationId) {
-        this.emitSubagentIdentity(session, conversation);
-      }
-    }
-    return conversations.slice(0, limit).map(({ conversation, storageState }) => conversationSummary(conversation, storageState));
-  }
-
-  async resumeConversation(agent: Context, target: ConversationResumeTarget) {
-    if (target.ref.backend !== 'codex') throw new Error('Codex cannot resume a non-Codex conversation.');
-    const threadId = target.ref.threadId;
-    const previousThreadId = codexThreadId(agent);
-    const targetWasArchived = target.storageState === 'archived';
-    if (targetWasArchived) await this.surface.unarchiveConversation(threadId);
-    try {
-      await this.bindAndLoad(agent, threadId);
-    } catch (error) {
-      if (previousThreadId && previousThreadId !== threadId) {
-        await this.bindAndLoad(agent, previousThreadId).catch(() => undefined);
-      }
-      if (targetWasArchived) {
-        await this.surface.archiveConversation(threadId).catch(() => undefined);
-      }
-      throw error;
-    }
-    return {
+  private startRealtimeForThread(
+    threadId: string,
+    options: StartCodexRealtimeOptions,
+  ): Promise<CodexRealtimeSession> {
+    return startCodexRealtimeSession({
+      client: this.client,
+      ensureThreadReady: async () => { await this.ensureThreadReady(threadId); },
+      onConversationEvent: (listener) => this.onConversationEvent(threadId, listener),
+      options,
       threadId,
-    };
+    });
   }
 
-  async archiveAgentConversation(agent: Context): Promise<void> {
-    const threadId = codexThreadId(agent);
-    if (!threadId) return;
-    await this.surface.archiveConversation(threadId);
-  }
-
-  async deleteAgentConversation(agent: Context): Promise<void> {
-    const threadId = codexThreadId(agent);
-    if (!threadId) return;
-    await this.surface.deleteConversation(threadId);
-  }
-
-  async reconcileConversations(agents: Context[]): Promise<void> {
-    const retainedThreadIds = new Set(agents.flatMap((agent) => {
-      const threadId = codexThreadId(agent);
-      return [threadId, ...(this.options.retainedSessions?.(agent) ?? []).flatMap(session => session.kind === 'codex' ? [session.threadId] : [])].filter((id): id is string => Boolean(id));
-    }));
-    const [active, archived] = await Promise.all([
-      this.surface.listConversations(),
-      this.surface.listConversations({ archived: true }),
-    ]);
-    for (const conversation of archived) {
-      if (retainedThreadIds.has(conversation.id)) {
-        await this.surface.unarchiveConversation(conversation.id);
-      }
-    }
-    for (const conversation of active) {
-      if (conversation.parentConversationId || retainedThreadIds.has(conversation.id)) continue;
-      await this.surface.archiveConversation(conversation.id);
-    }
-  }
-
-  async forkWorktreeConversation(agent: Context, targetAgent: Context) {
-    const source = await this.ensureSession(agent);
-    const snapshot = source.handle.getSnapshot();
-    if (snapshot.busy || snapshot.activeTurnId) {
-      // The delegating turn contains an unfinished tool call. Fork only a
-      // completed native boundary; never interrupt or replay the parent.
-      const boundary = [...snapshot.turns].reverse().find(turn => turn.status === 'completed' && turn.id !== snapshot.activeTurnId);
-      if (!boundary) throw new Error('No completed conversation turn is available to continue from.');
-      return this.forkConversation(agent, targetAgent, boundary.id);
-    }
-    return this.forkConversation(agent, targetAgent);
-  }
-
-  async forkConversation(agent: Context, targetAgent: Context, turnId?: string) {
-    const source = await this.ensureSession(agent);
-    const defaults = targetAgent.backendDefaults?.kind === 'codex' ? targetAgent.backendDefaults : undefined;
-    const preset = effectiveApprovalPreset(this.approvalPreset(defaults), this.surface.getSnapshot().approvalPresets);
-    const options = {
-      ...agentCwd(targetAgent),
-      ...(preset ? { approvalPreset: preset } : {}),
-      ...(defaults?.model ? { model: defaults.model } : {}),
-      ...(defaults?.reasoningEffort ? { reasoningEffort: defaults.reasoningEffort } : {}),
-      ...(defaults?.serviceTier !== undefined ? { serviceTier: defaults.serviceTier } : {}),
-    };
-    const result = await (turnId === undefined ? source.handle.fork(
-      options,
-      { extensionContext: this.extensionContext(targetAgent) },
-    ) : source.handle.forkTurn(
-      turnId,
-      options,
-      { extensionContext: this.extensionContext(targetAgent) },
-    ));
-    this.bindRuntime(targetAgent, result.conversationId, false);
+  private conversationForkResult(conversationId: string): CodexConversationForkResult {
+    const conversation = this.conversation(conversationId);
     return {
-      threadId: result.conversationId,
-      activeTurnId: result.snapshot.activeTurnId,
+      conversationId,
+      conversation,
+      snapshot: conversation.getSnapshot(),
     };
   }
 
-  async loadConversation(agent: Context): Promise<string | null> {
-    const threadId = codexThreadId(agent);
-    if (!threadId) return null;
-    const started = performance.now();
-    const mark = (stage: string) => {
-      this.diagnostic({ layer: 'harness-adapter', stage,
-        agentId: agent.id, threadId, at: performance.timeOrigin + performance.now(), elapsedMs: performance.now() - started });
+  getConversationSnapshot(conversationId: string): CodexConversationSnapshot {
+    const runtime = this.requireRuntime(conversationId);
+    return structuredClone({
+      ...this.state,
+      activeConversationId: conversationId,
+      ...this.runtimeProjection(runtime),
+      activeTurnId: runtime.activeTurnId,
+      turnIds: runtime.turnIds,
+    });
+  }
+
+  onConversationStateChange(conversationId: string, listener: ConversationStateListener): () => void {
+    const listeners = this.conversationListeners.get(conversationId) ?? new Set<ConversationStateListener>();
+    listeners.add(listener);
+    this.conversationListeners.set(conversationId, listeners);
+    return () => {
+      listeners.delete(listener);
+      if (listeners.size === 0) this.conversationListeners.delete(conversationId);
     };
-    mark('load.begin');
-    const pending = this.sessionInitializations.get(agent.id);
-    if (pending) {
-      const session = await pending;
-      if (session.handle.id === threadId && this.sessionsByAgentId.get(agent.id) === session) {
-        this.publishInitial(session, session.handle.getSnapshot());
-        mark('load.shared-initialization');
-        return threadId;
-      }
-    }
-    const existing = this.sessionsByAgentId.get(agent.id);
-    if (existing?.handle.id === threadId) {
-      existing.agent = agent;
-      const currentSnapshot = existing.handle.getSnapshot();
-      if (currentSnapshot.activeTurnId !== null) {
-        // This adapter already owns the live session and receives its events in
-        // the background. Keep that richer in-memory transcript authoritative
-        // instead of replacing it with load's five-turn bootstrap page.
-        this.publishConversationSnapshot(existing, currentSnapshot);
-        mark('load.live-cache');
-        return threadId;
-      }
-      const hydratedAt = this.historyHydratedAtByAgentId.get(agent.id) ?? 0;
-      if (Date.now() - hydratedAt < AGENT_HISTORY_CACHE_TTL_MS) {
-        this.publishConversationSnapshot(existing, currentSnapshot);
-        mark('load.ttl-cache');
-        return threadId;
-      }
-
-      const wasSuppressingEvents = existing.suppressEvents;
-      existing.suppressEvents = true;
-      try {
-        const requestedDefaults = agent.backendDefaults?.kind === 'codex' ? { ...agent.backendDefaults } : undefined;
-        await existing.handle.load({ ...agentCwd(agent), extensionContext: this.extensionContext(agent) });
-        mark('load.sdk-ready');
-        this.historyHydratedAtByAgentId.set(agent.id, Date.now());
-        const snapshot = await this.restoreConversationSettings(existing, existing.handle.getSnapshot(), requestedDefaults);
-        mark('load.settings-restored');
-        // Publish load's full initial page now. Older messages remain behind
-        // the SDK's demand-paging cursor until the conversation requests them.
-        this.publishInitial(existing, snapshot);
-        mark('load.published');
-        existing.suppressEvents = wasSuppressingEvents;
-      } finally {
-        existing.suppressEvents = wasSuppressingEvents;
-      }
-      return threadId;
-    }
-    await this.bindAndLoad(agent, threadId);
-    mark('load.cold-ready');
-    this.historyHydratedAtByAgentId.set(agent.id, Date.now());
-    return threadId;
   }
 
-  async respondToClientRequest(response: ClientRequestResponse): Promise<void> {
-    const { agentId, ...nativeResponse } = response;
-    const owners = [...this.approvalOwners, ...this.clientRequestOwners]
-      .filter(([key, owner]) => key === JSON.stringify([owner.agent.id, response.id]) && (!agentId || owner.agent.id === agentId));
-    if (!agentId && new Set(owners.map(([, owner]) => owner.agent.id)).size > 1) throw new Error('Agent identity is required for this request.');
-    const key = agentId ? JSON.stringify([agentId, response.id]) : owners[0]?.[0];
-    const approvalOwner = key ? this.approvalOwners.get(key) : undefined;
-    if (approvalOwner) {
-      const allow = response.payload?.decision !== 'deny' && response.payload?.cancelled !== true;
-      const scope = response.payload?.decision === 'allow_conversation' || response.payload?.decision === 'always_allow'
-        ? 'session'
-        : 'once';
-      await invokeCodexConversationBridgeOperation(
-        this.surface, approvalOwner.handle.id, 'resolveApproval', [response.id, allow ? 'approve' : 'deny', scope],
-      );
-      return;
-    }
-    const requestOwner = key ? this.clientRequestOwners.get(key) : undefined;
-    // A message-derived async question can remain pending in the SDK snapshot
-    // even if its clientRequest.requested event was missed during transport.
-    const projectedOwner = agentId ? this.sessionsByAgentId.get(agentId) : undefined;
-    const pendingQuestionOwner = projectedOwner?.handle.getSnapshot().clientRequests.some(
-      (request) => request.id === response.id,
-    ) ? projectedOwner : undefined;
-    const owner = requestOwner ?? pendingQuestionOwner;
-    if (owner) {
-      try {
-        const respond = () => invokeCodexConversationBridgeOperation(
-          this.surface, owner.handle.id, 'respondToClientRequest', [nativeResponse],
-        );
-        const request = owner.handle.getSnapshot().clientRequests.find(request => request.id === response.id);
-        // Async answers submit a new user message. Blocking replies and approvals
-        // must remain free to unblock provider work during submission.
-        if (request?.kind === 'ask_user' && request.payload.request.delivery === 'async') await this.serializeSubmission(owner, respond);
-        else await respond();
-      } finally {
-        this.publishConversationSnapshot(owner, owner.handle.getSnapshot());
+  onConversationEvent(conversationId: string, listener: ConversationEventListener): () => void {
+    return this.onEvent((event) => {
+      if ('conversationId' in event && event.conversationId === conversationId) {
+        listener(event as CodexConversationEvent);
       }
-      return;
-    }
-    if (agentId) throw new Error(`Context request '${response.id}' is no longer pending for '${agentId}'.`);
-    await this.surface.respondToClientRequest(nativeResponse);
+    });
   }
 
-  private emitUsage(observation:ExecutionObservation):void { for(const listener of this.usageListeners) { try { listener(observation); } catch { /* Observation must not change provider execution. */ } } }
-  onUsage(listener:(observation:ExecutionObservation)=>void):()=>void { this.usageListeners.add(listener); return ()=>this.usageListeners.delete(listener); }
+  getSnapshot(): CodexHostSnapshot {
+    return structuredClone(this.state);
+  }
 
-  onEvent(listener: AdapterListener): () => void {
+  onStateChange(listener: StateListener): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  /** Returns the current snapshot with the version that the next state patch continues from. */
+  getVersionedSnapshot(): CodexVersionedHostSnapshot {
+    return { version: this.stateVersion, snapshot: this.getSnapshot() };
+  }
+
+  /**
+   * Streams structural state patches. Each patch carries only changed values
+   * and list items, so its size tracks what changed rather than conversation
+   * length. Start from `getVersionedSnapshot()` and apply patches in order.
+   */
+  onStatePatch(listener: StatePatchListener): () => void {
+    this.patchListeners.add(listener);
+    return () => this.patchListeners.delete(listener);
+  }
+
+  onEvent(listener: HostEventListener): () => void {
+    this.eventListeners.add(listener);
+    return () => this.eventListeners.delete(listener);
   }
 
   async close(): Promise<void> {
     if (this.closed) return;
     this.closed = true;
-    this.imageGeneration.close();
-    this.resetCreditTokens.clear();
-    for (const cancel of this.resetReadCancellations) cancel();
-    this.resetReadCancellations.clear();
-    this.unsubscribeSurface();
-    for (const session of this.sessionsByAgentId.values()) session.unsubscribe();
-    this.sessionsByAgentId.clear();
-    this.sessionInitializations.clear();
-    this.historyHydratedAtByAgentId.clear();
-    this.agentIdsByThreadId.clear();
-    this.approvalOwners.clear();
-    this.clientRequestOwners.clear();
-    this.subagentOwners.clear();
-    this.conversationSummaries.clear();
-    this.lastSubagentIdentityByConversationId.clear();
-    this.subagentIdentityLoads.clear();
-    this.liveSubagentConversationIds.clear();
-    await this.closeSurface();
-  }
-
-  private async ensureSession(
-    agent: Context,
-    extensionContext: unknown = this.extensionContext(agent),
-  ): Promise<AgentConversation<Context>> {
-    const requestedThreadId = codexThreadId(agent);
-    const pending = this.sessionInitializations.get(agent.id);
-    if (pending) {
-      const session = await pending;
-      if (!requestedThreadId || session.handle.id === requestedThreadId) {
-        session.agent = agent;
-        return session;
-      }
-      return this.ensureSession(agent, extensionContext);
+    this.originalImages?.clear();
+    this.clearUsage();
+    this.unsubscribeNotification();
+    this.unsubscribeToolInputRequests();
+    this.unsubscribeMcpElicitationRequests();
+    this.unsubscribeDisconnect();
+    this.approvals.close();
+    this.clientRequests.clear();
+    this.items.reset();
+    this.catalog.reset(false);
+    this.textGeneration.close();
+    for (const runtime of this.runtimeState.values()) {
+      runtime.activeTurnId = null;
+      runtime.busy = false;
+      runtime.turnStartPending = false;
     }
-    const existing = this.sessionsByAgentId.get(agent.id);
-    if (existing && (!requestedThreadId || existing.handle.id === requestedThreadId)) {
-      existing.agent = agent;
-      return existing;
-    }
-    if (existing) this.releaseConversation(agent.id);
-    if (requestedThreadId) return this.bindAndLoad(agent, requestedThreadId);
-
-    let initialization!: Promise<AgentConversation<Context>>;
-    initialization = this.createAgentConversation(agent, extensionContext, () => (
-      !this.closed && this.sessionInitializations.get(agent.id) === initialization
-    ));
-    this.sessionInitializations.set(agent.id, initialization);
-    try {
-      return await initialization;
-    } finally {
-      if (this.sessionInitializations.get(agent.id) === initialization) {
-        this.sessionInitializations.delete(agent.id);
-      }
-    }
-  }
-
-  private async createAgentConversation(
-    agent: Context,
-    extensionContext: unknown,
-    isCurrent: () => boolean,
-  ): Promise<AgentConversation<Context>> {
-    await this.start();
-    if (!isCurrent()) throw new Error('Codex conversation initialization was cancelled.');
-    const defaults = agent.backendDefaults?.kind === 'codex'
-      ? { ...agent.backendDefaults }
-      : undefined;
-    const requestedPreset = this.approvalPreset(defaults);
-    const effectivePreset = effectiveApprovalPreset(requestedPreset, this.surface.getSnapshot().approvalPresets);
-    const snapshot = await this.surface.createConversation({
-      ...agentCwd(agent),
-      threadSource: 'user',
-      ...(effectivePreset ? { approvalPreset: effectivePreset } : {}),
-      ...(defaults?.model ? { model: defaults.model } : {}),
-      ...(defaults?.reasoningEffort ? { reasoningEffort: defaults.reasoningEffort } : {}),
-      ...(defaults?.serviceTier !== undefined ? { serviceTier: defaults.serviceTier } : {}),
-    }, { extensionContext });
-    const threadId = snapshot.activeConversationId;
-    if (!threadId) throw new Error('Codex did not create a conversation.');
-    if (!isCurrent()) {
-      if (!this.closed) this.surface.forgetConversation(threadId);
-      throw new Error('Codex conversation initialization was cancelled.');
-    }
-    const session = this.bindRuntime(agent, threadId, true, false);
-    try {
-      if (this.syncTitle(agent)) {
-        await this.renameSessionIfNeeded(session, this.displayName(agent));
-      }
-    } catch {
-      // Naming is best effort and must not prevent the first prompt. The host
-      // retries through its normal post-session title synchronization.
-    }
-    if (this.closed || this.sessionsByAgentId.get(agent.id) !== session) {
-      throw new Error('Codex conversation initialization was cancelled.');
-    }
-    return session;
-  }
-
-  private async captureSessionHandoff(session: AgentConversation<Context>): Promise<string> {
-    const completedBeforeTarget = new Map<string, CodexSurfaceTurnStatus>();
-    let targetTurnId: string | null = null;
-    let resolveCompletion: ((status: CodexSurfaceTurnStatus) => void) | null = null;
-    const completion = new Promise<CodexSurfaceTurnStatus>((resolve) => {
-      resolveCompletion = resolve;
+    await this.client.close();
+    this.patch({
+      status: 'idle',
+      activeTurnId: null,
+      busy: false,
+      approvals: [],
+      clientRequests: [],
+      historyLoading: false,
     });
-    const unsubscribe = session.handle.onEvent((event) => {
-      if (event.type !== 'turn.completed') return;
-      if (event.turnId === targetTurnId) {
-        resolveCompletion?.(event.payload.status);
-      } else {
-        completedBeforeTarget.set(event.turnId, event.payload.status);
-      }
-    });
-    const wasSuppressingEvents = session.suppressEvents;
-    session.suppressEvents = true;
-
-    try {
-      const beforeTurnIds = session.handle.getSnapshot().turnIds;
-      const started = await session.handle.sendMessage(SESSION_HANDOFF_PROMPT, {
-        model: SESSION_HANDOFF_MODEL,
-        reasoningEffort: SESSION_HANDOFF_REASONING_EFFORT,
-      });
-      targetTurnId = resultTurnId(started, beforeTurnIds) ?? null;
-      if (!targetTurnId) throw new Error('Codex did not start the session handoff turn.');
-
-      const alreadyCompleted = completedBeforeTarget.get(targetTurnId)
-        ?? started.turns.find((turn) => turn.id === targetTurnId && turn.status !== 'inProgress')?.status;
-      const status = alreadyCompleted ?? await sessionHandoffCompletion(completion);
-      if (status !== 'completed') {
-        throw new Error(`Session handoff was ${status}.`);
-      }
-
-      const handoff = sessionHandoffText(session.handle.getSnapshot().messages, targetTurnId);
-      if (!handoff) throw new Error('The agent returned an empty session handoff.');
-      return handoff.slice(0, SESSION_HANDOFF_MAX_CHARACTERS);
-    } finally {
-      session.suppressEvents = wasSuppressingEvents;
-      unsubscribe();
-    }
+    this.emitHostStatus('lifecycle');
   }
 
-  private async renameSessionIfNeeded(session: AgentConversation<Context>, title: string): Promise<void> {
-    const name = title.trim();
-    const summary = session.handle.getSnapshot().conversations.find(
-      (conversation) => conversation.id === session.handle.id,
-    );
-    if (summary?.title === name) return;
-    await invokeCodexConversationBridgeOperation(
-      this.surface, session.handle.id, 'renameConversation', [name],
-    );
+  private async ensureConnected(): Promise<void> {
+    return this.connection.ensureConnected();
   }
 
-  async readConversationContent(agent: Context, input: import('../../contracts/conversation').ConversationContentInput): Promise<import('../../contracts/conversation').ConversationContentChunk> {
-    const session = this.sessionsByAgentId.get(agent.id);
-    if (!session || agent.backendSession?.kind !== 'codex' || agent.backendSession.threadId !== input.sessionId || session.handle.id !== input.sessionId) throw new Error('Conversation image is no longer available.');
-    const chunk = await session.handle.readContent(input.contentId, input.offset);
-    if (this.closed || this.sessionsByAgentId.get(agent.id) !== session || agent.backendSession?.kind !== 'codex' || agent.backendSession.threadId !== input.sessionId) throw new Error('Conversation image is no longer available.');
-    return chunk;
-  }
-
-  private async bindAndLoad(
-    agent: Context,
+  private async ensureThreadReady(
     threadId: string,
-  ): Promise<AgentConversation<Context>> {
-    const pending = this.sessionInitializations.get(agent.id);
-    if (pending) {
-      const session = await pending;
-      if (session.handle.id === threadId) return session;
-      return this.bindAndLoad(agent, threadId);
-    }
-    let initialization!: Promise<AgentConversation<Context>>;
-    initialization = this.loadBoundConversation(agent, threadId, () => !this.closed && this.sessionInitializations.get(agent.id) === initialization);
-    this.sessionInitializations.set(agent.id, initialization);
-    try { return await initialization; }
-    finally {
-      if (this.sessionInitializations.get(agent.id) === initialization) this.sessionInitializations.delete(agent.id);
-    }
+    loadOptions: CodexConversationLoadOptions = {},
+  ): Promise<ThreadRuntimeState> {
+    return this.lifecycle.ensureReady(threadId, loadOptions);
   }
 
-  private async loadBoundConversation(agent: Context, threadId: string, isCurrent: () => boolean): Promise<AgentConversation<Context>> {
-    const started = performance.now();
-    let previous = started;
-    const mark = (stage: string) => {
-      const now = performance.now();
-      this.diagnostic({ layer: 'harness-adapter', stage,
-        agentId: agent.id, threadId, at: performance.timeOrigin + now, stageMs: now - previous, elapsedMs: now - started });
-      previous = now;
-    };
-    const existing = this.sessionsByAgentId.get(agent.id);
-    if (existing && existing.handle.id === threadId) {
-      existing.agent = agent;
-      const snapshot = existing.handle.getSnapshot();
-      this.publishInitial(existing, snapshot);
-      return existing;
-    }
-
-    await this.start();
-    mark('bind.driver-connected');
-    if (!isCurrent()) throw new Error('Conversation load was cancelled.');
-    const requestedDefaults = agent.backendDefaults?.kind === 'codex'
-      ? { ...agent.backendDefaults }
-      : undefined;
-    const session = this.bindRuntime(agent, threadId, false, true);
-    mark('bind.runtime-bound');
-    try {
-      let snapshot = await session.handle.load({ ...agentCwd(agent), extensionContext: this.extensionContext(agent) });
-      mark('bind.sdk-ready');
-      if (!isCurrent() || this.sessionsByAgentId.get(agent.id) !== session) throw new Error('Conversation load was cancelled.');
-      const interruptedTurnId = snapshot.activeTurnId;
-      const resumedActiveGoal = snapshot.goal?.status === 'active';
-      if (interruptedTurnId && !resumedActiveGoal) {
-        // A newly created App backend has no ownership of an old in-progress
-        // turn unless app-server is continuing a persistent goal. Leaving a
-        // genuinely orphaned turn active permanently disables the composer
-        // after an app restart, so ask app-server to end only that case before
-        // exposing the hydrated conversation.
-        snapshot = await session.handle.interrupt();
-      }
-      snapshot = session.handle.getSnapshot();
-      this.publishQuickChatConversationTitle(session, snapshot.conversations.find(
-        (conversation) => conversation.id === threadId,
-      ));
-      snapshot = await this.restoreConversationSettings(session, snapshot, requestedDefaults);
-      mark('bind.settings-restored');
-      if (!isCurrent() || this.sessionsByAgentId.get(agent.id) !== session) throw new Error('Conversation load was cancelled.');
-      this.publishInitial(session, snapshot);
-      mark('bind.published');
-      session.suppressEvents = false;
-      return session;
-    } catch (error) {
-      mark('bind.failed');
-      if (this.sessionsByAgentId.get(agent.id) === session) this.releaseConversation(agent.id);
-      throw error;
-    }
+  private createRuntime(threadId: string, patch: ThreadRuntimePatch = {}): ThreadRuntimeState {
+    const runtime = this.runtimeState.create(threadId, patch);
+    if (patch.messages) this.scheduleMarkdownImageHydration(threadId, patch.messages);
+    return runtime;
   }
 
-  private async restoreConversationSettings(
-    session: AgentConversation<Context>,
-    snapshot: CodexConversationSnapshot,
-    requestedDefaults: Context['backendDefaults'],
-  ): Promise<CodexConversationSnapshot> {
-    if (this.options.inheritNativeSettings) return snapshot;
-    const settings: UpdateCodexConversationSettings = {};
-    if (requestedDefaults?.userSelectedModel && requestedDefaults.model) {
-      const modelId = snapshot.models.find(model => model.model === requestedDefaults.model || model.id === requestedDefaults.model)?.id ?? requestedDefaults.model;
-      if (snapshot.selectedModelId !== modelId || (requestedDefaults.reasoningEffort && snapshot.selectedReasoningEffort !== requestedDefaults.reasoningEffort)) {
-        settings.modelId = modelId;
-        if (requestedDefaults.reasoningEffort) settings.reasoningEffort = requestedDefaults.reasoningEffort;
-      }
-    }
-    const requestedPreset = this.approvalPreset(requestedDefaults);
-    const effectivePreset = effectiveApprovalPreset(requestedPreset, snapshot.approvalPresets);
-    if (effectivePreset && snapshot.approvalPreset !== effectivePreset) settings.approvalPreset = effectivePreset;
-    if (requestedDefaults?.kind === 'codex' && requestedDefaults.serviceTier !== undefined && (snapshot.selectedServiceTier !== requestedDefaults.serviceTier || settings.modelId)) {
-      settings.serviceTier = requestedDefaults.serviceTier;
-    }
-    return Object.keys(settings).length ? invokeCodexConversationBridgeOperation(
-      this.surface, session.handle.id, 'updateConversationSettings', [settings],
-    ) : snapshot;
+  private requireRuntime(threadId: string): ThreadRuntimeState {
+    return this.runtimeState.require(threadId);
   }
 
-  private bindRuntime(
-    agent: Context,
+  private runtimeProjection(
+    runtime: ThreadRuntimeState,
+  ): ReturnType<CodexHostRuntimeController['projection']> {
+    return this.runtimeState.projection(runtime);
+  }
+
+  private snapshotForRuntime(runtime: ThreadRuntimeState): CodexHostSnapshot {
+    return this.runtimeState.snapshot(runtime);
+  }
+
+  private activateRuntime(runtime: ThreadRuntimeState): void {
+    this.runtimeState.activate(runtime);
+  }
+
+  private patchRuntime(threadId: string, patch: ThreadRuntimePatch): void {
+    this.runtimeState.patch(threadId, patch);
+    if (patch.messages) this.scheduleMarkdownImageHydration(threadId, patch.messages);
+  }
+
+  private scheduleMarkdownImageHydration(
     threadId: string,
-    publishInitial: boolean,
-    suppressEvents = false,
-  ): AgentConversation<Context> {
-    const otherAgentId = this.agentIdsByThreadId.get(threadId);
-    if (otherAgentId && otherAgentId !== agent.id) this.releaseConversation(otherAgentId);
-    const initialization = this.sessionInitializations.get(agent.id);
-    this.releaseConversation(agent.id);
-    if (initialization) this.sessionInitializations.set(agent.id, initialization);
-    const handle = this.surface.conversation(threadId);
-    const session: AgentConversation<Context> = {
-      agent,
-      handle,
-      images: new ConversationContentTransport(threadId),
-      suppressEvents,
-      unsubscribe: () => undefined,
-    };
-    this.sessionsByAgentId.set(agent.id, session);
-    this.agentIdsByThreadId.set(threadId, agent.id);
-    try {
-      session.unsubscribe = subscribeCodexConversationReplicaBridge(this.surface, threadId, (notification) => {
-        if (notification.type === 'snapshot') {
-          if (!session.suppressEvents) this.publishConversationSnapshot(session, notification.snapshot);
-          return;
-        }
-        this.handleConversationEvent(session, notification.event);
-      });
-    } catch (error) {
-      this.releaseConversation(agent.id);
-      throw error;
-    }
-    if (publishInitial) {
-      this.publishInitial(session, handle.getSnapshot(), {
-        publishProviderSnapshot: false,
-        publishStatus: false,
-      });
-    }
-    return session;
-  }
-
-  private publishInitial(
-    session: AgentConversation<Context>,
-    snapshot: CodexConversationSnapshot,
-    options: { publishProviderSnapshot?: boolean; publishStatus?: boolean } = {},
+    messages: readonly ConversationMessage[],
   ): void {
-    this.emitThread(session, { type: 'agent.conversationAttached', payload: { cwd: conversationCwd(snapshot) } });
-    this.emitSettings(
-      session,
-      snapshot.approvalPreset,
-      snapshot.selectedModelId,
-      snapshot.selectedReasoningEffort,
-      snapshot.selectedServiceTier,
-      snapshot.planMode,
-    );
-    if (snapshot.goal) this.emitThread(session, { type: 'conversation.goalUpdated', payload: { goal: snapshot.goal } });
-    if (snapshot.contextUsage) {
-      this.emitThread(session, { type: 'conversation.contextUsageUpdated', payload: { contextUsage: snapshot.contextUsage } });
+    const cwd = this.runtimeState.get(threadId)?.cwd;
+    for (const message of messages) {
+      if (message.role !== 'assistant' || message.status === 'streaming') continue;
+      message.parts.forEach((part, partIndex) => {
+        if (part.type !== 'text' || !part.text.includes('![')) return;
+        const key = `${threadId}\u0000${message.id}\u0000${part.itemId ?? partIndex}\u0000${part.text}`;
+        if (this.pendingMarkdownImageHydrations.has(key)) return;
+        this.pendingMarkdownImageHydrations.add(key);
+        void this.markdownImages.hydrate(part.text, cwd).then(async (hydratedText) => {
+          if (this.closed || hydratedText === part.text) return;
+          const runtime = this.runtimeState.get(threadId);
+          if (!runtime) return;
+          const messageIndex = runtime.messages.findIndex((candidate) => candidate.id === message.id);
+          const currentMessage = runtime.messages[messageIndex];
+          if (!currentMessage) return;
+          const currentPart = currentMessage.parts[partIndex];
+          if (currentPart?.type !== 'text' || currentPart.text !== part.text) return;
+          const nextParts = [...currentMessage.parts];
+          nextParts.splice(partIndex, 1, { ...currentPart, text: hydratedText });
+          const hydratedMessage = { ...currentMessage, parts: nextParts };
+          const nextMessages = [...runtime.messages];
+          nextMessages.splice(messageIndex, 1, hydratedMessage);
+          this.runtimeState.patch(threadId, { messages: nextMessages });
+
+          await this.conversations.waitForHistoryEmission(threadId);
+          if (this.closed) return;
+          const currentRuntime = this.runtimeState.get(threadId);
+          const publishedMessage = currentRuntime?.messages.find((candidate) => candidate.id === message.id);
+          if (!publishedMessage) return;
+          const publishedPart = publishedMessage.parts[partIndex];
+          if (publishedPart?.type !== 'text' || publishedPart.text !== hydratedText) return;
+          if (publishedMessage.turnId) this.emitEvent('lifecycle', {
+            type: 'message.updated',
+            conversationId: threadId,
+            turnId: publishedMessage.turnId,
+            payload: { message: structuredClone(publishedMessage) },
+          });
+        }).finally(() => this.pendingMarkdownImageHydrations.delete(key));
+      });
     }
-    if (snapshot.turnGitDiff) this.emitDiff(session, snapshot.turnGitDiff);
-    if (options.publishStatus !== false) this.emitStatus(session, (this.options.statusFromSnapshot ?? statusFromSnapshot)(snapshot));
-    if (options.publishProviderSnapshot !== false) this.publishConversationSnapshot(session, snapshot);
-    else this.reconcilePending(session, snapshot);
   }
 
-  private diagnostic(record: HarnessDiagnostic): void {
-    notifyListeners(this.options.onDiagnostic ? [this.options.onDiagnostic] : [], record, this.options.onListenerError);
+  private emitHostStatus(origin: HostEventOrigin): void {
+    this.runtimeState.emitHostStatus(origin);
   }
 
-  private publishConversationSnapshot(
-    session: AgentConversation<Context>,
-    snapshot: CodexConversationSnapshot,
+  private emitSummaryUpserted(
+    summary: CodexConversationSummary,
+    reason: Extract<CodexHostEvent, { type: 'conversation.summaryUpserted' }>['payload']['reason'],
+    origin: HostEventOrigin,
   ): void {
-    if (this.sessionsByAgentId.get(session.agent.id) !== session) return;
-    const started = performance.now();
-    this.reconcilePending(session, snapshot);
-    const revision = (this.conversationRevisionsByAgentId.get(session.agent.id) ?? 0) + 1;
-    this.conversationRevisionsByAgentId.set(session.agent.id, revision);
-    const projected = conversationSnapshotForTransport(session.images.project(snapshot));
-    const projectedAt = performance.now();
-    this.emitThread(session, {
-      type: 'codex.conversationSnapshotChanged',
-      payload: {
-        revision,
-        snapshot: projected,
-      },
+    this.runtimeState.emitSummaryUpserted(summary, reason, origin);
+  }
+
+  private emitConversationActivity(threadId: string, origin: HostEventOrigin): void {
+    this.runtimeState.emitConversationActivity(threadId, origin);
+  }
+
+  private emitConversationSettings(threadId: string, origin: HostEventOrigin): void {
+    this.runtimeState.emitConversationSettings(threadId, origin);
+  }
+
+  private emitConversationSkills(threadId: string, origin: HostEventOrigin): void {
+    this.runtimeState.emitConversationSkills(threadId, origin);
+  }
+
+  private emitConversationPermissions(threadId: string, origin: HostEventOrigin): void {
+    this.runtimeState.emitConversationPermissions(threadId, origin);
+  }
+
+  private emitHistoryReplaced(
+    threadId: string,
+    reason: Extract<CodexHostEvent, { type: 'conversation.historyReplaced' }>['payload']['reason'],
+    origin: HostEventOrigin,
+  ): void {
+    this.runtimeState.emitHistoryReplaced(threadId, reason, origin);
+  }
+
+  private emitHistoryPrepended(
+    threadId: string,
+    messages: readonly ConversationMessage[],
+    origin: HostEventOrigin,
+  ): void {
+    this.runtimeState.emitHistoryPrepended(threadId, messages, origin);
+  }
+
+  private messageContainingTool(threadId: string, turnId: string, itemId: string): ConversationMessage | null {
+    return this.runtimeState.messageContainingTool(threadId, turnId, itemId);
+  }
+
+  private assistantMessageForTurn(threadId: string, turnId: string): ConversationMessage | null {
+    return this.runtimeState.assistantMessageForTurn(threadId, turnId);
+  }
+
+  private notifyConversationListeners(threadId: string): void {
+    const listeners = this.conversationListeners.get(threadId);
+    if (!listeners) return;
+    const snapshot = this.getConversationSnapshot(threadId);
+    notifyListeners(listeners, snapshot, this.options.onListenerError);
+  }
+
+  private markRuntimeTurnActive(runtime: ThreadRuntimeState, turnId: string): void {
+    this.runtimeState.markTurnActive(runtime, turnId);
+  }
+
+  private patchConversationStatus(
+    threadId: string,
+    status: CodexConversationSummary['status'],
+    origin: HostEventOrigin = 'notification',
+  ): void {
+    this.runtimeState.patchConversationStatus(threadId, status, origin);
+  }
+
+  private patchConversationTurnCount(
+    threadId: string,
+    turnCount: number,
+    origin: HostEventOrigin = 'notification',
+  ): void {
+    this.runtimeState.patchConversationTurnCount(threadId, turnCount, origin);
+  }
+
+  private clearPendingForThread(
+    threadId: string,
+    reason: string,
+    eventReason: 'conversation_closed' | 'conversation_removed' | 'host_disconnected',
+  ): void {
+    this.approvals.clearForThread(threadId, eventReason);
+    this.clientRequests.clearForThread(threadId, reason, eventReason);
+  }
+
+  private removeThread(
+    threadId: string,
+    reason: 'archived' | 'deleted',
+    origin: HostEventOrigin = 'notification',
+  ): void {
+    const known = this.state.conversations.some((conversation) => conversation.id === threadId)
+      || this.runtimeState.get(threadId) !== undefined
+      || this.approvals.hasForThread(threadId)
+      || this.clientRequests.hasForThread(threadId);
+    if (!known) return;
+    this.clearPendingForThread(threadId, 'Codex thread is no longer available', 'conversation_removed');
+    this.runtimeState.forget(threadId);
+    this.lifecycle.forget(threadId);
+    this.originalImages?.forget(threadId);
+    this.conversations.forget(threadId);
+    this.conversationHandles.delete(threadId);
+    const conversations = this.state.conversations.filter((conversation) => conversation.id !== threadId);
+    if (this.state.activeConversationId !== threadId) {
+      this.patch({ conversations });
+      this.emitEvent(origin, {
+        type: 'conversation.summaryRemoved',
+        conversationId: threadId,
+        payload: { reason },
+      });
+      return;
+    }
+    this.patch({
+      conversations,
+      activeConversationId: null,
+      messages: [],
+      answeredClientRequestIds: [],
+      approvals: [],
+      contextUsage: null,
+      goal: null,
+      turnGitDiff: null,
+      threadStatus: null,
+      queuedPrompts: [],
+      busy: false,
+      historyLoading: false,
+      error: null,
     });
-    this.diagnostic({ layer: 'harness-adapter', stage: 'frame.projected-and-emitted',
-      agentId: session.agent.id, threadId: session.handle.id, revision, messages: snapshot.messages.length,
-      startAt: performance.timeOrigin + started, at: performance.timeOrigin + performance.now(), projectMs: projectedAt - started, emitMs: performance.now() - projectedAt });
+    this.emitEvent(origin, {
+      type: 'conversation.summaryRemoved',
+      conversationId: threadId,
+      payload: { reason },
+    });
+    this.emitEvent(origin, {
+      type: 'conversation.selected',
+      payload: { conversationId: null },
+    });
   }
 
-  private reconcilePending(
-    session: AgentConversation<Context>,
-    snapshot: CodexConversationSnapshot,
-  ): void {
-    const pendingIds = new Set(snapshot.clientRequests.map(request => request.id));
-    for (const [key, owner] of this.clientRequestOwners) {
-      if (owner !== session) continue;
-      const [, id] = JSON.parse(key) as [string, string];
-      if (pendingIds.has(id)) continue;
-      this.clientRequestOwners.delete(key);
-      this.emitThread(session, { type: 'agentRequest.resolved', payload: {
-        id, outcome: { kind: 'cancelled', reason: 'provider_snapshot' },
-      } });
-    }
-    for (const request of snapshot.clientRequests) {
-      const key = JSON.stringify([session.agent.id, request.id]);
-      if (this.clientRequestOwners.get(key) === session) continue;
-      this.clientRequestOwners.set(key, session);
-      this.emitThread(session, { type: 'agentRequest.created', payload: { request: requestFromClientRequest(request, { conversationId: session.handle.id }) } });
-    }
-    for (const approval of snapshot.approvals) {
-      const key = JSON.stringify([session.agent.id, approval.id]);
-      if (this.approvalOwners.get(key) === session) continue;
-      this.approvalOwners.set(key, session);
-      this.emitThread(session, { type: 'agentRequest.created', payload: { request: approvalAgentRequest(approval) } });
-    }
+
+  private handleUnknownNotification(notification: ServerNotification): void {
+    const runtimeNotification = notification as unknown as { method: string; params?: unknown };
+    this.options.onUnknownNotification?.({
+      method: runtimeNotification.method,
+      ...('params' in runtimeNotification ? { params: runtimeNotification.params } : {}),
+    });
   }
 
-  private handleSurfaceEvent(event: CodexSurfaceEvent): void {
-    if (event.type === 'authentication.changed') {
-      const identity = JSON.stringify(event.payload.authentication.account);
-      if (identity !== this.accountIdentity || event.origin === 'notification') {
-        this.accountIdentity = identity; ++this.accountRevision;
-        this.resetCreditTokens.clear();
-        for (const cancel of this.resetReadCancellations) cancel();
-        const state = authenticationFromSurface(event.payload.authentication);
-        this.emit({ backend: 'codex', type: 'provider.authenticationChanged', payload: { kind: 'codex', connected: Boolean(state.account || !state.requiresOpenaiAuth), state }, occurredAt: event.occurredAt });
-      }
-    }
 
-    if (event.type === 'conversation.summaryUpserted') {
-      this.conversationSummaries.set(event.conversationId, event.payload.summary);
-      const rootAgentId = this.agentIdsByThreadId.get(event.conversationId);
-      const rootSession = rootAgentId ? this.sessionsByAgentId.get(rootAgentId) : undefined;
-      if (rootSession?.handle.id === event.conversationId) {
-        this.publishQuickChatConversationTitle(rootSession, event.payload.summary);
-      }
-      const owner = this.subagentOwners.get(event.conversationId);
-      const session = owner ? this.sessionsByAgentId.get(owner.agentId) : undefined;
-      if (session && session.handle.id === owner?.rootConversationId) {
-        this.emitSubagentIdentity(session, event.payload.summary);
-      }
-      return;
+  private async requestForAccount<Response, Result>(
+    request: () => Promise<Response>, project: (response: Response) => Result,
+  ): Promise<Result> {
+    await this.ensureConnected();
+    await this.authentication.pendingRefresh();
+    const generation = this.accountGeneration;
+    const identity = hostAuthenticationIdentityKey(this.state.authentication);
+    const result = await request();
+    if (this.closed || generation !== this.accountGeneration
+      || identity !== hostAuthenticationIdentityKey(this.state.authentication)) {
+      throw new Error('Account changed during account operation');
     }
-    if (event.type === 'conversation.summaryRemoved') {
-      this.conversationSummaries.delete(event.conversationId);
-      this.lastSubagentIdentityByConversationId.delete(event.conversationId);
-      return;
-    }
-    if ('conversationId' in event) {
-      const owner = this.subagentOwners.get(event.conversationId);
-      if (!owner) return;
-      const session = this.sessionsByAgentId.get(owner.agentId);
-      if (!session || session.handle.id !== owner.rootConversationId) return;
-      if (
-        event.origin === 'notification' &&
-        event.type !== 'conversation.historyReplaced' &&
-        event.type !== 'conversation.historyPrepended'
-      ) {
-        this.liveSubagentConversationIds.add(event.conversationId);
-      }
-      this.refreshSubagentIdentity(session, event.conversationId);
-      if (event.type === 'subagent.toolCallChanged') {
-        this.emitSubagentToolCall(session, event);
-      } else if (event.type === 'subagent.activity') {
-        this.emitSubagentActivity(session, event);
-      } else if (event.type === 'turn.started') {
-        this.emitSubagentStatus(session, event.conversationId, 'running', event.occurredAt);
-      } else if (event.type === 'turn.completed') {
-        this.emitSubagentStatus(
-          session,
-          event.conversationId,
-          subagentStatusFromTurn(event.payload.status),
-          event.occurredAt,
-          event.payload.error?.message ?? undefined,
-        );
-      } else if (event.type === 'turn.error' && !event.payload.willRetry) {
-        this.emitSubagentStatus(
-          session,
-          event.conversationId,
-          'errored',
-          event.occurredAt,
-          event.payload.error.message,
-        );
-      }
-      return;
-    }
-    if (event.type === 'surface.statusChanged') {
-      this.emit({ backend: 'codex', type: 'backend.statusChanged', payload: runtimeStatus(this.surface.getSnapshot(), this.options.runtimeStatusDetail), occurredAt: event.occurredAt });
-      return;
-    }
-    if (event.type === 'rateLimits.changed' && event.payload.rateLimits) {
-      this.emit({
-        backend: 'codex',
-        type: 'account.rateLimitsUpdated',
-        payload: { rateLimits: event.payload.rateLimits.rateLimits },
-        occurredAt: event.occurredAt,
-      });
-      return;
-    }
-    if (event.type === 'catalog.skillsChanged' && event.payload.status === 'loaded') {
-      this.emit({
-        backend: 'codex',
-        type: 'skills.changed',
-        payload: skillsChangedPayload(event.payload.cwd, event.payload.skills, event.payload.status),
-        occurredAt: event.occurredAt,
-      });
-      return;
-    }
-    if (event.type === 'remoteControl.statusChanged') {
-      this.emit({
-        backend: 'codex',
-        type: 'remoteControl.statusChanged',
-        payload: event.payload.status,
-        occurredAt: event.occurredAt,
-      });
-    }
+    return project(result);
   }
 
-  private handleConversationEvent(session: AgentConversation<Context>, event: CodexConversationEvent): void {
-    if (session.suppressEvents) return;
-    if (isClientConversationEvent(event)) this.publishConversationEvent(session, event);
-    this.historyHydratedAtByAgentId.set(session.agent.id, Date.now());
-    const consumption=codexExecutionConsumption(event);
-    const requestCoverage = codexRequestCoverage(event);
-    if (event.type === 'conversation.executionUsageChanged' && (consumption || requestCoverage)) {
-      const turnId=(event as unknown as {turnId?:string}).turnId;
-      if (typeof turnId === 'string') {
-        this.emitUsage({
-          agentId: session.agent.id,
-          sessionId: session.handle.id,
-          turnId,
-          provider: 'codex',
-          phase: 'usage',
-          at: Date.parse(event.occurredAt),
-          model: null,
-          ...consumption,
-          ...requestCoverage,
+  private emitEvent(origin: HostEventOrigin, input: HostEventInput, recovered = false): void {
+    if (input.type === 'conversation.historyReplaced' && input.payload.reason !== 'details' && input.payload.reason !== 'images') {
+      this.originalUsage?.forget(input.conversationId);
+    }
+    input = this.usage.observe(origin, input);
+    if (input.type === 'turn.started' && origin !== 'lifecycle') {
+      const runtime = this.runtimeState.get(input.conversationId);
+      const turnId = input.turnId;
+      const startedAt = input.payload.startedAt;
+      if (runtime?.turns.some(turn => turn.id === turnId && turn.startedAt === null)) {
+        this.patchRuntime(input.conversationId, {
+          turns: runtime.turns.map(turn => turn.id === turnId ? { ...turn, startedAt } : turn),
         });
       }
     }
-    if (event.type === 'turn.modelRerouted') {
-      this.emitUsage({
-        agentId: session.agent.id,
-        sessionId: session.handle.id,
-        turnId: event.turnId,
-        provider: 'codex',
-        phase: 'usage',
-        at: Date.parse(event.occurredAt),
-        model: event.payload.toModel,
-      });
-    }
-    if (event.type === 'turn.error' && !event.payload.willRetry) {
-      this.emitUsage({agentId:session.agent.id,sessionId:session.handle.id,turnId:event.turnId,provider:'codex',phase:'failed',at:Date.parse(event.occurredAt),model:null});
-    }
-    if (event.type === 'turn.started' || event.type === 'turn.completed') {
-      const settings = event.type === 'turn.started' ? session.handle.getSnapshot() : null;
-      const phase =
-        event.type === 'turn.started'
-          ? 'started'
-          : event.payload.status === 'inProgress'
-            ? 'started'
-            : event.payload.status;
-      const observation: ExecutionObservation = {
-        agentId: session.agent.id,
-        sessionId: session.handle.id,
-        turnId: event.turnId,
-        provider: 'codex',
-        phase,
-        at: Date.parse(event.occurredAt),
-        model:
-          consumption?.model ??
-          (settings ? selectedCodexModel(settings) : null),
-        ...(settings
-          ? {
-              reasoningEffort: settings.selectedReasoningEffort,
-              serviceTier:
-                settings.selectedServiceTier === null
-                  ? 'normal'
-                  : settings.selectedServiceTier ?? null,
-            }
-          : {}),
-        ...(event.type === 'turn.started'
-          ? { requestCoverage: 'partial' as const, requestCoverageReason: 'missing-sdk-request-evidence' as const }
-          : requestCoverage),
-        ...(consumption ? { tokens: consumption.tokens } : {}),
-        ...(event.type === 'turn.completed' && event.payload.durationMs !== null
-          ? { durationMs: event.payload.durationMs }
-          : {}),
-      };
-      this.emitUsage(observation);
-    }
-    const metadata = { occurredAt: event.occurredAt };
-    switch (event.type) {
-      case 'conversation.summaryUpserted':
-      case 'conversation.summaryRemoved':
-        return;
-      case 'conversation.activityChanged':
-        this.emitStatus(session, (this.options.statusFromSnapshot ?? statusFromSnapshot)(session.handle.getSnapshot()), event.occurredAt);
-        return;
-      case 'conversation.settingsChanged':
-        this.emitSettings(
-          session,
-          event.payload.approvalPreset,
-          event.payload.selectedModelId,
-          event.payload.selectedReasoningEffort,
-          event.payload.selectedServiceTier,
-          event.payload.planMode,
-          event.occurredAt,
-        );
-        return;
-      case 'conversation.goalChanged':
-        if (event.origin === 'action') return;
-        this.emitThread(session, event.payload.goal
-          ? { type: 'conversation.goalUpdated', turnId: event.turnId, payload: { goal: event.payload.goal }, ...metadata }
-          : { type: 'conversation.goalCleared', turnId: event.turnId, payload: {}, ...metadata });
-        return;
-      case 'conversation.contextUsageChanged':
-        if (event.payload.contextUsage) {
-          this.emitThread(session, {
-            type: 'conversation.contextUsageUpdated', turnId: event.turnId,
-            payload: { contextUsage: event.payload.contextUsage }, ...metadata,
-          });
-        }
-        return;
-      case 'conversation.skillsChanged':
-        if (event.payload.status === 'loaded') {
-          this.emitThread(session, {
-            type: 'skills.changed',
-            payload: skillsChangedPayload(event.payload.cwd, event.payload.skills, event.payload.status),
-            ...metadata,
-          });
-        }
-        return;
-      case 'conversation.permissionsChanged':
-        return;
-      case 'conversation.diffUpdated':
-        if (event.payload.diff) this.emitDiff(session, event.payload.diff, event.occurredAt);
-        return;
-      case 'subagent.toolCallChanged': {
-        this.emitSubagentToolCall(session, event);
-        return;
-      }
-      case 'subagent.activity': {
-        this.emitSubagentActivity(session, event);
-        return;
-      }
-      case 'turn.error':
-        if (providerSafetyBlockMessage(event.payload.error)) this.emitStatus(session, (this.options.statusFromSnapshot ?? statusFromSnapshot)(session.handle.getSnapshot()), event.occurredAt);
-        return;
-      case 'turn.completed':
-        if (providerSafetyBlockMessage(event.payload.error)) this.emitStatus(session, (this.options.statusFromSnapshot ?? statusFromSnapshot)(session.handle.getSnapshot()), event.occurredAt);
-        void this.refreshQuickChatConversationTitle(session);
-        return;
-      case 'file.activity':
-        this.emitThread(session, {
-          type: 'workspace.fileActivityDetected', turnId: event.turnId,
-          payload: { ...event.payload },
-          ...metadata,
+    if (input.type === 'conversation.executionUsageChanged' || input.type === 'turn.completed') {
+      const runtime = this.runtimeState.get(input.conversationId);
+      const executionUsage = input.type === 'turn.completed' ? input.payload.executionUsage : input.payload.usage;
+      const turnId = input.turnId;
+      if (runtime?.turns.some(turn => turn.id === turnId)) {
+        this.patchRuntime(input.conversationId, {
+          turns: runtime.turns.map(turn => turn.id === turnId ? { ...turn, executionUsage: structuredClone(executionUsage) } : turn),
         });
-        return;
-      case 'approval.requested':
-        this.approvalOwners.set(JSON.stringify([session.agent.id, event.payload.approval.id]), session);
-        this.emitThread(session, { type: 'agentRequest.created', turnId: event.turnId, payload: { request: approvalAgentRequest(event.payload.approval) }, ...metadata });
-        return;
-      case 'approval.resolved':
-        this.approvalOwners.delete(JSON.stringify([session.agent.id, event.payload.approval.id]));
-        this.emitThread(session, { type: 'agentRequest.resolved', turnId: event.turnId, payload: {
-          id: event.payload.approval.id,
-          outcome: approvalOutcome(event.payload.decision, event.payload.scope, event.payload.reason),
-        }, ...metadata });
-        this.emitStatus(session, (this.options.statusFromSnapshot ?? statusFromSnapshot)(session.handle.getSnapshot()), event.occurredAt);
-        return;
-      case 'clientRequest.requested':
-        this.clientRequestOwners.set(JSON.stringify([session.agent.id, event.payload.request.id]), session);
-        this.emitThread(session, { type: 'agentRequest.created', turnId: event.turnId, payload: { request: requestFromClientRequest(event.payload.request, { conversationId: session.handle.id, turnId: event.turnId }) }, ...metadata });
-        return;
-      case 'clientRequest.resolved':
-        this.clientRequestOwners.delete(JSON.stringify([session.agent.id, event.payload.request.id]));
-        this.emitThread(session, { type: 'agentRequest.resolved', turnId: event.turnId, payload: {
-          id: event.payload.request.id,
-          outcome: event.payload.response ? agentResponseFromClientResponse(event.payload.response).outcome : approvalOutcome(null, null, event.payload.reason),
-        }, ...metadata });
-        this.emitStatus(session, (this.options.statusFromSnapshot ?? statusFromSnapshot)(session.handle.getSnapshot()), event.occurredAt);
-        return;
-      default:
-        return;
-    }
-  }
-
-  private publishConversationEvent(
-    session: AgentConversation<Context>,
-    event: CodexConversationEvent,
-  ): void {
-    if (this.sessionsByAgentId.get(session.agent.id) !== session) return;
-    const revision = (this.conversationRevisionsByAgentId.get(session.agent.id) ?? 0) + 1;
-    this.conversationRevisionsByAgentId.set(session.agent.id, revision);
-    this.emitThread(session, {
-      type: 'codex.conversationEventReceived',
-      payload: {
-        revision,
-        event: structuredClone(session.images.project(event)),
-      },
-    });
-  }
-
-  private emitSettings(
-    session: AgentConversation<Context>,
-    preset: ApprovalPreset | null,
-    selectedModelId: string | null,
-    selectedReasoningEffort: string | null,
-    selectedServiceTier: string | null | undefined,
-    planMode: boolean,
-    occurredAt?: string,
-  ): void {
-    if (preset || selectedModelId || selectedReasoningEffort || selectedServiceTier !== undefined) {
-      this.emitThread(session, {
-        type: 'conversation.settingsUpdated',
-        payload: {
-          settings: {
-            ...(preset ? { approvalPreset: preset } : {}),
-            ...(selectedModelId ? { model: selectedModelId } : {}),
-            ...(selectedReasoningEffort ? { reasoningEffort: selectedReasoningEffort } : {}),
-            ...(selectedServiceTier === undefined ? {} : { serviceTier: selectedServiceTier }),
-          },
-        },
-        ...(occurredAt ? { occurredAt } : {}),
-      });
-    }
-    this.emitThread(session, {
-      type: 'conversation.modeUpdated',
-      payload: { mode: planMode ? 'plan' : 'default' },
-      ...(occurredAt ? { occurredAt } : {}),
-    });
-  }
-
-  private emitDiff(
-    session: AgentConversation<Context>,
-    diff: NonNullable<CodexConversationSnapshot['turnGitDiff']>,
-    occurredAt?: string,
-  ): void {
-    this.emitThread(session, {
-      type: 'conversation.turnDiffUpdated', turnId: diff.turnId,
-      payload: { addedLines: diff.addedLines, removedLines: diff.removedLines, diff: diff.diff },
-      ...(occurredAt ? { occurredAt } : {}),
-    });
-  }
-
-  private emitStatus(session: AgentConversation<Context>, status: AgentStatus, occurredAt?: string): void {
-    this.emitThread(session, {
-      type: 'agent.statusChanged', payload: status,
-      ...(occurredAt ? { occurredAt } : {}),
-    });
-  }
-
-  private emitSubagentToolCall(
-    session: AgentConversation<Context>,
-    event: Extract<CodexConversationEvent, { type: 'subagent.toolCallChanged' }>,
-  ): void {
-    const toolCall = event.payload.toolCall;
-    const owner = { agentId: session.agent.id, rootConversationId: session.handle.id };
-    for (const conversationId of toolCall.receiverConversationIds) {
-      this.subagentOwners.set(conversationId, owner);
-    }
-    const operation: SubagentOperationChange['operation'] = {
-      id: toolCall.id,
-      ...(event.turnId ? { turnId: event.turnId } : {}),
-      lifecycle: event.payload.lifecycle,
-      kind: toolCall.tool,
-      status: toolCall.status,
-      senderConversationId: toolCall.senderConversationId,
-      receiverConversationIds: [...toolCall.receiverConversationIds],
-      ...(toolCall.prompt ? { prompt: toolCall.prompt } : {}),
-      ...(toolCall.model ? { model: toolCall.model } : {}),
-      ...(toolCall.reasoningEffort ? { reasoningEffort: toolCall.reasoningEffort } : {}),
-      occurredAt: event.occurredAt,
-    };
-    const agentStates: SubagentOperationChange['agentStates'] = {};
-    for (const [conversationId, state] of Object.entries(toolCall.agentStates)) {
-      this.subagentOwners.set(conversationId, owner);
-      agentStates[conversationId] = {
-        status: state.status,
-        ...(state.message ? { message: state.message } : {}),
-      };
-    }
-    this.emitThread(session, {
-      type: 'subagent.operationChanged',
-      turnId: event.turnId,
-      payload: {
-        rootConversationId: session.handle.id,
-        operation,
-        agentStates,
-      } satisfies SubagentOperationChange,
-      occurredAt: event.occurredAt,
-    });
-    for (const conversationId of new Set([
-      ...toolCall.receiverConversationIds,
-      ...Object.keys(toolCall.agentStates),
-    ])) {
-      const summary = this.conversationSummaries.get(conversationId);
-      if (summary) this.emitSubagentIdentity(session, summary);
-      this.refreshSubagentIdentity(session, conversationId);
-    }
-  }
-
-  private emitSubagentActivity(
-    session: AgentConversation<Context>,
-    event: Extract<CodexConversationEvent, { type: 'subagent.activity' }>,
-  ): void {
-    const activity: SubagentActivityChange['activity'] = {
-      id: event.payload.activity.id,
-      ...(event.turnId ? { turnId: event.turnId } : {}),
-      lifecycle: event.payload.lifecycle,
-      kind: event.payload.activity.kind,
-      conversationId: event.payload.activity.agentConversationId,
-      agentPath: event.payload.activity.agentPath,
-      occurredAt: event.occurredAt,
-    };
-    if (activity.conversationId === session.handle.id) return;
-    this.subagentOwners.set(activity.conversationId, {
-      agentId: session.agent.id,
-      rootConversationId: session.handle.id,
-    });
-    this.emitThread(session, {
-      type: 'subagent.activityChanged',
-      turnId: event.turnId,
-      payload: {
-        rootConversationId: session.handle.id,
-        parentConversationId: event.conversationId,
-        activity,
-      } satisfies SubagentActivityChange,
-      occurredAt: event.occurredAt,
-    });
-    const summary = this.conversationSummaries.get(activity.conversationId);
-    if (summary) this.emitSubagentIdentity(session, summary);
-    this.refreshSubagentIdentity(session, activity.conversationId);
-  }
-
-  private refreshSubagentIdentity(session: AgentConversation<Context>, conversationId: string): void {
-    if (this.lastSubagentIdentityByConversationId.has(conversationId)) return;
-    if (this.subagentIdentityLoads.has(conversationId)) return;
-    const load = this.surface.readConversationSummary(conversationId).then((summary) => {
-      const owner = this.subagentOwners.get(conversationId);
-      if (owner?.agentId !== session.agent.id || owner.rootConversationId !== session.handle.id) return;
-      this.conversationSummaries.set(summary.id, summary);
-      this.emitSubagentIdentity(session, summary);
-    }).catch(() => undefined).finally(() => {
-      if (this.subagentIdentityLoads.get(conversationId) === load) {
-        this.subagentIdentityLoads.delete(conversationId);
-      }
-    });
-    this.subagentIdentityLoads.set(conversationId, load);
-  }
-
-  private emitSubagentIdentity(session: AgentConversation<Context>, summary: CodexConversationSummary): void {
-    if (summary.id === session.handle.id) return;
-    if (!summary.agentNickname && !summary.agentRole) return;
-    const identityKey = `${summary.agentNickname ?? ''}\u0000${summary.agentRole ?? ''}`;
-    if (this.lastSubagentIdentityByConversationId.get(summary.id) === identityKey) return;
-    this.lastSubagentIdentityByConversationId.set(summary.id, identityKey);
-    this.emitThread(session, {
-      type: 'subagent.identityChanged',
-      payload: {
-        rootConversationId: session.handle.id,
-        conversationId: summary.id,
-        ...(summary.agentNickname ? { agentNickname: summary.agentNickname } : {}),
-        ...(summary.agentRole ? { agentRole: summary.agentRole } : {}),
-      } satisfies SubagentIdentityChange,
-      occurredAt: summary.updatedAt,
-    });
-  }
-
-  private publishQuickChatConversationTitle(
-    session: AgentConversation<Context>,
-    summary: CodexConversationSummary | undefined,
-  ): void {
-    if (!summary || this.syncTitle(session.agent)) return;
-    const conversationTitle = summary.title.trim();
-    if (
-      !conversationTitle ||
-      conversationTitle === summary.id ||
-      conversationTitle === session.agent.conversationTitle
-    ) return;
-
-    session.agent.conversationTitle = conversationTitle;
-    this.emit({
-      backend: 'codex',
-      agentId: session.agent.id,
-      threadId: session.handle.id,
-      type: 'agent.updated',
-      payload: {
-        id: session.agent.id,
-        conversationTitle,
-      },
-      occurredAt: summary.updatedAt,
-    });
-  }
-
-  private async refreshQuickChatConversationTitle(session: AgentConversation<Context>): Promise<void> {
-    if (this.syncTitle(session.agent)) return;
-    const summary = await this.surface.readConversationSummary(session.handle.id).catch(() => undefined);
-    if (!summary) return;
-    this.conversationSummaries.set(summary.id, summary);
-    this.publishQuickChatConversationTitle(session, summary);
-  }
-
-  private emitSubagentStatus(
-    session: AgentConversation<Context>,
-    conversationId: string,
-    status: SubagentStatusChange['status'],
-    occurredAt: string,
-    statusMessage?: string,
-  ): void {
-    this.emitThread(session, {
-      type: 'subagent.statusChanged',
-      payload: {
-        rootConversationId: session.handle.id,
-        conversationId,
-        status,
-        ...(statusMessage ? { statusMessage } : {}),
-      } satisfies SubagentStatusChange,
-      occurredAt,
-    });
-  }
-
-  private emitThread(
-    session: AgentConversation<Context>,
-    event: ThreadBackendEvent,
-  ): void {
-    this.emit({
-      ...event,
-      agentId: session.agent.id,
-      backend: 'codex',
-      threadId: session.handle.id,
-      conversationId: session.handle.id,
-    } as HarnessEvent);
-  }
-
-  private emit(event: HarnessEvent): void {
-    for (const listener of this.listeners) listener(event);
-  }
-
-  private removePendingOwners(session: AgentConversation<Context>): void {
-    for (const [id, owner] of this.approvalOwners) {
-      if (owner === session) this.approvalOwners.delete(id);
-    }
-    for (const [id, owner] of this.clientRequestOwners) {
-      if (owner === session) this.clientRequestOwners.delete(id);
-    }
-  }
-}
-
-function epochTimestampToIso(value: bigint): string {
-  const numericValue = Number(value);
-  const milliseconds = Math.abs(numericValue) < 100_000_000_000 ? numericValue * 1_000 : numericValue;
-  const date = new Date(milliseconds);
-  if (Number.isNaN(date.getTime())) throw new Error('Codex returned an invalid remote-control timestamp.');
-  return date.toISOString();
-}
-
-function conversationSummary(
-  conversation: CodexConversationSummary,
-  storageState: ConversationSummary['storageState'] = 'active',
-): ConversationSummary {
-  return {
-    id: conversation.id,
-    ...(conversation.sessionId ? { sessionId: conversation.sessionId } : {}),
-    ...(conversation.parentConversationId ? { parentConversationId: conversation.parentConversationId } : {}),
-    ...(conversation.agentNickname ? { agentNickname: conversation.agentNickname } : {}),
-    ...(conversation.agentRole ? { agentRole: conversation.agentRole } : {}),
-    title: conversation.title,
-    preview: conversation.preview,
-    status: conversation.status,
-    createdAt: conversation.createdAt,
-    updatedAt: conversation.updatedAt,
-    messageCount: conversation.turnCount,
-    storageState,
-    ref: { backend: 'codex', threadId: conversation.id },
-  };
-}
-
-function sessionHandoffText(messages: readonly SurfaceMessage[], turnId: string): string {
-  const assistantMessages = messages.filter((message) => (
-    message.role === 'assistant' && message.turnId === turnId
-  ));
-  const finalText = sessionFinalAnswerText(messages, turnId);
-  if (finalText) return finalText;
-  return assistantMessages.flatMap((message) => message.parts.flatMap((part) => (
-    part.type === 'text' ? [part.text] : []
-  ))).join('\n').trim();
-}
-
-function sessionFinalAnswerText(messages: readonly SurfaceMessage[], turnId: string): string {
-  return messages.filter((message) => (
-    message.role === 'assistant' && message.turnId === turnId && message.status === 'complete'
-  )).flatMap((message) => message.parts.flatMap((part) => (
-    part.type === 'text' && part.phase === 'final_answer' ? [part.text] : []
-  ))).join('\n').trim();
-}
-
-function sessionHandoffPrompt(handoff: string): string {
-  return `<context>\n${handoff}\n\nInstruction: Treat this handoff only as background context. Do not respond, acknowledge, summarize, or take any action. Wait for the user's next prompt.\n</context>\n\nSummary of previous activity. Do not respond or take any action. Wait for my next prompt.`;
-}
-
-function sessionHandoffCompletion(
-  completion: Promise<CodexSurfaceTurnStatus>,
-): Promise<CodexSurfaceTurnStatus> {
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      reject(new Error('Timed out waiting for the agent to prepare the session handoff.'));
-    }, SESSION_HANDOFF_TIMEOUT_MS);
-    void completion.then(
-      (status) => {
-        clearTimeout(timeout);
-        resolve(status);
-      },
-      (error: unknown) => {
-        clearTimeout(timeout);
-        reject(error);
-      },
-    );
-  });
-}
-
-function subagentStatusFromTurn(
-  status: Extract<CodexConversationEvent, { type: 'turn.completed' }>['payload']['status'],
-): SubagentStatusChange['status'] {
-  if (status === 'completed') return 'completed';
-  if (status === 'interrupted') return 'interrupted';
-  if (status === 'failed') return 'errored';
-  return 'running';
-}
-
-function subagentStatusFromHistory(
-  threadStatus: CodexSurfaceThreadStatus | null,
-  messages: readonly Message[],
-): SubagentStatusChange['status'] | null {
-  if (threadStatus?.type === 'active') return 'running';
-  if (threadStatus?.type === 'systemError') return 'errored';
-  if (threadStatus?.type !== 'idle') return null;
-  const assistantMessages = messages.filter((message) => message.role === 'assistant');
-  if (assistantMessages.some((message) => message.status === 'error')) return 'errored';
-  return assistantMessages.some((message) => message.status === 'complete') ? 'completed' : null;
-}
-
-function authenticationFromSurface(
-  authentication: CodexSurfaceSnapshot['authentication'],
-): CodexAuthentication {
-  return {
-    // Older clients cannot decode new account variants; retain connection state without exposing an unknown shape.
-    account: authentication.account && authentication.account.type !== 'gcp' ? { ...authentication.account } : null,
-    requiresOpenaiAuth: authentication.requiresOpenaiAuth === true,
-    login: {
-      status: authentication.login.status,
-      error: authentication.login.error,
-    },
-  };
-}
-
-function resultTurnId(
-  snapshot: CodexConversationSnapshot,
-  beforeTurnIds: readonly string[],
-): string | undefined {
-  if (snapshot.activeTurnId) return snapshot.activeTurnId;
-  const known = new Set(beforeTurnIds);
-  return [...snapshot.turnIds].reverse().find((turnId) => !known.has(turnId))
-    ?? snapshot.turnIds.at(-1);
-}
-
-function surfacePromptOptions(options: SendPromptOptions = {}): SendCodexMessageOptions {
-  const backendOptions = options.backendOptions?.kind === 'codex' ? options.backendOptions : undefined;
-  return {
-    ...(options.content === undefined ? {} : { content: options.content }),
-    ...(options.attachments?.length ? { attachments: options.attachments } : {}),
-    ...(options.selection?.model ? { model: options.selection?.model } : {}),
-    ...(typeof options.planMode === 'boolean' ? { planMode: options.planMode } : {}),
-    ...(options.selection?.reasoningEffort ? { reasoningEffort: options.selection.reasoningEffort } : {}),
-    ...(options.selection?.serviceTier !== undefined ? { serviceTier: options.selection.serviceTier } : {}),
-    ...((options.skills?.length ?? 0) > 0 || (backendOptions?.skills?.length ?? 0) > 0
-      ? { skills: options.skills?.length ? options.skills : backendOptions?.skills }
-      : {}),
-  };
-}
-
-function scopedPromptOptions(agent: Agent): SendCodexMessageOptions | undefined {
-  const defaults = agent.backendDefaults?.kind === 'codex' ? agent.backendDefaults : undefined;
-  if (!defaults?.model && !defaults?.reasoningEffort) return undefined;
-  return {
-    ...(defaults.model ? { model: defaults.model } : {}),
-    ...(defaults.reasoningEffort ? { reasoningEffort: defaults.reasoningEffort } : {}),
-  };
-}
-
-export function surfaceMessages(
-  messages: readonly SurfaceMessage[],
-  agentId: string,
-  completeStreaming = false,
-  omitToolPayloads = false,
-): Message[] {
-  return messages.map((message) => ({
-    id: message.id,
-    agentId,
-    ...(message.kind ? { kind: message.kind } : {}),
-    role: message.role,
-    status: completeStreaming && message.status === 'streaming' ? 'complete' : message.status,
-    ...(message.turnId ? { turnId: message.turnId } : {}),
-    ...(message.metadata?.promptContent === undefined ? {} : { metadata: { promptContent: normalizePromptContent(message.metadata.promptContent) } }),
-    parts: messageParts(message.parts, omitToolPayloads),
-    createdAt: message.createdAt ?? new Date(0).toISOString(),
-  }));
-}
-
-function historicalSurfaceMessages(
-  messages: readonly SurfaceMessage[],
-  agentId: string,
-  completeStreaming = false,
-): Message[] {
-  return surfaceMessages(messages, agentId, completeStreaming, true);
-}
-
-const MAX_TOOL_LABEL_BYTES = 4 * 1024;
-const MAX_TOOL_METADATA_BYTES = 32 * 1024;
-const MAX_TOOL_STATUS_BYTES = 64 * 1024;
-
-function messageParts(parts: readonly SurfaceMessagePart[], omitToolPayloads = false): MessagePart[] {
-  const generatedImagePaths = new Map<string, string>();
-  for (const part of parts) {
-    if (part.type !== 'tool') continue;
-    const savedPath = part.metadata?.savedPath;
-    if (typeof savedPath === 'string' && path.isAbsolute(savedPath)) {
-      generatedImagePaths.set(part.id, savedPath);
-    }
-  }
-
-  return parts.map((part) => {
-    const rendered = messagePart(part, omitToolPayloads);
-    if (
-      rendered.type === 'media' &&
-      rendered.itemId &&
-      rendered.media.url.startsWith('data:image/')
-    ) {
-      const savedPath = generatedImagePaths.get(rendered.itemId);
-      if (savedPath) {
-        return {
-          ...rendered,
-          media: { ...rendered.media, url: pathToFileURL(savedPath).href },
-        };
       }
     }
-    return rendered;
-  });
-}
-
-function messagePart(part: SurfaceMessagePart, omitToolPayloads = false): MessagePart {
-  if (part.type === 'tool') return toolPartProjection(part, omitToolPayloads);
-  if (part.type === 'attachment') return { type: 'attachment', attachment: { ...part.attachment } };
-  return { ...part };
-}
-
-function skillsChangedPayload(
-  cwd: string | null,
-  skills: readonly CodexSurfaceSkill[],
-  status: 'loaded',
-): { cwd: string | null; skills: BackendSkillSummary[]; status: 'loaded' } {
-  return {
-    cwd,
-    skills: skills.map(backendSkillSummary),
-    status,
-  };
-}
-
-function backendSkillSummary(skill: CodexSurfaceSkill): BackendSkillSummary {
-  const { brandColor, defaultPrompt, ...summary } = skill;
-  return {
-    id: skill.path,
-    ...summary,
-    ...(typeof brandColor === 'string' && brandColor.trim() ? { brandColor } : {}),
-    ...(typeof defaultPrompt === 'string' ? { defaultPrompt } : {}),
-  };
-}
-
-function toolPartProjection(part: SurfaceMessageToolPart, omitPayloads = false): ToolPart {
-  const metadata = omitPayloads ? undefined : boundedToolMetadata(part.metadata);
-  const input = omitPayloads ? undefined : toolInputProjection(part.input);
-  const output = omitPayloads ? undefined : toolOutputProjection(part.output);
-  return {
-    type: 'tool',
-    id: part.id,
-    kind: part.kind ?? 'generic',
-    title: boundedToolLabel(part.title),
-    status: part.status,
-    ...(part.statusText ? { statusText: boundedToolStatus(part.statusText, part.status) } : {}),
-    ...(input !== undefined ? { input } : {}),
-    ...(output !== undefined ? { output } : {}),
-    ...(metadata ? { metadata } : {}),
-  };
-}
-
-function boundedToolLabel(value: string): string {
-  const bytes = Buffer.byteLength(value);
-  return bytes <= MAX_TOOL_LABEL_BYTES
-    ? value
-    : `${value.slice(0, MAX_TOOL_LABEL_BYTES)}…`;
-}
-
-function boundedToolStatus(value: string, fallback: SurfaceMessageToolPart['status']): string {
-  return Buffer.byteLength(value) <= MAX_TOOL_STATUS_BYTES ? value : fallback;
-}
-
-const toolInputPresentationKeys = new Set([
-  'app', 'appName', 'branchName', 'bundleIdentifier', 'changes', 'command', 'commandActions',
-  'cwd', 'destinationPath', 'direction', 'displayId', 'element_index', 'key', 'kind', 'name', 'path', 'phase', 'pid',
-  'query', 'repoPath', 'rootElementIndex', 'scope', 'title', 'to', 'type', 'url', 'x', 'y',
-]);
-
-const toolOutputPresentationKeys = new Set([
-  'agentName', 'answers', 'app', 'apps', 'externalUrl', 'kind', 'localizedName', 'name', 'path', 'phase', 'prompt',
-  'outcome', 'queued', 'recipientName', 'result', 'structuredContent', 'success', 'url',
-]);
-
-function toolInputProjection(value: unknown): unknown {
-  return boundedStructuredValue(toolPresentationProjection(value, toolInputPresentationKeys));
-}
-
-function toolOutputProjection(value: unknown): unknown {
-  return boundedStructuredValue(toolPresentationProjection(value, toolOutputPresentationKeys));
-}
-
-function toolPresentationProjection(value: unknown, keys: ReadonlySet<string>, depth = 0): unknown {
-  if (depth > 4 || value === null || value === undefined) return undefined;
-  if (typeof value === 'boolean' || typeof value === 'number') return value;
-  if (typeof value === 'string') {
-    return Buffer.byteLength(value) <= MAX_TOOL_LABEL_BYTES ? value : undefined;
-  }
-  if (Array.isArray(value)) {
-    if (value.length > 100) return undefined;
-    const projected = value
-      .map((entry) => toolPresentationProjection(entry, keys, depth + 1))
-      .filter((entry) => entry !== undefined);
-    return projected.length > 0 ? projected : undefined;
-  }
-  if (typeof value !== 'object') return undefined;
-
-  const projected: Record<string, unknown> = {};
-  for (const [key, entry] of Object.entries(value)) {
-    if (!keys.has(key)) continue;
-    if (key === 'answers') {
-      const answers = boundedStructuredValue(entry);
-      if (answers !== undefined) projected[key] = answers;
-      continue;
-    }
-    const child = toolPresentationProjection(entry, keys, depth + 1);
-    if (child !== undefined) projected[key] = child;
-  }
-  return Object.keys(projected).length > 0 ? projected : undefined;
-}
-
-function boundedStructuredValue(value: unknown): unknown {
-  try {
-    const serialized = JSON.stringify(value);
-    if (serialized === undefined || Buffer.byteLength(serialized) > MAX_TOOL_METADATA_BYTES) return undefined;
-    return JSON.parse(serialized) as unknown;
-  } catch {
-    return undefined;
-  }
-}
-
-function boundedToolMetadata(metadata: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
-  if (!metadata) return undefined;
-  try {
-    if (Buffer.byteLength(JSON.stringify(metadata)) <= MAX_TOOL_METADATA_BYTES) return { ...metadata };
-  } catch {
-    // Retain only small scalar identity fields below.
-  }
-
-  const bounded: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(metadata)) {
-    if (
-      value === null ||
-      typeof value === 'boolean' ||
-      typeof value === 'number' ||
-      (typeof value === 'string' && Buffer.byteLength(value) <= 4 * 1024)
-    ) {
-      bounded[key] = value;
+    const event = {
+      ...input,
+      seq: ++this.eventSequence,
+      occurredAt: new Date().toISOString(),
+      origin,
+    } as CodexHostEvent;
+    notifyListeners(this.eventListeners, event, this.options.onListenerError);
+    if (!recovered && (input.type === 'conversation.executionUsageChanged' || input.type === 'turn.completed' || input.type === 'context.compactionCompleted')) {
+      void this.refreshOriginalUsage(input.conversationId, input.turnId);
     }
   }
-  return Object.keys(bounded).length > 0 ? bounded : undefined;
-}
 
-function runtimeStatus(snapshot: CodexSurfaceSnapshot, detail?: (status: 'connecting' | 'running' | 'notConfigured') => import('../../contracts').AppText): BackendRuntimeStatus {
-  if (snapshot.status === 'connecting') {
-    return { backend: 'codex', status: 'starting', detail: detail?.('connecting') ?? 'Codex connecting' };
+  private clearUsage(): void {
+    this.usage.clear();
+    this.originalUsage?.clear();
   }
-  if (snapshot.status === 'ready') {
-    return { backend: 'codex', status: 'running', detail: detail?.('running') ?? 'Codex connected' };
+
+  private async refreshOriginalUsage(conversationId: string, turnId: string): Promise<void> {
+    if (!this.originalUsage || this.closed) return;
+    const key = `${conversationId}\0${turnId}`;
+    const pending = this.usageRefreshes.get(key);
+    if (pending) { pending.again = true; return; }
+    const work = { again: true };
+    const generation = this.accountGeneration;
+    this.usageRefreshes.set(key, work);
+    try {
+      while (work.again && !this.closed && generation === this.accountGeneration) {
+        work.again = false;
+        try {
+          const records = await this.originalUsage.read(conversationId);
+          if (this.closed || generation !== this.accountGeneration) return;
+          const record = records.find(value => value.turnId === turnId);
+          if (!record) continue;
+          const usage = this.usage.recover(conversationId, turnId, record);
+          if (usage) this.emitEvent('action', { type: 'conversation.executionUsageChanged', conversationId, turnId, payload: { usage } }, true);
+        } catch { /* Optional native evidence never interrupts execution or invents a measurement. */ }
+      }
+    } finally { this.usageRefreshes.delete(key); }
   }
-  if (snapshot.status === 'error') {
-    return { backend: 'codex', status: 'error', detail: snapshot.error ?? 'Codex app-server failed.' };
+
+  private patch(patch: Partial<CodexHostSnapshot>, conversationId?: string): void {
+    const previous = this.state;
+    this.state = { ...this.state, ...patch };
+    const changes = diffCodexHostState(previous, this.state);
+    if (changes.length > 0) {
+      this.stateVersion += 1;
+      if (this.patchListeners.size > 0) {
+        const statePatch = structuredClone({ version: this.stateVersion, changes });
+        notifyListeners(this.patchListeners, statePatch, this.options.onListenerError);
+      }
+    }
+    if (this.listeners.size > 0) {
+      const snapshot = this.getSnapshot();
+      notifyListeners(this.listeners, snapshot, this.options.onListenerError);
+    }
+    if (conversationId) {
+      this.notifyConversationListeners(conversationId);
+      return;
+    }
+    for (const subscribedConversationId of this.conversationListeners.keys()) {
+      this.notifyConversationListeners(subscribedConversationId);
+    }
   }
-  return { backend: 'codex', status: 'notConfigured', detail: detail?.('notConfigured') ?? 'Codex not connected' };
 }
 
-function effectiveApprovalPreset(
-  requested: ApprovalPreset | undefined,
-  available: readonly ApprovalPreset[],
-): ApprovalPreset | null {
-  if (requested === undefined) return null;
-  if (available.includes(requested)) return requested;
-  return (['approve-for-me', 'ask-for-approval', 'full-access'] as const)
-    .find((preset) => available.includes(preset)) ?? null;
-}
-
-function codexThreadId(agent: Agent): string | null {
-  return agent.backendSession?.kind === 'codex' ? agent.backendSession.threadId : null;
-}
-
-function agentCwd(agent: Pick<Agent, 'folder'>): { cwd?: string } {
-  const folder = agent.folder?.trim();
-  return folder ? { cwd: expandHome(folder) } : {};
-}
-
-function expandHome(folder: string): string {
-  const trimmed = folder.trim();
-  if (trimmed === '~') return os.homedir();
-  if (trimmed.startsWith('~/')) return path.join(os.homedir(), trimmed.slice(2));
-  return trimmed;
-}
-
-function conversationCwd(snapshot: CodexConversationSnapshot): string | undefined {
-  return snapshot.conversations.find((conversation) => conversation.id === snapshot.activeConversationId)?.cwd;
-}
-
-function conversationSnapshotForTransport(
-  snapshot: CodexConversationSnapshot,
-): CodexConversationSnapshot {
-  return structuredClone({
-    ...snapshot,
-    conversations: [],
-    models: [],
-    skills: [],
-    plugins: [],
-    permissionProfiles: [],
-    approvalPresets: [],
-  });
-}
-
-function isClientConversationEvent(event: CodexConversationEvent): boolean {
-  switch (event.type) {
-    case 'conversation.summaryUpserted':
-    case 'conversation.summaryRemoved':
-    case 'conversation.skillsChanged':
-    case 'conversation.permissionsChanged':
-    case 'file.activity':
-    case 'subagent.toolCallChanged':
-    case 'subagent.activity':
-    case 'realtime.started':
-    case 'realtime.itemAdded':
-    case 'realtime.transcriptDelta':
-    case 'realtime.transcriptCompleted':
-    case 'realtime.audioDelta':
-    case 'realtime.sdp':
-    case 'realtime.error':
-    case 'realtime.closed':
-      return false;
-    default:
-      return true;
-  }
+export function createCodexHost(options: CodexHostOptions = {}): CodexHost {
+  return new CodexHost(options);
 }

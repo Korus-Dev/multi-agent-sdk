@@ -3,20 +3,20 @@ import {
   codexImageDataUrl,
   codexItemToMediaPart,
   codexItemToMediaParts,
-  codexItemToSurfaceMessage,
-  codexThreadToSurfaceMessages,
-  codexTurnToSurfaceMessages,
+  codexItemToConversationMessage,
+  codexThreadToConversationMessages,
+  codexTurnToConversationMessages,
   preserveHistoricalAttachmentPreviews,
 } from '../../src/providers/codex/codex-conversation-history';
 import type { v2 } from '@korus-dev/codex-sdk';
-import type { SurfaceMessage } from '../../src/index';
+import type { ConversationMessage } from '../../src/index';
 
 const pngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 
-describe('codexThreadToSurfaceMessages', () => {
+describe('codexThreadToConversationMessages', () => {
   it('does not repeat structured skills or plugins already present in prompt text', () => {
     const text = '[$cp](/skills/commit-push/SKILL.md) then [@computer-use](plugin://computer-use@openai-bundled)';
-    const [message] = codexTurnToSurfaceMessages('thread-skill', {
+    const [message] = codexTurnToConversationMessages('thread-skill', {
       id: 'turn-skill', status: 'completed', startedAt: 1, completedAt: 2,
       items: [{
         type: 'userMessage', id: 'user-skill', clientId: null,
@@ -37,7 +37,7 @@ describe('codexThreadToSurfaceMessages', () => {
 
   it('does not replay a tagged Plan-mode document as assistant text', () => {
     const markdown = '# Proposed plan\n\n- Build it';
-    const messages = codexTurnToSurfaceMessages('thread-plan', {
+    const messages = codexTurnToConversationMessages('thread-plan', {
       id: 'turn-plan', status: 'completed', startedAt: 1, completedAt: 2,
       items: [
         {
@@ -49,7 +49,7 @@ describe('codexThreadToSurfaceMessages', () => {
     } as unknown as v2.Turn);
 
     expect(messages).toStrictEqual([]);
-    expect(codexItemToSurfaceMessage('thread-plan', {
+    expect(codexItemToConversationMessage('thread-plan', {
       id: 'turn-plan', status: 'completed', startedAt: 1,
     }, {
       type: 'agentMessage', id: 'agent-plan',
@@ -59,8 +59,8 @@ describe('codexThreadToSurfaceMessages', () => {
   });
 
   it('normalizes incomplete history and every persisted user input type', () => {
-    expect(codexThreadToSurfaceMessages({ id: 'empty', turns: null } as unknown as v2.Thread)).toStrictEqual([]);
-    const messages = codexTurnToSurfaceMessages('thread-inputs', {
+    expect(codexThreadToConversationMessages({ id: 'empty', turns: null } as unknown as v2.Thread)).toStrictEqual([]);
+    const messages = codexTurnToConversationMessages('thread-inputs', {
       id: 'turn-inputs',
       status: 'failed',
       startedAt: null,
@@ -112,7 +112,7 @@ describe('codexThreadToSurfaceMessages', () => {
   });
 
   it('preserves context compaction between assistant history segments', () => {
-    const messages = codexTurnToSurfaceMessages('thread-compaction', {
+    const messages = codexTurnToConversationMessages('thread-compaction', {
       id: 'turn-compaction',
       status: 'inProgress',
       startedAt: 1,
@@ -160,7 +160,7 @@ describe('codexThreadToSurfaceMessages', () => {
   });
 
   it('displays and deduplicates structured skills when no prompt text is available', () => {
-    const [message] = codexTurnToSurfaceMessages('thread-skill-only', {
+    const [message] = codexTurnToConversationMessages('thread-skill-only', {
       id: 'turn-skill-only', status: 'completed', startedAt: 1, completedAt: 2,
       items: [{
         type: 'userMessage', id: 'user-skill-only', clientId: null,
@@ -176,7 +176,7 @@ describe('codexThreadToSurfaceMessages', () => {
 
   it('maps individual history items and all turn statuses', () => {
     const baseTurn = { id: 'turn', startedAt: Number.NaN } as Pick<v2.Turn, 'id' | 'status' | 'startedAt'>;
-    expect(codexItemToSurfaceMessage('thread', { ...baseTurn, status: 'inProgress' }, {
+    expect(codexItemToConversationMessage('thread', { ...baseTurn, status: 'inProgress' }, {
       type: 'agentMessage', id: 'agent', text: 'Streaming', phase: 'commentary', memoryCitation: null,
       delivery: null, questions: null,
     })).toMatchObject({
@@ -184,10 +184,10 @@ describe('codexThreadToSurfaceMessages', () => {
       createdAt: '1970-01-01T00:00:00.000Z',
       parts: [{ type: 'text', text: 'Streaming', phase: 'commentary' }],
     });
-    expect(codexItemToSurfaceMessage('thread', { ...baseTurn, status: 'failed' }, {
+    expect(codexItemToConversationMessage('thread', { ...baseTurn, status: 'failed' }, {
       type: 'exitedReviewMode', id: 'review', review: 'Failed review',
     })).toMatchObject({ status: 'error', parts: [{ text: 'Failed review' }] });
-    expect(codexItemToSurfaceMessage('thread', { ...baseTurn, status: 'completed' }, {
+    expect(codexItemToConversationMessage('thread', { ...baseTurn, status: 'completed' }, {
       type: 'reasoning', id: 'reasoning', summary: ['Checked the event flow'], content: ['raw chain of thought'],
     })).toMatchObject({
       status: 'complete',
@@ -198,14 +198,14 @@ describe('codexThreadToSurfaceMessages', () => {
         summaryIndex: 0,
       }],
     });
-    expect(codexItemToSurfaceMessage('thread', { ...baseTurn, status: 'interrupted' }, {
+    expect(codexItemToConversationMessage('thread', { ...baseTurn, status: 'interrupted' }, {
       type: 'agentMessage', id: 'interrupted', text: 'Partial response', phase: null,
       memoryCitation: null, delivery: null, questions: null,
     })).toMatchObject({ status: 'complete', parts: [{ text: 'Partial response' }] });
-    expect(codexItemToSurfaceMessage('thread', { ...baseTurn, status: 'completed' }, {
+    expect(codexItemToConversationMessage('thread', { ...baseTurn, status: 'completed' }, {
       type: 'userMessage', id: 'user', clientId: null, content: [],
     })).toBeNull();
-    expect(codexItemToSurfaceMessage('thread', { ...baseTurn, status: 'completed' }, {
+    expect(codexItemToConversationMessage('thread', { ...baseTurn, status: 'completed' }, {
       type: 'userMessage', id: 'image-only', clientId: null,
       content: [{ type: 'localImage', path: '/tmp/resumed.png' }],
     })).toMatchObject({
@@ -219,12 +219,12 @@ describe('codexThreadToSurfaceMessages', () => {
         },
       }],
     });
-    expect(codexItemToSurfaceMessage('thread', { ...baseTurn, status: 'completed' }, {
+    expect(codexItemToConversationMessage('thread', { ...baseTurn, status: 'completed' }, {
       type: 'webSearch', id: 'search', query: '', action: null, results: null,
     })).toMatchObject({
       status: 'complete', parts: [{ type: 'tool', id: 'search', body: 'web search' }],
     });
-    expect(codexItemToSurfaceMessage('thread', { ...baseTurn, status: 'completed' }, {
+    expect(codexItemToConversationMessage('thread', { ...baseTurn, status: 'completed' }, {
       type: 'enteredReviewMode', id: 'entered', review: 'changes',
     })).toBeNull();
   });
@@ -242,7 +242,7 @@ describe('codexThreadToSurfaceMessages', () => {
       delivery: 'async',
       questions: [{ title: 'Which framework should I use?', options: ['Vue', 'React'] }],
     };
-    const question = codexItemToSurfaceMessage('thread-question', turn, questionItem);
+    const question = codexItemToConversationMessage('thread-question', turn, questionItem);
     expect(question).toMatchObject({
       parts: [
         {
@@ -261,7 +261,7 @@ describe('codexThreadToSurfaceMessages', () => {
       ],
     });
 
-    const [history] = codexTurnToSurfaceMessages('thread-question', {
+    const [history] = codexTurnToConversationMessages('thread-question', {
       ...turn, completedAt: 3, items: [
         { type: 'agentMessage', id: 'intro', text: 'I have one decision.', phase: 'commentary',
           memoryCitation: null, delivery: null, questions: null },
@@ -273,7 +273,7 @@ describe('codexThreadToSurfaceMessages', () => {
       { type: 'question', request: { id: 'async-question:agent-question' } },
     ]);
 
-    const answer = codexItemToSurfaceMessage('thread-question', turn, {
+    const answer = codexItemToConversationMessage('thread-question', turn, {
       type: 'userMessage',
       id: 'question-answer',
       clientId: null,
@@ -300,7 +300,7 @@ describe('codexThreadToSurfaceMessages', () => {
     const turn = {
       id: 'turn-reasoning', status: 'completed', startedAt: 2, completedAt: 3,
     } as Pick<v2.Turn, 'id' | 'status' | 'startedAt' | 'completedAt'>;
-    expect(codexItemToSurfaceMessage('thread-reasoning', turn, {
+    expect(codexItemToConversationMessage('thread-reasoning', turn, {
       type: 'reasoning',
       id: 'reasoning-item',
       summary: ['  Inspecting  ', '', '   ', 'Testing'],
@@ -319,13 +319,13 @@ describe('codexThreadToSurfaceMessages', () => {
         conversationId: 'thread-reasoning', turnId: 'turn-reasoning', itemId: 'reasoning-item',
       },
     });
-    expect(codexItemToSurfaceMessage('thread-reasoning', turn, {
+    expect(codexItemToConversationMessage('thread-reasoning', turn, {
       type: 'reasoning', id: 'empty-reasoning', summary: ['', '   '], content: ['private'],
     })).toBeNull();
   });
 
   it('preserves ordered reasoning summaries inside complete turn history', () => {
-    const messages = codexTurnToSurfaceMessages('thread-reasoning', {
+    const messages = codexTurnToConversationMessages('thread-reasoning', {
       id: 'turn-reasoning',
       status: 'completed',
       startedAt: 2,
@@ -373,7 +373,7 @@ describe('codexThreadToSurfaceMessages', () => {
       type: 'userMessage', id: 'user-after-reasoning', clientId: null,
       content: [{ type: 'text', text: 'Continue', text_elements: [] }],
     } as const;
-    const empty = codexTurnToSurfaceMessages('thread-reasoning', {
+    const empty = codexTurnToConversationMessages('thread-reasoning', {
       ...base,
       id: 'turn-empty-reasoning',
       items: [
@@ -381,7 +381,7 @@ describe('codexThreadToSurfaceMessages', () => {
         userMessage,
       ],
     } as unknown as v2.Turn);
-    const visible = codexTurnToSurfaceMessages('thread-reasoning', {
+    const visible = codexTurnToConversationMessages('thread-reasoning', {
       ...base,
       id: 'turn-visible-reasoning',
       items: [
@@ -412,14 +412,14 @@ describe('codexThreadToSurfaceMessages', () => {
       durationMs: null,
     } as unknown as v2.ThreadItem;
 
-    expect(codexItemToSurfaceMessage('thread', {
+    expect(codexItemToConversationMessage('thread', {
       id: 'turn-interrupted', status: 'interrupted', startedAt: 1,
     }, runningCommand)).toMatchObject({
       status: 'complete',
       parts: [{ type: 'tool', status: 'failed' }],
     });
 
-    const [message] = codexTurnToSurfaceMessages('thread', {
+    const [message] = codexTurnToConversationMessages('thread', {
       id: 'turn-interrupted',
       status: 'interrupted',
       startedAt: 1,
@@ -440,13 +440,13 @@ describe('codexThreadToSurfaceMessages', () => {
         content: [{ type: 'localImage', path: '/tmp/resumed.png' }],
       }],
     } as unknown as v2.Turn;
-    const previous = codexTurnToSurfaceMessages('thread', turn).map((message) => ({
+    const previous = codexTurnToConversationMessages('thread', turn).map((message) => ({
       ...message,
       parts: message.parts.map((part) => part.type === 'attachment'
         ? { ...part, attachment: { ...part.attachment, url: 'data:image/png;base64,cG5n' } }
         : part),
     }));
-    const history = codexTurnToSurfaceMessages('thread', turn);
+    const history = codexTurnToConversationMessages('thread', turn);
 
     expect(preserveHistoricalAttachmentPreviews(previous, history)[0]?.parts).toContainEqual({
       type: 'attachment',
@@ -481,7 +481,7 @@ describe('codexThreadToSurfaceMessages', () => {
         prompt: 'A friendly logistics map',
       },
     });
-    expect(codexItemToSurfaceMessage('thread', {
+    expect(codexItemToConversationMessage('thread', {
       id: 'turn', status: 'completed', startedAt: 1,
     }, completed)).toMatchObject({
       parts: [
@@ -492,7 +492,7 @@ describe('codexThreadToSurfaceMessages', () => {
         },
       ],
     });
-    expect(codexTurnToSurfaceMessages('thread', {
+    expect(codexTurnToConversationMessages('thread', {
       id: 'turn', status: 'completed', startedAt: 1, completedAt: 2,
       items: [
         completed,
@@ -557,7 +557,7 @@ describe('codexThreadToSurfaceMessages', () => {
 
   it('bounds historical tool payloads without dropping visible generated images', () => {
     const largeImagePayload = 'A'.repeat(2 * 1024 * 1024);
-    const messages = codexThreadToSurfaceMessages({
+    const messages = codexThreadToConversationMessages({
       id: 'thread-large-tool-output',
       turns: [{
         id: 'turn-large-tool-output', status: 'completed', startedAt: 1, completedAt: 2,
@@ -642,7 +642,7 @@ describe('codexThreadToSurfaceMessages', () => {
       ],
     };
 
-    expect(codexThreadToSurfaceMessages(thread as unknown as v2.Thread)).toStrictEqual([
+    expect(codexThreadToConversationMessages(thread as unknown as v2.Thread)).toStrictEqual([
       {
         id: 'user-thread-resumed-turn-1-user-1',
         role: 'user',
@@ -726,7 +726,7 @@ describe('codexThreadToSurfaceMessages', () => {
       ],
     };
 
-    expect(codexThreadToSurfaceMessages(thread as unknown as v2.Thread)).toStrictEqual([
+    expect(codexThreadToConversationMessages(thread as unknown as v2.Thread)).toStrictEqual([
       {
         id: 'user-thread-resumed-turn-1-user-1',
         role: 'user',
@@ -787,7 +787,7 @@ describe('codexThreadToSurfaceMessages', () => {
       ],
     };
 
-    expect(codexThreadToSurfaceMessages(thread as unknown as v2.Thread)).toStrictEqual([
+    expect(codexThreadToConversationMessages(thread as unknown as v2.Thread)).toStrictEqual([
       {
         id: 'user-thread-steered-turn-1-user-1',
         role: 'user',
@@ -869,7 +869,7 @@ describe('codexThreadToSurfaceMessages', () => {
       ],
     };
 
-    expect(codexThreadToSurfaceMessages(thread as unknown as v2.Thread)).toStrictEqual([
+    expect(codexThreadToConversationMessages(thread as unknown as v2.Thread)).toStrictEqual([
       {
         id: 'user-thread-review-turn-review-user-review',
         role: 'user',
@@ -893,7 +893,7 @@ describe('codexThreadToSurfaceMessages', () => {
 
   it('materializes the canonical review-mode items returned by app-server history', () => {
     const text = 'The review found one issue.';
-    const messages = codexTurnToSurfaceMessages('thread-review', {
+    const messages = codexTurnToConversationMessages('thread-review', {
       id: 'turn-review',
       status: 'completed',
       startedAt: 1_780_000_000,
@@ -912,7 +912,7 @@ describe('codexThreadToSurfaceMessages', () => {
 
   it('collapses duplicated initial user items materialized by an app-server review turn', () => {
     const prompt = 'Review the current code changes and provide prioritized findings.';
-    const messages = codexTurnToSurfaceMessages('thread-review', {
+    const messages = codexTurnToConversationMessages('thread-review', {
       id: 'turn-review-worker',
       status: 'completed',
       startedAt: 1_780_000_000,
@@ -930,7 +930,7 @@ describe('codexThreadToSurfaceMessages', () => {
 
   it('preserves only safe exact-path previews across mixed history parts', () => {
     const safe = 'data:image/png;base64,cG5n';
-    const previous: SurfaceMessage[] = [{
+    const previous: ConversationMessage[] = [{
       id: 'previous', role: 'user', status: 'complete', parts: [
         { type: 'text', text: 'ignore' },
         { type: 'attachment', attachment: { kind: 'file', name: 'file', path: '/file.png', url: safe } },
@@ -944,7 +944,7 @@ describe('codexThreadToSurfaceMessages', () => {
     const same = historyImage('same', '/same.png', safe);
     const other = historyImage('other', '/other.png', 'file:///other.png');
     const target = historyImage('target', '/same.png', 'file:///same.png');
-    const text: SurfaceMessage = {
+    const text: ConversationMessage = {
       id: 'text', role: 'assistant', status: 'complete', parts: [{ type: 'text', text: 'unchanged' }],
     };
 
@@ -956,7 +956,7 @@ describe('codexThreadToSurfaceMessages', () => {
   });
 
   it('normalizes attachment names and MIME fallbacks in one user-input contract', () => {
-    const message = codexItemToSurfaceMessage('thread', {
+    const message = codexItemToConversationMessage('thread', {
       id: 'turn', status: 'completed', startedAt: 1,
     }, {
       type: 'userMessage', id: 'inputs', clientId: null, content: [
@@ -1014,7 +1014,7 @@ describe('codexThreadToSurfaceMessages', () => {
 
 });
 
-function historyImage(id: string, path: string, url: string): SurfaceMessage {
+function historyImage(id: string, path: string, url: string): ConversationMessage {
   return {
     id, role: 'user', status: 'complete', parts: [{
       type: 'attachment', attachment: { kind: 'image', name: id, path, url },

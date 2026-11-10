@@ -1,6 +1,6 @@
 const product = { name: 'CPA workbench' };
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { codexSdkFixture, sdkAgent, sdkSnapshot } from './sdk-surface-fixture';
+import { codexSdkFixture, sdkAgent, sdkSnapshot } from './sdk-host-fixture';
 
 describe(`Codex SDK → ${product.name} backend controls`, () => {
   const fixtures: ReturnType<typeof codexSdkFixture>[] = [];
@@ -8,16 +8,16 @@ describe(`Codex SDK → ${product.name} backend controls`, () => {
   afterEach(async () => { await Promise.all(fixtures.splice(0).map(({ driver }) => driver.close())); });
 
   it('refreshes the SDK model catalog without filtering new models or exposing mutable SDK arrays', async () => {
-    const { driver, surface } = setup();
+    const { driver, host } = setup();
     const models = [{ id: 'new-model', model: 'new-model', displayName: 'New', description: '', defaultReasoningEffort: 'high', isDefault: true,
       supportedReasoningEfforts: [{ reasoningEffort: 'high', description: 'Deep' }], serviceTiers: [{ id: 'fast', name: 'Fast', description: '' }], defaultServiceTier: 'fast' }];
-    surface.listModels.mockResolvedValue(models);
+    host.listModels.mockResolvedValue(models);
     const result = await driver.listModels(sdkAgent());
     expect(result).toStrictEqual(models);
     expect(result[0]).not.toBe(models[0]);
     expect(result[0]!.supportedReasoningEfforts).not.toBe(models[0]!.supportedReasoningEfforts);
-    expect(surface.listModels).toHaveBeenCalledWith({ includeHidden: false, forceReload: true });
-    surface.listModels.mockRejectedValueOnce(new Error('catalog offline'));
+    expect(host.listModels).toHaveBeenCalledWith({ includeHidden: false, forceReload: true });
+    host.listModels.mockRejectedValueOnce(new Error('catalog offline'));
     await expect(driver.listModels(sdkAgent())).rejects.toThrow('catalog offline');
   });
 
@@ -40,50 +40,50 @@ describe(`Codex SDK → ${product.name} backend controls`, () => {
 
 
   it('delegates account lifecycle and device-login identity without handling credentials', async () => {
-    const { driver, surface } = setup();
-    surface.refreshAccount.mockResolvedValue(sdkSnapshot());
-    surface.cancelLogin.mockResolvedValue(sdkSnapshot());
-    surface.logout.mockResolvedValue(sdkSnapshot());
-    surface.startChatGptLogin.mockResolvedValue({ loginId: 'browser', authUrl: 'https://example.test/auth' });
-    surface.startChatGptDeviceCodeLogin.mockResolvedValue({ loginId: 'device', verificationUrl: 'https://example.test/device', userCode: 'ABCD' });
+    const { driver, host } = setup();
+    host.refreshAccount.mockResolvedValue(sdkSnapshot());
+    host.cancelLogin.mockResolvedValue(sdkSnapshot());
+    host.logout.mockResolvedValue(sdkSnapshot());
+    host.startChatGptLogin.mockResolvedValue({ loginId: 'browser', authUrl: 'https://example.test/auth' });
+    host.startChatGptDeviceCodeLogin.mockResolvedValue({ loginId: 'device', verificationUrl: 'https://example.test/device', userCode: 'ABCD' });
     await expect(driver.getAuthentication()).resolves.toStrictEqual({ account: null, requiresOpenaiAuth: false, login: { status: 'idle', error: null } });
     await expect(driver.startChatGptLogin()).resolves.toStrictEqual({ loginId: 'browser', authUrl: 'https://example.test/auth' });
     await expect(driver.startChatGptDeviceCodeLogin()).resolves.toStrictEqual({ loginId: 'device', verificationUrl: 'https://example.test/device', userCode: 'ABCD' });
     await driver.cancelChatGptLogin('device');
-    expect(surface.cancelLogin).toHaveBeenCalledWith('device');
+    expect(host.cancelLogin).toHaveBeenCalledWith('device');
     await driver.logout();
-    expect(surface.logout).toHaveBeenCalledOnce();
-    surface.startChatGptDeviceCodeLogin.mockRejectedValueOnce(new Error('login unavailable'));
+    expect(host.logout).toHaveBeenCalledOnce();
+    host.startChatGptDeviceCodeLogin.mockRejectedValueOnce(new Error('login unavailable'));
     await expect(driver.startChatGptDeviceCodeLogin()).rejects.toThrow('login unavailable');
   });
 
   it('maps remote pairing timestamps and enforces provider remote-control requirements in its result', async () => {
-    const { driver, surface } = setup();
+    const { driver, host } = setup();
     const status = { status: 'connected' as const, serverName: product.name, installationId: 'install', environmentId: 'environment' };
-    surface.readRemoteControlStatus.mockResolvedValue(status);
-    surface.readConfigRequirements.mockResolvedValue({ allowRemoteControl: false } as NonNullable<Awaited<ReturnType<typeof surface.readConfigRequirements>>>);
+    host.readRemoteControlStatus.mockResolvedValue(status);
+    host.readConfigRequirements.mockResolvedValue({ allowRemoteControl: false } as NonNullable<Awaited<ReturnType<typeof host.readConfigRequirements>>>);
     await expect(driver.getRemoteControlStatus()).resolves.toStrictEqual({ ...status, allowRemoteControl: false });
-    surface.startRemoteControlPairing.mockResolvedValue({ pairingCode: 'opaque', manualPairingCode: 'CODE', environmentId: 'environment', expiresAt: 1_900_000_000n });
+    host.startRemoteControlPairing.mockResolvedValue({ pairingCode: 'opaque', manualPairingCode: 'CODE', environmentId: 'environment', expiresAt: 1_900_000_000n });
     const pairing = await driver.startDevicePairing();
     expect(pairing).toStrictEqual({ pairingCode: 'opaque', manualPairingCode: 'CODE', environmentId: 'environment', expiresAt: '2030-03-17T17:46:40.000Z' });
-    expect(surface.startRemoteControlPairing).toHaveBeenCalledWith({ manualCode: true });
-    surface.readRemoteControlPairingStatus.mockResolvedValue({ claimed: true });
+    expect(host.startRemoteControlPairing).toHaveBeenCalledWith({ manualCode: true });
+    host.readRemoteControlPairingStatus.mockResolvedValue({ claimed: true });
     await expect(driver.checkDevicePairing(pairing)).resolves.toBe(true);
-    expect(surface.readRemoteControlPairingStatus).toHaveBeenCalledWith({ pairingCode: 'opaque' });
+    expect(host.readRemoteControlPairingStatus).toHaveBeenCalledWith({ pairingCode: 'opaque' });
     await driver.revokePairedDevice('environment', 'client');
-    expect(surface.revokeRemoteControlClient).toHaveBeenCalledWith({ environmentId: 'environment', clientId: 'client' });
-    surface.enableRemoteControl.mockResolvedValue(status);
-    surface.disableRemoteControl.mockResolvedValue({ ...status, status: 'disabled' });
+    expect(host.revokeRemoteControlClient).toHaveBeenCalledWith({ environmentId: 'environment', clientId: 'client' });
+    host.enableRemoteControl.mockResolvedValue(status);
+    host.disableRemoteControl.mockResolvedValue({ ...status, status: 'disabled' });
     await expect(driver.enableRemoteControl()).resolves.toMatchObject({ status: 'connected', allowRemoteControl: false });
     await expect(driver.disableRemoteControl()).resolves.toMatchObject({ status: 'disabled' });
     await driver.checkDevicePairing({ ...pairing, pairingCode: '' });
-    expect(surface.readRemoteControlPairingStatus).toHaveBeenLastCalledWith({ manualPairingCode: 'CODE' });
-    surface.listRemoteControlClients.mockResolvedValue({ data: [{ clientId: 'client', displayName: 'Phone', deviceType: 'phone', platform: 'iOS', osVersion: '26', deviceModel: 'iPhone', appVersion: '1', lastSeenAt: 1_800_000_000n }], nextCursor: null });
+    expect(host.readRemoteControlPairingStatus).toHaveBeenLastCalledWith({ manualPairingCode: 'CODE' });
+    host.listRemoteControlClients.mockResolvedValue({ data: [{ clientId: 'client', displayName: 'Phone', deviceType: 'phone', platform: 'iOS', osVersion: '26', deviceModel: 'iPhone', appVersion: '1', lastSeenAt: 1_800_000_000n }], nextCursor: null });
     await expect(driver.listPairedDevices('environment')).resolves.toMatchObject([{ clientId: 'client', lastSeenAt: '2027-01-15T08:00:00.000Z' }]);
   });
 
   it('preserves attachments and turn identity through steer, edit, retry, delete and fork', async () => {
-    const { driver, conversation, surface } = setup();
+    const { driver, conversation, host } = setup();
     const handle = conversation('conversation-a').handle;
     const attachments = [{ type: 'image' as const, path: '/image.png', detail: 'high' as const }, { type: 'file' as const, path: '/file.md', name: 'file' }];
     const content = [{ type: 'text' as const, text: '$cp vs ' },
@@ -104,12 +104,12 @@ describe(`Codex SDK → ${product.name} backend controls`, () => {
     expect(handle.sendMessage).toHaveBeenCalledOnce();
     await driver.deleteTurn(sdkAgent(), 'turn');
     expect(handle.deleteTurn).toHaveBeenCalledWith('turn');
-    handle.forkTurn.mockResolvedValue({ conversationId: 'fork', conversation: surface.conversation('fork'), snapshot: sdkSnapshot('fork') });
+    handle.forkTurn.mockResolvedValue({ conversationId: 'fork', conversation: host.conversation('fork'), snapshot: sdkSnapshot('fork') });
     const target = sdkAgent('fork-agent', 'fork');
     await expect(driver.forkConversation(sdkAgent(), target, 'turn')).resolves.toMatchObject({ backendSession: { kind: 'codex', threadId: 'fork' } });
     expect(handle.forkTurn).toHaveBeenCalledWith('turn', { cwd: '/repo' }, { extensionContext: target });
     expect(conversation('fork').listenerCount()).toBe(1);
-    handle.fork.mockResolvedValue({ conversationId: 'whole-fork', conversation: surface.conversation('whole-fork'), snapshot: sdkSnapshot('whole-fork') });
+    handle.fork.mockResolvedValue({ conversationId: 'whole-fork', conversation: host.conversation('whole-fork'), snapshot: sdkSnapshot('whole-fork') });
     await driver.forkConversation(sdkAgent(), { ...target, id: 'whole-fork-agent' });
     expect(handle.fork).toHaveBeenCalledWith({ cwd: '/repo' }, { extensionContext: expect.objectContaining({ id: 'whole-fork-agent' }) });
   });
@@ -154,7 +154,7 @@ describe(`Codex SDK → ${product.name} backend controls`, () => {
   });
 
   it('forks a worktree assignment at the last completed native turn with the worker configuration', async () => {
-    const { driver, conversation, surface } = setup();
+    const { driver, conversation, host } = setup();
     const source = sdkAgent();
     const original = structuredClone(source);
     conversation('conversation-a').setSnapshot({ activeTurnId: 'delegating', busy: true,
@@ -164,7 +164,7 @@ describe(`Codex SDK → ${product.name} backend controls`, () => {
     const target = { ...sdkAgent('worker', 'unused'), folder: '/repo-worktree', backendSession: undefined,
       backendDefaults: { kind: 'codex' as const, model: 'worker-model', reasoningEffort: 'high', serviceTier: null } };
     const handle = conversation('conversation-a').handle;
-    handle.forkTurn.mockResolvedValue({ conversationId: 'worker-thread', conversation: surface.conversation('worker-thread'), snapshot: sdkSnapshot('worker-thread') });
+    handle.forkTurn.mockResolvedValue({ conversationId: 'worker-thread', conversation: host.conversation('worker-thread'), snapshot: sdkSnapshot('worker-thread') });
     await expect(driver.forkWorktreeConversation(source, target)).resolves.toMatchObject({ backendSession: { kind: 'codex', threadId: 'worker-thread' } });
     expect(handle.forkTurn).toHaveBeenCalledWith('discussion', expect.objectContaining({ cwd: '/repo-worktree', model: 'worker-model', reasoningEffort: 'high', serviceTier: null }), { extensionContext: target });
     expect(handle.fork).not.toHaveBeenCalled();
@@ -183,11 +183,11 @@ describe(`Codex SDK → ${product.name} backend controls`, () => {
   });
 
   it('forks an idle worker with its permission policy and directory', async () => {
-    const { driver, conversation, surface } = setup();
-    surface.getSnapshot.mockReturnValue(sdkSnapshot('conversation-a', { approvalPresets: ['ask-for-approval', 'full-access'] }));
+    const { driver, conversation, host } = setup();
+    host.getSnapshot.mockReturnValue(sdkSnapshot('conversation-a', { approvalPresets: ['ask-for-approval', 'full-access'] }));
     const target = { ...sdkAgent('worker'), folder: '/worker', backendSession: undefined,
       backendDefaults: { kind: 'codex' as const, approvalPreset: 'ask-for-approval' as const } };
-    conversation('conversation-a').handle.fork.mockResolvedValue({ conversationId: 'child', conversation: surface.conversation('child'), snapshot: sdkSnapshot('child') });
+    conversation('conversation-a').handle.fork.mockResolvedValue({ conversationId: 'child', conversation: host.conversation('child'), snapshot: sdkSnapshot('child') });
     await driver.forkWorktreeConversation(sdkAgent(), target);
     expect(conversation('conversation-a').handle.fork).toHaveBeenCalledExactlyOnceWith({ cwd: '/worker', approvalPreset: 'ask-for-approval' }, { extensionContext: target });
   });

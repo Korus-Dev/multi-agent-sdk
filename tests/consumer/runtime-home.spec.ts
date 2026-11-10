@@ -41,5 +41,5 @@ it('switches Claude home A to B to native default after fully closing each drive
 
 it('rejects ambiguous home configuration before creating a provider runtime', () => {
   expect(() => createHarnessDriver('codex', { client: { name: 'home-test' }, home: 'relative' })).toThrow(/absolute/);
-  expect(() => createHarnessDriver('codex', { client: { name: 'home-test' }, home: '/one', codex: { surface: { codexHome: '/two' } } })).toThrow(/conflict/);
+  expect(() => createHarnessDriver('codex', { client: { name: 'home-test' }, home: '/one', codex: { host: { codexHome: '/two' } } })).toThrow(/conflict/);
 });

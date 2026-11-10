@@ -1,4 +1,4 @@
-import type { CodexConversationEvent } from "../../core/surface";
+import type { CodexConversationEvent } from "../../core/codex-host";
 import type {
   ExecutionObservation,
   RequestCoverageReason,

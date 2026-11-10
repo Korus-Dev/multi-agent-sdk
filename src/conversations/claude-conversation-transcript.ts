@@ -1,4 +1,4 @@
-import { normalizePromptContent, promptContentText, type PromptPart } from '../core/surface';
+import { normalizePromptContent, promptContentText, type PromptPart } from '../core/prompt-content';
 import type {
   ClaudeConversationSnapshot,
   PromptAttachment,

@@ -1,14 +1,14 @@
-import { CodexSurface } from './codex-surface';
+import { CodexHost } from './host';
 import {
-  CodexAppBackendTtlCache,
-  type CodexAppBackendTtlCacheOptions,
-} from './codex-app-backend-cache';
-import type { CodexSurfaceOptions } from './codex-surface-contracts';
+  TtlCache,
+  type TtlCacheOptions,
+} from '../../core/ttl-cache';
+import type { CodexHostOptions } from './host-contracts';
 
 export type CodexAppBackendModuleContext = {
-  surface: CodexSurface;
+  host: CodexHost;
   closeBackend(): Promise<void>;
-  createTtlCache<Value>(options: CodexAppBackendTtlCacheOptions<Value>): CodexAppBackendTtlCache<Value>;
+  createTtlCache<Value>(options: TtlCacheOptions<Value>): TtlCache<Value>;
 };
 
 export type CodexAppBackendModule<Service = unknown> = {
@@ -18,8 +18,8 @@ export type CodexAppBackendModule<Service = unknown> = {
 
 export type CodexAppBackendOptions = {
   modules?: readonly CodexAppBackendModule[];
-  surface?: CodexSurface;
-  surfaceOptions?: CodexSurfaceOptions;
+  host?: CodexHost;
+  hostOptions?: CodexHostOptions;
 };
 
 /**
@@ -30,14 +30,14 @@ export type CodexAppBackendOptions = {
  * ownership stay with the embedding application.
  */
 export class CodexAppBackend {
-  readonly surface: CodexSurface;
+  readonly host: CodexHost;
   private readonly moduleServices = new Map<string, unknown>();
   private readonly ttlCaches = new Set<{ close(): Promise<void> }>();
   private closePromise: Promise<void> | null = null;
 
   constructor(options: CodexAppBackendOptions = {}) {
-    if (options.surface && options.surfaceOptions) {
-      throw new Error('Provide either surface or surfaceOptions, not both');
+    if (options.host && options.hostOptions) {
+      throw new Error('Provide either host or hostOptions, not both');
     }
     const modules = (options.modules ?? []).map((module) => ({ id: module.id.trim(), module }));
     const moduleIds = new Set<string>();
@@ -46,10 +46,10 @@ export class CodexAppBackend {
       if (moduleIds.has(id)) throw new Error(`Duplicate Codex backend module '${id}'`);
       moduleIds.add(id);
     }
-    this.surface = options.surface ?? new CodexSurface(options.surfaceOptions);
+    this.host = options.host ?? new CodexHost(options.hostOptions);
     for (const { id, module } of modules) {
       this.moduleServices.set(id, module.create({
-        surface: this.surface,
+        host: this.host,
         closeBackend: () => this.close(),
         createTtlCache: (cacheOptions) => this.createTtlCache(cacheOptions),
       }));
@@ -62,9 +62,9 @@ export class CodexAppBackend {
     return this.moduleServices.get(normalizedId) as Service;
   }
 
-  createTtlCache<Value>(options: CodexAppBackendTtlCacheOptions<Value>): CodexAppBackendTtlCache<Value> {
+  createTtlCache<Value>(options: TtlCacheOptions<Value>): TtlCache<Value> {
     if (this.closePromise) throw new Error('Cannot create a cache after the Codex backend is closed');
-    const cache = new CodexAppBackendTtlCache(options);
+    const cache = new TtlCache(options);
     this.ttlCaches.add(cache);
     return cache;
   }
@@ -76,7 +76,7 @@ export class CodexAppBackend {
 
   private async closeResources(): Promise<void> {
     await Promise.all([...this.ttlCaches].map((cache) => cache.close()));
-    await this.surface.close();
+    await this.host.close();
   }
 }
 

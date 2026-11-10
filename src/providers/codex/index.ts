@@ -17,8 +17,8 @@ export {
   type ResolveCodexRuntimeOptions,
 } from '@korus-dev/codex-sdk';
 export {
-  CodexSurface,
-  createCodexSurface,
+  CodexHost,
+  createCodexHost,
   type CodexConversation,
   type CodexConversationDefaults,
   type CodexConversationForkResult,
@@ -32,27 +32,27 @@ export {
   type CodexMcpServerDefinition,
   type CodexMcpServerToolApprovalMode,
   type CodexMcpServerTransport,
-  type CodexSurfaceExtension,
-  type CodexSurfaceConfigRequirements,
-  type CodexSurfaceOptions,
+  type CodexHostExtension,
+  type CodexConfigRequirements,
+  type CodexHostOptions,
   type CodexAppServerTransportOptions,
-  type CodexSurfaceRemoteControlClient,
-  type CodexSurfaceRemoteControlClientPage,
-  type CodexSurfaceRemoteControlPairing,
-  type CodexSurfaceRemoteControlPairingStatus,
-  type CodexSurfaceRemoteControlStatus,
+  type CodexRemoteControlClient,
+  type CodexRemoteControlClientPage,
+  type CodexRemoteControlPairing,
+  type CodexRemoteControlPairingStatus,
+  type CodexRemoteControlStatus,
   type CodexThreadStartExtension,
-  type CodexGeneratedText,
+  type HarnessTextGenerationResult,
   type ForkCodexConversationOptions,
   type GenerateCodexTextOptions,
   type ListCodexSkillsOptions,
-} from './codex-surface';
+} from './host';
 export { CodexOriginalHistoryUsage, type CodexHistoricalExecutionUsage } from './codex-original-history-usage';
 export type {
   CodexConversationHistoryPage,
   CodexConversationLoadingStrategy,
-  CodexConversationRenderStrategy,
-} from '../../core/surface';
+  ConversationRenderStrategy,
+} from '../../core/codex-host';
 export {
   CodexAppBackend,
   createCodexAppBackend,
@@ -61,26 +61,18 @@ export {
   type CodexAppBackendOptions,
 } from './codex-app-backend';
 export {
-  CodexAppBackendTtlCache,
-  type CodexAppBackendTtlCacheEvictionContext,
-  type CodexAppBackendTtlCacheOptions,
-  type CodexAppBackendTtlCacheRecord,
-  type CodexAppBackendTtlCacheScheduler,
-  type CodexAppBackendTtlTimer,
-} from './codex-app-backend-cache';
-export {
   codexItemToMediaPart,
-  codexItemToSurfaceMessage,
+  codexItemToConversationMessage,
   codexItemToToolPart,
-  codexThreadToSurfaceMessages,
-  codexTurnToSurfaceMessages,
+  codexThreadToConversationMessages,
+  codexTurnToConversationMessages,
   preserveHistoricalAttachmentPreviews,
 } from './codex-conversation-history';
 
 
 
 export { ConversationContentTransport } from "./conversation-content-transport";
-export { CodexSurfaceAgentAdapter, type CodexHostOptions } from './host';
+export { CodexHostAdapter, type CodexHostAdapterOptions } from './host-adapter';
 export { CodexBackendDriver } from './driver';
 export { codexExecutionConsumption } from './execution-usage';
 export { statusFromSnapshot, safetyReviewFromSnapshot } from './status';

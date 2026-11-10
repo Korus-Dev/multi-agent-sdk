@@ -1,35 +1,35 @@
 import { isDeepStrictEqual } from 'node:util';
 import { afterEach, beforeEach, expect } from 'vitest';
-import { createCodexSurfaceStateMirror, type CodexSurfaceStateMirror } from '../../../src/core/surface-bridge';
+import { createCodexHostStateMirror, type CodexHostStateMirror } from '../../../src/core/host-bridge';
 
-// Every surface in the suite doubles as a state-patch consistency check:
+// Every host in the suite doubles as a state-patch consistency check:
 // after each state change, a mirror built only from the emitted patches must
-// equal the surface's own snapshot. This catches in-place mutations that a
+// equal the host's own snapshot. This catches in-place mutations that a
 // reference-based diff would silently miss.
-type InvariantSurface = {
+type InvariantHost = {
   getSnapshot(): unknown;
-  getVersionedSnapshot(): Parameters<CodexSurfaceStateMirror['reset']>[0];
-  onStatePatch(listener: Parameters<CodexSurfaceStateMirror['receive']>[0] extends infer Patch
+  getVersionedSnapshot(): Parameters<CodexHostStateMirror['reset']>[0];
+  onStatePatch(listener: Parameters<CodexHostStateMirror['receive']>[0] extends infer Patch
     ? (patch: Patch) => void
     : never): () => void;
   patch(...args: unknown[]): void;
 };
 
 const instrumented = new WeakSet<object>();
-const mirrors = new WeakMap<object, CodexSurfaceStateMirror>();
+const mirrors = new WeakMap<object, CodexHostStateMirror>();
 const violations: string[] = [];
 
-// Imported lazily so each test file's module mocks apply to the surface it loads.
+// Imported lazily so each test file's module mocks apply to the host it loads.
 beforeEach(async () => {
-  const { CodexSurface } = await import('../../../src/providers/codex');
-  const prototype = CodexSurface.prototype as unknown as InvariantSurface;
+  const { CodexHost } = await import('../../../src/providers/codex/index');
+  const prototype = CodexHost.prototype as unknown as InvariantHost;
   if (instrumented.has(prototype)) return;
   instrumented.add(prototype);
   const originalPatch = prototype.patch;
-  prototype.patch = function patchWithInvariant(this: InvariantSurface, ...args: unknown[]) {
+  prototype.patch = function patchWithInvariant(this: InvariantHost, ...args: unknown[]) {
     let mirror = mirrors.get(this);
     if (!mirror) {
-      const created = createCodexSurfaceStateMirror();
+      const created = createCodexHostStateMirror();
       created.reset(this.getVersionedSnapshot());
       this.onStatePatch((patch) => { created.receive(patch); });
       mirrors.set(this, created);
@@ -48,5 +48,5 @@ beforeEach(async () => {
 
 afterEach(() => {
   const found = violations.splice(0);
-  expect(found, 'surface state patches must reproduce getSnapshot()').toStrictEqual([]);
+  expect(found, 'host state patches must reproduce getSnapshot()').toStrictEqual([]);
 });

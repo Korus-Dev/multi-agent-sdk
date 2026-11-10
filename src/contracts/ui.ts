@@ -1,20 +1,22 @@
+import type { ApprovalPreset } from './shared';
+export type { ApprovalPreset } from './shared';
 import type { PromptPart } from './prompt';
 import type { JsonValue } from './turn';
-export type SurfaceMessageTextPart = {
+export type ConversationMessageTextPart = {
   type: 'text';
   text: string;
   itemId?: string;
   phase?: 'commentary' | 'partial_answer' | 'final_answer';
 };
 
-export type SurfaceMessageReasoningPart = {
+export type ConversationMessageReasoningPart = {
   type: 'reasoning';
   summary: string;
   itemId: string;
   summaryIndex: number;
 };
 
-export type SurfaceMessageStatusPart = {
+export type ConversationMessageStatusPart = {
   type: 'status';
   text: string;
 };
@@ -31,14 +33,14 @@ export type AskUserQuestion = {
   }[] | null;
 };
 
-export type SurfaceMessageQuestionPart = {
+export type ConversationMessageQuestionPart = {
   type: 'question';
   /** Replayed transcript content, not a live request to answer. */
   historical?: boolean;
   request: Extract<ClientRequest, { kind: 'ask_user' }>;
 };
 
-export type SurfaceMessageAttachment = {
+export type ConversationMessageAttachment = {
   /** Intrinsic display dimensions, available before lazy image bytes load. */
   width?: number;
   height?: number;
@@ -49,12 +51,12 @@ export type SurfaceMessageAttachment = {
   mimeType?: string;
 };
 
-export type SurfaceMessageAttachmentPart = {
+export type ConversationMessageAttachmentPart = {
   type: 'attachment';
-  attachment: SurfaceMessageAttachment;
+  attachment: ConversationMessageAttachment;
 };
 
-export type SurfaceMessageMedia = {
+export type ConversationMessageMedia = {
   /** Intrinsic display dimensions, available before lazy image bytes load. */
   width?: number;
   height?: number;
@@ -65,15 +67,15 @@ export type SurfaceMessageMedia = {
   title?: string;
 };
 
-export type SurfaceMessageMediaPart = {
+export type ConversationMessageMediaPart = {
   type: 'media';
   /** Tool observations belong to Working; final-answer media stays visible. */
-  phase?: SurfaceMessageTextPart['phase'];
-  media: SurfaceMessageMedia;
+  phase?: ConversationMessageTextPart['phase'];
+  media: ConversationMessageMedia;
   itemId?: string;
 };
 
-export type SurfaceMessageToolPart = {
+export type ConversationMessageToolPart = {
   type: 'tool';
   id: string;
   title: string;
@@ -86,21 +88,21 @@ export type SurfaceMessageToolPart = {
   metadata?: Record<string, unknown>;
 };
 
-export type SurfaceMessagePart =
-  | SurfaceMessageAttachmentPart
-  | SurfaceMessageMediaPart
-  | SurfaceMessageQuestionPart
-  | SurfaceMessageReasoningPart
-  | SurfaceMessageTextPart
-  | SurfaceMessageStatusPart
-  | SurfaceMessageToolPart;
+export type ConversationMessagePart =
+  | ConversationMessageAttachmentPart
+  | ConversationMessageMediaPart
+  | ConversationMessageQuestionPart
+  | ConversationMessageReasoningPart
+  | ConversationMessageTextPart
+  | ConversationMessageStatusPart
+  | ConversationMessageToolPart;
 
-export type SurfaceMessage = {
+export type ConversationMessage = {
   id: string;
   kind?: 'compaction' | 'steer';
   role: 'user' | 'assistant' | 'system';
   status: 'complete' | 'streaming' | 'error';
-  parts: readonly SurfaceMessagePart[];
+  parts: readonly ConversationMessagePart[];
   createdAt?: string;
   turnId?: string;
   metadata?: Record<string, unknown>;
@@ -138,7 +140,6 @@ export type RequestedPermission =
 
 export type ApprovalDecision = 'approve' | 'deny';
 export type ApprovalScope = 'once' | 'session';
-export type ApprovalPreset = 'ask-for-approval' | 'approve-for-me' | 'full-access';
 
 export type AskUserAnswers = Record<string, { answers: string[] }>;
 export type ToolConfirmationDecision = 'allow' | 'allow_conversation' | 'always_allow' | 'deny';
@@ -278,4 +279,55 @@ export type UpdateConversationSettings = {
   reasoningEffort?: string;
   serviceTier?: string | null;
   planMode?: boolean;
+};
+
+
+
+export type ConversationMessageToolPartUpdate = {
+  itemId: string;
+  title?: string;
+  status?: ConversationMessageToolPart['status'];
+  statusText?: string | null;
+  body?: string;
+  bodyDelta?: string;
+  bodyAppend?: string;
+  input?: unknown;
+  output?: unknown;
+  metadata?: Record<string, unknown>;
+  fallbackToolPart?: ConversationMessageToolPart;
+};
+
+
+
+export type CatalogStatus = 'notLoaded' | 'loading' | 'loaded' | 'error';
+
+
+
+export type ReasoningEffortOption = {
+  reasoningEffort: string;
+  description: string;
+};
+
+
+
+export type ModelDescriptor = {
+  id: string;
+  model: string;
+  displayName: string;
+  description?: string;
+  hidden?: boolean;
+  supportedReasoningEfforts?: ReasoningEffortOption[];
+  defaultReasoningEffort?: string | null;
+  serviceTiers?: ServiceTier[];
+  defaultServiceTier?: string | null;
+  isDefault?: boolean;
+  providerMetadata?: Record<string, unknown>;
+};
+
+
+
+export type PermissionProfile = {
+  id: string;
+  description: string | null;
+  allowed: boolean;
 };

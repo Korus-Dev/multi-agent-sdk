@@ -1,11 +1,11 @@
 import type {
   CodexConversationEvent,
   CodexConversationSnapshot,
-  CodexSurfaceTurn,
-  SurfaceMessage,
-  SurfaceMessageToolPart,
-  SurfaceMessageToolPartUpdate,
-} from './surface';
+  Turn,
+  ConversationMessage,
+  ConversationMessageToolPart,
+  ConversationMessageToolPartUpdate,
+} from './codex-host';
 
 /**
  * A client-local projection initialized once from a conversation snapshot and
@@ -290,20 +290,20 @@ function addUnique(values: readonly string[], value: string): string[] {
   return values.includes(value) ? [...values] : [...values, value];
 }
 
-function upsertTurn(turns: readonly CodexSurfaceTurn[], turn: CodexSurfaceTurn): CodexSurfaceTurn[] {
+function upsertTurn(turns: readonly Turn[], turn: Turn): Turn[] {
   return upsertById(turns, turn);
 }
 
-function upsertMessage(messages: readonly SurfaceMessage[], message: SurfaceMessage): SurfaceMessage[] {
+function upsertMessage(messages: readonly ConversationMessage[], message: ConversationMessage): ConversationMessage[] {
   return upsertById(messages, message);
 }
 
 function ensureAssistantTurnMessage(
-  messages: readonly SurfaceMessage[],
+  messages: readonly ConversationMessage[],
   conversationId: string,
   turnId: string,
   createdAt: string,
-): SurfaceMessage[] {
+): ConversationMessage[] {
   if (messages.some((message) => (
     message.role === 'assistant'
     && message.kind === undefined
@@ -325,12 +325,12 @@ function ensureAssistantTurnMessage(
 }
 
 function appendSteerMessage(
-  messages: readonly SurfaceMessage[],
-  steer: SurfaceMessage,
+  messages: readonly ConversationMessage[],
+  steer: ConversationMessage,
   conversationId: string,
   eventTurnId: string | undefined,
   occurredAt: string,
-): SurfaceMessage[] {
+): ConversationMessage[] {
   const turnId = eventTurnId ?? messageTurnId(steer);
   const appended = upsertMessage(messages, steer);
   if (!turnId) return appended;
@@ -350,17 +350,17 @@ function appendSteerMessage(
 }
 
 function prependUniqueMessages(
-  current: readonly SurfaceMessage[],
-  prepended: readonly SurfaceMessage[],
-): SurfaceMessage[] {
+  current: readonly ConversationMessage[],
+  prepended: readonly ConversationMessage[],
+): ConversationMessage[] {
   const incomingIds = new Set(prepended.map((message) => message.id));
   return [...prepended, ...current.filter((message) => !incomingIds.has(message.id))];
 }
 
 function appendMessageDelta(
-  messages: readonly SurfaceMessage[],
+  messages: readonly ConversationMessage[],
   event: Extract<CodexConversationEvent, { type: 'message.delta' }>,
-): SurfaceMessage[] {
+): ConversationMessage[] {
   const index = messages.findIndex((message) => message.id === event.payload.messageId);
   const message = index >= 0 ? messages[index]! : {
     id: event.payload.messageId,
@@ -385,7 +385,7 @@ function appendMessageDelta(
       ...(event.payload.phase ? { phase: event.payload.phase } : {}),
     });
   }
-  const nextMessage: SurfaceMessage = { ...message, status: 'streaming', parts };
+  const nextMessage: ConversationMessage = { ...message, status: 'streaming', parts };
   if (index < 0) return [...messages, nextMessage];
   const next = [...messages];
   next.splice(index, 1, nextMessage);
@@ -393,11 +393,11 @@ function appendMessageDelta(
 }
 
 function completeMessage(
-  message: SurfaceMessage,
-  status: SurfaceMessage['status'],
-): SurfaceMessage {
+  message: ConversationMessage,
+  status: ConversationMessage['status'],
+): ConversationMessage {
   let changed = message.status !== status;
-  const toolStatus: SurfaceMessageToolPart['status'] = status === 'complete' ? 'completed' : 'failed';
+  const toolStatus: ConversationMessageToolPart['status'] = status === 'complete' ? 'completed' : 'failed';
   const parts = message.parts.map((part) => {
     if (part.type !== 'tool' || part.status !== 'running') return part;
     changed = true;
@@ -410,14 +410,14 @@ function completeMessage(
   return changed ? { ...message, status, parts } : message;
 }
 
-function isEmptyAssistantForTurn(message: SurfaceMessage, turnId: string): boolean {
+function isEmptyAssistantForTurn(message: ConversationMessage, turnId: string): boolean {
   return message.role === 'assistant'
     && message.kind === undefined
     && messageTurnId(message) === turnId
     && message.parts.length === 0;
 }
 
-function messageTurnId(message: SurfaceMessage): string | null {
+function messageTurnId(message: ConversationMessage): string | null {
   return message.turnId
     ?? (typeof message.metadata?.turnId === 'string' ? message.metadata.turnId : null);
 }
@@ -434,19 +434,19 @@ function findLastIndex<Value>(
 }
 
 function upsertToolPart(
-  messages: readonly SurfaceMessage[],
+  messages: readonly ConversationMessage[],
   messageId: string,
   conversationId: string,
   turnId: string,
-  toolPart: SurfaceMessageToolPart,
-): SurfaceMessage[] {
+  toolPart: ConversationMessageToolPart,
+): ConversationMessage[] {
   const index = messages.findIndex((message) => message.id === messageId);
   const message = index >= 0 ? messages[index]! : assistantMessage(messageId, conversationId, turnId);
   const parts = [...message.parts];
   const partIndex = parts.findIndex((part) => part.type === 'tool' && part.id === toolPart.id);
   if (partIndex < 0) parts.push(toolPart);
   else {
-    const existing = parts[partIndex] as SurfaceMessageToolPart;
+    const existing = parts[partIndex] as ConversationMessageToolPart;
     parts.splice(partIndex, 1, mergeToolPart(existing, toolPart));
   }
   const nextMessage = { ...message, status: 'streaming' as const, parts };
@@ -457,12 +457,12 @@ function upsertToolPart(
 }
 
 function updateToolPart(
-  messages: readonly SurfaceMessage[],
+  messages: readonly ConversationMessage[],
   messageId: string,
   conversationId: string,
   turnId: string,
-  update: SurfaceMessageToolPartUpdate,
-): SurfaceMessage[] {
+  update: ConversationMessageToolPartUpdate,
+): ConversationMessage[] {
   let next = [...messages];
   let messageIndex = next.findIndex((message) => message.id === messageId);
   if (messageIndex < 0 && update.fallbackToolPart) {
@@ -474,7 +474,7 @@ function updateToolPart(
   const parts = [...message.parts];
   const partIndex = parts.findIndex((part) => part.type === 'tool' && part.id === update.itemId);
   if (partIndex < 0) return next;
-  const existing = parts[partIndex] as SurfaceMessageToolPart;
+  const existing = parts[partIndex] as ConversationMessageToolPart;
   parts.splice(partIndex, 1, {
     ...existing,
     ...(update.title !== undefined ? { title: update.title } : {}),
@@ -496,9 +496,9 @@ function updateToolPart(
 }
 
 function mergeToolPart(
-  existing: SurfaceMessageToolPart,
-  incoming: SurfaceMessageToolPart,
-): SurfaceMessageToolPart {
+  existing: ConversationMessageToolPart,
+  incoming: ConversationMessageToolPart,
+): ConversationMessageToolPart {
   return {
     ...existing,
     ...incoming,
@@ -510,7 +510,7 @@ function mergeToolPart(
   };
 }
 
-function assistantMessage(messageId: string, conversationId: string, turnId: string): SurfaceMessage {
+function assistantMessage(messageId: string, conversationId: string, turnId: string): ConversationMessage {
   return {
     id: messageId,
     role: 'assistant',
@@ -526,7 +526,7 @@ function applyPlan(
   conversationId: string,
   turnId: string,
   markdown: string,
-  status: SurfaceMessageToolPart['status'],
+  status: ConversationMessageToolPart['status'],
 ): CodexConversationSnapshot {
   const message = [...snapshot.messages].reverse().find((candidate) => (
     candidate.role === 'assistant' && messageTurnId(candidate) === turnId
@@ -557,9 +557,9 @@ function applyPlan(
 }
 
 function startCompaction(
-  messages: readonly SurfaceMessage[],
+  messages: readonly ConversationMessage[],
   event: Extract<CodexConversationEvent, { type: 'context.compactionStarted' }>,
-): SurfaceMessage[] {
+): ConversationMessage[] {
   if (messages.some((message) => message.kind === 'compaction' && messageTurnId(message) === event.turnId)) {
     return [...messages];
   }
@@ -586,7 +586,7 @@ function startCompaction(
 
 function transitionedToolStatusText(
   statusText: string | undefined,
-  status: SurfaceMessageToolPart['status'],
+  status: ConversationMessageToolPart['status'],
 ): string | undefined {
   if (status === 'running' || !statusText) return statusText;
   try {

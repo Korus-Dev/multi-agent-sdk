@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import { CodexAppServerClient } from '@korus-dev/codex-sdk';
 import { createHarnessDriver } from '../../../src/backend';
 import type { HarnessContext } from '../../../src/driver';
-import { MockCodexAppServer, lastRequest, resumeResponse, thread, turn } from '../../codex/helpers/codex-surface-fixture';
+import { MockCodexAppServer, lastRequest, resumeResponse, thread, turn } from '../../codex/helpers/host-fixture';
 
 it('configures a CPA conversation and a separate scoped tool set through the real Codex protocol boundary', async () => {
   let id = 0;
@@ -17,7 +17,7 @@ it('configures a CPA conversation and a separate scoped tool set through the rea
     client: { name: 'cpa-workbench', title: 'CPA workbench' },
     instructions: () => 'Use only verified tax rules.',
     mcpServers: () => [{ name: 'tax_rules', url: 'http://127.0.0.1:1234/tax', enabledTools: ['lookup'] }],
-    codex: { surface: { client: new CodexAppServerClient(transport) } },
+    codex: { host: { client: new CodexAppServerClient(transport) } },
   });
   const context: HarnessContext = { id: 'tax', name: 'Tax assistant', backend: 'codex', folder: '/accounting' };
   try {

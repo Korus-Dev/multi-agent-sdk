@@ -35,8 +35,8 @@
       "@korus-dev/multi-agent-sdk/codex": [
         "./src/providers/codex/index.ts"
       ],
-      "@korus-dev/multi-agent-sdk/surface-bridge": [
-        "./src/core/surface-bridge.ts"
+      "@korus-dev/multi-agent-sdk/host-bridge": [
+        "./src/core/host-bridge.ts"
       ]
     }
   },

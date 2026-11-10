@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import type { HarnessDiagnostic } from '../../../src/diagnostics';
-import { codexSdkFixture, sdkAgent } from './sdk-surface-fixture';
+import { codexSdkFixture, sdkAgent } from './sdk-host-fixture';
 
 it('reports native bind, projection and cache measurements through the caller sink only', async () => {
   const diagnostics: HarnessDiagnostic[] = [];

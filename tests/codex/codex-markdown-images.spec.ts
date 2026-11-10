@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { CodexAppServerClient } from '@korus-dev/codex-sdk';
 import { CodexMarkdownImageHydrator, localImagePath } from '../../src/providers/codex/codex-markdown-images';
-import { MockCodexAppServer, generatedPngBase64 } from './helpers/codex-surface-fixture';
+import { MockCodexAppServer, generatedPngBase64 } from './helpers/host-fixture';
 
 describe('CodexMarkdownImageHydrator', () => {
   const clients: CodexAppServerClient[] = [];

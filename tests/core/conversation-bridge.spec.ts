@@ -6,11 +6,11 @@ import {
   subscribeCodexConversationReplicaBridge,
   type CodexConversationBridgeHandle,
   type CodexConversationBridgeTarget,
-} from '../../src/core/surface-bridge';
+} from '../../src/core/host-bridge';
 import type {
   CodexConversationEvent,
   CodexConversationSnapshot,
-} from '../../src/core/surface';
+} from '../../src/core/codex-host';
 import { describe, expect, it, vi } from 'vitest';
 
 describe('Codex conversation bridge', () => {

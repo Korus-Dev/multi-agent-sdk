@@ -1,6 +1,6 @@
 import type { CodexAppServerClient, v2 } from '@korus-dev/codex-sdk';
-import { codexTurnToSurfaceMessages } from './codex-conversation-history';
-import { readTurnItems } from './codex-surface-conversations-controller';
+import { codexTurnToConversationMessages } from './codex-conversation-history';
+import { readTurnItems } from './host-conversations-controller';
 
 /** Reads provider history without creating, resuming or selecting a runtime. */
 export async function readCodexMessages(client: CodexAppServerClient, threadId: string) {
@@ -23,5 +23,5 @@ export async function readCodexMessages(client: CodexAppServerClient, threadId: 
     if (cursor && cursors.has(cursor)) throw new Error('Repeated conversation history cursor.');
     if (cursor) cursors.add(cursor);
   } while (cursor);
-  return [...turns.values()].flatMap(turn => codexTurnToSurfaceMessages(threadId, turn));
+  return [...turns.values()].flatMap(turn => codexTurnToConversationMessages(threadId, turn));
 }

@@ -1,15 +1,15 @@
 import { open } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
 import type { CodexAppServerClient } from '@korus-dev/codex-sdk';
-import type { CodexSurfaceTokenUsage } from '../../core/surface';
-import { validCounts } from './codex-surface-usage-controller';
+import type { TokenUsage } from '../../core/codex-host';
+import { validCounts } from './host-usage-controller';
 
 export type CodexHistoricalExecutionUsage = {
   turnId: string;
   recordedAt: string;
-  execution: CodexSurfaceTokenUsage;
-  total: CodexSurfaceTokenUsage;
-  last: CodexSurfaceTokenUsage;
+  execution: TokenUsage;
+  total: TokenUsage;
+  last: TokenUsage;
   status?: 'completed' | 'interrupted';
 };
 type Index = { identity: string; size: number; mtimeMs: number; offset: number;
@@ -114,7 +114,7 @@ export class CodexOriginalHistoryUsage {
   }
 }
 
-function nativeCounts(value: any): CodexSurfaceTokenUsage | undefined {
+function nativeCounts(value: any): TokenUsage | undefined {
   if (!value || typeof value !== 'object') return;
   const result = { totalTokens: value.total_tokens, inputTokens: value.input_tokens, cachedInputTokens: value.cached_input_tokens,
     cacheWriteInputTokens: value.cache_write_input_tokens ?? null, outputTokens: value.output_tokens, reasoningOutputTokens: value.reasoning_output_tokens };

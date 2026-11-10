@@ -1,8 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.26.0 (2026-11-10)
 
 - Public subpaths use extensionless imports such as `@korus-dev/multi-agent-sdk/codex`, resolved through an explicit exports map. Replace previous `.js` subpath imports; root forwarding files are removed.
+- Native hosts use `CodexHost`, `ClaudeHost`, `CursorHost` and `AntigravityHost`. Shared message contracts use `ConversationMessage*`; portable contracts use canonical names without a provider prefix.
+- The bridge entry is `/host-bridge`. Codex engine options use `codex.host`; adapter policy uses `codex.adapter`. SDK host events use `host.statusChanged` and `host_disconnected`.
+- The generic `TtlCache` is available from the package root; text generation uses the shared `HarnessTextGenerationResult`.
+- Updates the Codex SDK dependency to `0.167.1`.
 
 ## 0.25.1 (2026-11-10)
 

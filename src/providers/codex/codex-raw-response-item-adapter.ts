@@ -1,10 +1,10 @@
 import type { ResponseItem } from '@korus-dev/codex-sdk';
-import type { SurfaceMessageToolPart, SurfaceMessageToolPartUpdate } from '../../core/surface';
+import type { ConversationMessageToolPart, ConversationMessageToolPartUpdate } from '../../core/codex-host';
 import { codexThreadItemToToolPart, rawOutputToToolPartUpdate } from './codex-tool-part-adapter';
 
 type AdaptedRawResponseItemEvent =
-  | { type: 'item.started' | 'item.completed'; payload: { toolPart: SurfaceMessageToolPart } }
-  | { type: 'item.updated'; payload: SurfaceMessageToolPartUpdate };
+  | { type: 'item.started' | 'item.completed'; payload: { toolPart: ConversationMessageToolPart } }
+  | { type: 'item.updated'; payload: ConversationMessageToolPartUpdate };
 
 export function rawResponseItemToEvent(item: ResponseItem): AdaptedRawResponseItemEvent | null {
   if (!isRecord(item) || typeof item.type !== 'string') {

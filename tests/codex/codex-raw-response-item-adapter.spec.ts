@@ -40,7 +40,7 @@ describe('rawResponseItemToEvent', () => {
     });
   });
 
-  it('bounds large raw tool output events before they enter surface state', () => {
+  it('bounds large raw tool output events before they enter host state', () => {
     const event = adapt({
       type: 'custom_tool_call_output', call_id: 'large-output', name: 'render',
       output: {

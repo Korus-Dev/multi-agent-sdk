@@ -1,10 +1,10 @@
 import { isAbsolute, resolve } from 'node:path';
 import type {
-  CodexSurfaceFileActivityAction,
-  CodexSurfaceFileActivityStatus,
-  SurfaceMessageToolPart as ToolPart,
-  SurfaceMessageToolPartUpdate as ToolPartUpdate,
-} from '../../core/surface';
+  FileActivityAction,
+  FileActivityStatus,
+  ConversationMessageToolPart as ToolPart,
+  ConversationMessageToolPartUpdate as ToolPartUpdate,
+} from '../../core/codex-host';
 import { toolOutputText } from './tool-output';
 
 const structuredToolResultNotice = 'Result returned in structuredContent.';
@@ -16,9 +16,9 @@ export type CodexToolPartAdapterOptions = {
 };
 
 export type CodexFileActivity = {
-  action: CodexSurfaceFileActivityAction;
+  action: FileActivityAction;
   path: string;
-  status: CodexSurfaceFileActivityStatus;
+  status: FileActivityStatus;
 };
 
 export function codexToolPartFileActivities(

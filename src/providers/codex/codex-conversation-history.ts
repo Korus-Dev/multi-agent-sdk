@@ -1,21 +1,21 @@
 import type { v2 } from '@korus-dev/codex-sdk';
-import { normalizePromptContent, promptContentText } from '../../core/surface';
+import { normalizePromptContent, promptContentText } from '../../core/prompt-content';
 import { basename, extname, isAbsolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { fileAttachmentReference } from './codex-file-attachment';
 import type {
-  CodexSurfaceClientRequest,
-  SurfaceMessage,
-  SurfaceMessageAttachment,
-  SurfaceMessageMediaPart,
-  SurfaceMessagePart,
-  SurfaceMessageQuestionPart,
-} from '../../core/surface';
+  ClientRequest,
+  ConversationMessage,
+  ConversationMessageAttachment,
+  ConversationMessageMediaPart,
+  ConversationMessagePart,
+  ConversationMessageQuestionPart,
+} from '../../core/codex-host';
 import { codexThreadItemToToolPart } from './codex-tool-part-adapter';
 import {
   extractProposedPlanDocument,
   finalizeTurnToolParts,
-} from './codex-surface-message-state';
+} from './host-message-state';
 
 export { codexThreadItemToToolPart as codexItemToToolPart } from './codex-tool-part-adapter';
 
@@ -28,9 +28,9 @@ const supportedGeneratedImageMimeTypes = new Set([
   'image/webp',
 ]);
 
-export function codexThreadToSurfaceMessages(thread: v2.Thread): SurfaceMessage[] {
+export function codexThreadToConversationMessages(thread: v2.Thread): ConversationMessage[] {
   const turns = Array.isArray(thread.turns) ? thread.turns : [];
-  return turns.flatMap((turn) => codexTurnToSurfaceMessages(thread.id, turn));
+  return turns.flatMap((turn) => codexTurnToConversationMessages(thread.id, turn));
 }
 
 /**
@@ -39,9 +39,9 @@ export function codexThreadToSurfaceMessages(thread: v2.Thread): SurfaceMessage[
  * Bounded data previews are used as image sources; no local paths exposed.
  */
 export function preserveHistoricalAttachmentPreviews(
-  previousMessages: readonly SurfaceMessage[],
-  historyMessages: readonly SurfaceMessage[],
-): SurfaceMessage[] {
+  previousMessages: readonly ConversationMessage[],
+  historyMessages: readonly ConversationMessage[],
+): ConversationMessage[] {
   const previewsByPath = new Map<string, string>();
   for (const message of previousMessages) {
     for (const part of message.parts) {
@@ -69,7 +69,7 @@ export function preserveHistoricalAttachmentPreviews(
 }
 
 /** Preserve authored presentation by provider-echoed client identity, never text matching. */
-export function preserveHistoricalMessagePresentation(previous: readonly SurfaceMessage[], history: readonly SurfaceMessage[]): SurfaceMessage[] {
+export function preserveHistoricalMessagePresentation(previous: readonly ConversationMessage[], history: readonly ConversationMessage[]): ConversationMessage[] {
   const authored = new Map(previous.filter(message => message.role === 'user' && message.metadata?.promptContent)
     .map(message => [message.id, message.metadata!.promptContent]));
   return preserveHistoricalAttachmentPreviews(previous, history).map(message => {
@@ -83,9 +83,9 @@ export function preserveHistoricalMessagePresentation(previous: readonly Surface
   });
 }
 
-export function codexTurnToSurfaceMessages(threadId: string, turn: v2.Turn): SurfaceMessage[] {
-  const messages: SurfaceMessage[] = [];
-  const assistantParts: SurfaceMessagePart[] = [];
+export function codexTurnToConversationMessages(threadId: string, turn: v2.Turn): ConversationMessage[] {
+  const messages: ConversationMessage[] = [];
+  const assistantParts: ConversationMessagePart[] = [];
   const createdAt = timestampToIso(turn.startedAt ?? turn.completedAt);
   let assistantSegmentIndex = 0;
   let sawAssistantActivity = false;
@@ -101,7 +101,7 @@ export function codexTurnToSurfaceMessages(threadId: string, turn: v2.Turn): Sur
     messages.push({
       id: `assistant-${turn.id}${segmentSuffix}`,
       role: 'assistant',
-      status: surfaceMessageStatus(turn.status),
+      status: conversationMessageStatus(turn.status),
       turnId: turn.id,
       parts: [...assistantParts],
       createdAt,
@@ -234,18 +234,18 @@ export function codexTurnToSurfaceMessages(threadId: string, turn: v2.Turn): Sur
 
   flushAssistantMessage();
   if ((turn.itemsView === 'summary' || turn.itemsView === 'notLoaded') && !messages.some(m => m.role === 'assistant')) {
-    messages.push({ id: `assistant-${turn.id}`, role: 'assistant', status: surfaceMessageStatus(turn.status), turnId: turn.id, parts: [], createdAt, metadata: { conversationId: threadId, turnId: turn.id } });
+    messages.push({ id: `assistant-${turn.id}`, role: 'assistant', status: conversationMessageStatus(turn.status), turnId: turn.id, parts: [], createdAt, metadata: { conversationId: threadId, turnId: turn.id } });
   }
   return turn.status === 'inProgress'
     ? messages
     : finalizeTurnToolParts(messages, turn.id, turn.status);
 }
 
-export function codexItemToSurfaceMessage(
+export function codexItemToConversationMessage(
   threadId: string,
   turn: Pick<v2.Turn, 'id' | 'status' | 'startedAt'>,
   item: v2.ThreadItem,
-): SurfaceMessage | null {
+): ConversationMessage | null {
   const createdAt = timestampToIso(turn.startedAt);
   if (item.type === 'userMessage') {
     const parts = userMessageParts(item);
@@ -277,7 +277,7 @@ export function codexItemToSurfaceMessage(
     const questionPart = item.type === 'agentMessage'
       ? codexItemToQuestionPart(threadId, turn.id, item, true)
       : null;
-    const parts: SurfaceMessagePart[] = [
+    const parts: ConversationMessagePart[] = [
       ...(!questionPart && (proposedPlan?.visibleText || (!proposedPlan && text)) ? [{
         type: 'text' as const,
         text: proposedPlan?.visibleText ?? text,
@@ -289,7 +289,7 @@ export function codexItemToSurfaceMessage(
     return parts.length > 0 ? {
       id: `assistant-${item.id}`,
       role: 'assistant',
-      status: surfaceMessageStatus(turn.status),
+      status: conversationMessageStatus(turn.status),
       turnId: turn.id,
       parts,
       createdAt,
@@ -310,7 +310,7 @@ export function codexItemToSurfaceMessage(
     return parts.length > 0 ? {
       id: `assistant-${item.id}`,
       role: 'assistant',
-      status: surfaceMessageStatus(turn.status),
+      status: conversationMessageStatus(turn.status),
       turnId: turn.id,
       parts,
       createdAt,
@@ -318,14 +318,14 @@ export function codexItemToSurfaceMessage(
     } : null;
   }
 
-  const parts: SurfaceMessagePart[] = [];
+  const parts: ConversationMessagePart[] = [];
   const toolPart = codexThreadItemToToolPart(item);
   if (toolPart) parts.push(toolPart);
   parts.push(...codexItemToMediaParts(item));
-  const message: SurfaceMessage | null = parts.length > 0 ? {
+  const message: ConversationMessage | null = parts.length > 0 ? {
     id: `assistant-${item.id}`,
     role: 'assistant',
-    status: surfaceMessageStatus(turn.status),
+    status: conversationMessageStatus(turn.status),
     turnId: turn.id,
     parts,
     createdAt,
@@ -340,7 +340,7 @@ export function codexItemToQuestionPart(
   turnId: string,
   item: Extract<v2.ThreadItem, { type: 'agentMessage' }>,
   historical = false,
-): SurfaceMessageQuestionPart | null {
+): ConversationMessageQuestionPart | null {
   if (item.delivery !== 'async') return null;
   const structuredQuestions = item.questions ?? [];
   const questions = structuredQuestions.length > 0
@@ -363,7 +363,7 @@ export function codexItemToQuestionPart(
         }]
       : [];
   if (questions.length === 0) return null;
-  const request: Extract<CodexSurfaceClientRequest, { kind: 'ask_user' }> = {
+  const request: Extract<ClientRequest, { kind: 'ask_user' }> = {
     id: `async-question:${item.id}`,
     kind: 'ask_user',
     conversationId: threadId,
@@ -381,7 +381,7 @@ export function codexItemToQuestionPart(
   return { type: 'question', request, ...(historical ? { historical: true } : {}) };
 }
 
-export function codexItemToMediaPart(item: v2.ThreadItem): SurfaceMessageMediaPart | null {
+export function codexItemToMediaPart(item: v2.ThreadItem): ConversationMessageMediaPart | null {
   if (item.type !== 'imageGeneration') return null;
   const toolPart = codexThreadItemToToolPart(item);
   if (toolPart?.status !== 'completed') return null;
@@ -413,7 +413,7 @@ export function codexItemToMediaPart(item: v2.ThreadItem): SurfaceMessageMediaPa
 }
 
 /** Tool result images are media, independently of the small text/JSON tool-output budget. */
-export function codexItemToMediaParts(item: v2.ThreadItem): SurfaceMessageMediaPart[] {
+export function codexItemToMediaParts(item: v2.ThreadItem): ConversationMessageMediaPart[] {
   if (item.type === 'imageView') {
     if (typeof item.path !== 'string') return [];
     const mimeType = mimeTypeForSource(item.path);
@@ -426,7 +426,7 @@ export function codexItemToMediaParts(item: v2.ThreadItem): SurfaceMessageMediaP
   const content = item.type === 'mcpToolCall' && item.status === 'completed' ? item.result?.content
     : item.type === 'dynamicToolCall' && item.status === 'completed' ? item.contentItems : undefined;
   if (!Array.isArray(content)) return [];
-  const parts: SurfaceMessageMediaPart[] = [];
+  const parts: ConversationMessageMediaPart[] = [];
   let remaining = 20 * 1024 * 1024;
   let parseBudget = 32 * 1024 * 1024;
   let entries = 256;
@@ -462,12 +462,12 @@ export function codexItemToMediaParts(item: v2.ThreadItem): SurfaceMessageMediaP
   return parts;
 }
 
-function userMessageParts(item: Extract<v2.ThreadItem, { type: 'userMessage' }>): SurfaceMessagePart[] {
+function userMessageParts(item: Extract<v2.ThreadItem, { type: 'userMessage' }>): ConversationMessagePart[] {
   const content = Array.isArray(item.content) ? item.content : [];
   const hasTextInput = content.some((input) => (
     isRecord(input) && input.type === 'text' && typeof input.text === 'string' && input.text.length > 0
   ));
-  const parts: SurfaceMessagePart[] = [];
+  const parts: ConversationMessagePart[] = [];
   let text: string[] = [];
   const renderedSkills = new Set<string>();
   const flushText = () => {
@@ -580,7 +580,7 @@ function asyncQuestionReply(text: string): { displayText: string; requestIds: st
   }
 }
 
-function userInputAttachment(input: unknown): SurfaceMessageAttachment | null {
+function userInputAttachment(input: unknown): ConversationMessageAttachment | null {
   if (!isRecord(input) || typeof input.type !== 'string') return null;
   if (input.type === 'mention' && typeof input.path === 'string' && !input.path.startsWith('plugin://')) {
     const name = typeof input.name === 'string' && input.name.trim()
@@ -691,7 +691,7 @@ function startsWithBytes(bytes: Uint8Array, prefix: readonly number[]): boolean 
   return prefix.every((value, index) => bytes[index] === value);
 }
 
-function surfaceMessageStatus(status: v2.Turn['status']): SurfaceMessage['status'] {
+function conversationMessageStatus(status: v2.Turn['status']): ConversationMessage['status'] {
   if (status === 'inProgress') return 'streaming';
   if (status === 'failed') return 'error';
   return 'complete';

@@ -1,5 +1,6 @@
-import type { CodexConversationSnapshot } from '../core/surface';
-import type { ClaudeConversationSnapshot, CursorConversationSnapshot, AntigravityConversationSnapshot, ThreadPlan, BackendSession } from '../contracts';
+import type { CodexConversationSnapshot } from '../core/codex-host';
+import type { ClaudeConversationSnapshot, CursorConversationSnapshot, AntigravityConversationSnapshot, ThreadPlan, ThreadGoal, BackendSession } from '../contracts';
+import type { ClientRequest, Approval } from '../contracts/ui';
 import { claudePaneClientRequests } from './claude-pane-client-requests';
 import { providerPaneClientRequests } from './provider-pane-client-requests';
 type NativeSnapshot = CodexConversationSnapshot | ClaudeConversationSnapshot | CursorConversationSnapshot | AntigravityConversationSnapshot;
@@ -11,9 +12,9 @@ export type ConversationPresentation = Pick<NativeSnapshot,
   latestTurnId: string | null;
   selection?: { model?: string | null; reasoningEffort?: string | null; serviceTier?: string | null };
   permission?: string | null;
-  clientRequests: NonNullable<CodexConversationSnapshot['clientRequests']>;
-  approvals?: CodexConversationSnapshot['approvals'];
-  goal?: CodexConversationSnapshot['goal'];
+  clientRequests: ClientRequest[];
+  approvals?: Approval[];
+  goal?: ThreadGoal | null;
   plan?: ThreadPlan | null;
 };
 type Project<S> = (snapshot: S | null | undefined) => ConversationPresentation | null;

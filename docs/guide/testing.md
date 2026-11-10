@@ -30,7 +30,7 @@ existing test or remove the new one.
 
 Use the smallest layer that observes the real contract. For app-server
 translation, drive the schema-typed `MockCodexAppServer` through the real
-`CodexAppServerClient`, adapters, controllers, replicas, and surfaces. Assert
+`CodexAppServerClient`, adapters, controllers, replicas, and hosts. Assert
 the outbound JSON-RPC shape and the public TypeScript result of inbound
 responses or events, including ordering, identity, concurrency, and cleanup
 when relevant.

@@ -3,12 +3,12 @@ import { cursorRuntime } from './providers/cursor/runtime';
 import type { AgentBackend } from './contracts';
 import type { HarnessContext, HarnessDriver, HarnessEvent, HarnessPromptScope } from './driver';
 import type { HarnessMcpEndpoint } from './generation';
-import type { PromptPart } from './core/surface';
-import { createCodexSurface, type CodexSurfaceOptions } from './providers/codex';
-import { mcpServerConfig } from './providers/codex/codex-surface-mcp';
-import { CodexSurfaceAgentAdapter, type CodexHostOptions } from './providers/codex/host';
+import type { PromptPart } from './core/prompt-content';
+import { createCodexHost, type CodexHostOptions } from './providers/codex';
+import { mcpServerConfig } from './providers/codex/host-mcp';
+import { CodexHostAdapter, type CodexHostAdapterOptions } from './providers/codex/host-adapter';
 import { CodexBackendDriver } from './providers/codex/driver';
-import { ClaudeConversationHost, type ClaudeHostOptions } from './providers/claude/host';
+import { ClaudeHost, type ClaudeHostOptions } from './providers/claude/host';
 import { ClaudeAgentSdkTransport, type ClaudeAgentSdkTransportOptions } from './providers/claude/agent-sdk-transport';
 import type { ClaudeTurnTransport } from './providers/claude/transport';
 import { CursorHost, type CursorHostOptions } from './providers/cursor/host';
@@ -25,7 +25,7 @@ export type HarnessOptions<Context extends HarnessContext = HarnessContext> = {
   instructions?: (context: Context) => string | undefined;
   mcpServers?: (context: Context) => readonly HarnessMcpEndpoint[];
   formatPrompt?: (prompt: string, content: readonly PromptPart[] | undefined) => string;
-  codex?: { surface?: CodexSurfaceOptions; host?: CodexHostOptions<Context> };
+  codex?: { host?: CodexHostOptions; adapter?: CodexHostAdapterOptions<Context> };
   claude?: { transport?: ClaudeTurnTransport; transportOptions?: ClaudeAgentSdkTransportOptions; host?: ClaudeHostOptions<Context> };
   cursor?: CursorHostOptions<Context>;
   antigravity?: AntigravityHostOptions<Context>;
@@ -64,7 +64,7 @@ export function createHarnessDriver<Context extends HarnessContext = HarnessCont
     client: { ...options.antigravity?.client, ...options.client },
   });
   if (backend === 'claude') {
-    const driver = new ClaudeConversationHost(options.claude?.transport ?? new ClaudeAgentSdkTransport({ ...options.claude?.transportOptions, client: { ...options.claude?.transportOptions?.client, ...options.client } }), undefined, {
+    const driver = new ClaudeHost(options.claude?.transport ?? new ClaudeAgentSdkTransport({ ...options.claude?.transportOptions, client: { ...options.claude?.transportOptions?.client, ...options.client } }), undefined, {
     ...options.claude?.host,
     configurePrompt: context => {
       const defaults = options.claude?.host?.configurePrompt?.(context) ?? {};
@@ -96,12 +96,12 @@ export function createHarnessDriver<Context extends HarnessContext = HarnessCont
     return driver;
   }
   if (backend !== 'codex') throw new Error(`Unsupported harness: ${backend}`);
-  const nativeSurfaceOptions = options.codex?.surface ?? {};
-  if (home && nativeSurfaceOptions.codexHome && home !== nativeSurfaceOptions.codexHome) throw new Error('Runtime home conflicts with codex.surface.codexHome.');
-  const surfaceOptions = { ...nativeSurfaceOptions, ...(home ? { codexHome: home } : {}) };
-  const surface = createCodexSurface({ ...surfaceOptions, autoSelectFirstConversation: false,
-    clientInfo: surfaceOptions.clientInfo ?? { name: options.client.name, title: options.client.title ?? options.client.name, version: options.client.version ?? '1' },
-    extensions: [...surfaceOptions.extensions ?? [], { configureConversation: ({ extensionContext }) => {
+  const nativeHostOptions = options.codex?.host ?? {};
+  if (home && nativeHostOptions.codexHome && home !== nativeHostOptions.codexHome) throw new Error('Runtime home conflicts with codex.host.codexHome.');
+  const hostOptions = { ...nativeHostOptions, ...(home ? { codexHome: home } : {}) };
+  const host = createCodexHost({ ...hostOptions, autoSelectFirstConversation: false,
+    clientInfo: hostOptions.clientInfo ?? { name: options.client.name, title: options.client.title ?? options.client.name, version: options.client.version ?? '1' },
+    extensions: [...hostOptions.extensions ?? [], { configureConversation: ({ extensionContext }) => {
       const binding = extensionContext as CodexContext<Context> | undefined;
       if (!binding?.context) return {};
       const instructions = binding.scope?.developerInstructions ?? options.instructions?.(binding.context);
@@ -111,10 +111,10 @@ export function createHarnessDriver<Context extends HarnessContext = HarnessCont
       };
     } }],
   });
-  const adapter = new CodexSurfaceAgentAdapter<Context>(surface, () => surface.close(), {
-    ...options.codex?.host,
+  const adapter = new CodexHostAdapter<Context>(host, () => host.close(), {
+    ...options.codex?.adapter,
     extensionContext: (context, scope) => ({ context, scope } satisfies CodexContext<Context>),
-    formatPrompt: options.formatPrompt ?? options.codex?.host?.formatPrompt,
+    formatPrompt: options.formatPrompt ?? options.codex?.adapter?.formatPrompt,
   });
   return new CodexBackendDriver(adapter);
 }

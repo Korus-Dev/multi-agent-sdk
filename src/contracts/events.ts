@@ -3,7 +3,7 @@ import type { AgentStatus } from './status';
 import type { DevicePairingStatus } from './remote-control';
 import type { TurnGitDiff } from './turn-diff';
 import type { ConversationSettings } from './conversation-settings';
-import type { CodexConversationEvent, CodexConversationSnapshot } from '../core/surface';
+import type { CodexConversationEvent, CodexConversationSnapshot } from '../core/codex-host';
 type EventEnvelope = { seq?: number; source?: 'backend' | 'client'; agentId?: string; backend?: AgentBackend; backendSessionId?: string; conversationId?: string; threadId?: string; turnId?: string; occurredAt?: string };
 type EventWith<Variant> = EventEnvelope & Variant;
 type AgentUpdatedPayload = { id: string; conversationTitle?: string };

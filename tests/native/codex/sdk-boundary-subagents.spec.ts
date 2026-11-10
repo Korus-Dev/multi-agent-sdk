@@ -1,14 +1,14 @@
 const product = { name: 'CPA workbench' };
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { CodexConversationEvent, SurfaceMessage } from '../../../src/index';
-import { codexSdkFixture, sdkAgent, sdkSummary } from './sdk-surface-fixture';
+import type { CodexConversationEvent, ConversationMessage } from '../../../src/index';
+import { codexSdkFixture, sdkAgent, sdkSummary } from './sdk-host-fixture';
 
 const metadata = { seq: 1, origin: 'notification' as const, occurredAt: '2026-09-16T00:00:00Z', conversationId: 'conversation-a', turnId: 'turn' };
 const spawn: CodexConversationEvent = { ...metadata, type: 'subagent.toolCallChanged', payload: { lifecycle: 'started', toolCall: {
   id: 'spawn', tool: 'spawnAgent', status: 'inProgress', senderConversationId: 'conversation-a', receiverConversationIds: ['child'], prompt: 'Inspect', model: null, reasoningEffort: null, agentStates: { child: { status: 'running', message: null } },
 } } };
 const completed: CodexConversationEvent = { ...metadata, conversationId: 'child', type: 'turn.completed', payload: { status: 'completed', error: null, willRetry: false, startedAt: null, completedAt: null, durationMs: null } };
-function message(id: string): SurfaceMessage {
+function message(id: string): ConversationMessage {
   return { id, turnId: id, role: 'assistant', status: 'complete', createdAt: metadata.occurredAt, parts: [{ type: 'text', text: id }] };
 }
 
@@ -18,8 +18,8 @@ describe(`Codex SDK → ${product.name} subagent ownership`, () => {
   afterEach(async () => { await Promise.all(fixtures.splice(0).map(({ driver }) => driver.close())); });
 
   it('projects child identity and completion only to its root owner', async () => {
-    const { driver, conversation, surface, events, emit } = setup();
-    surface.readConversationSummary.mockResolvedValue(sdkSummary('child', { parentConversationId: 'conversation-a', agentNickname: 'Scout', agentRole: 'reviewer' }));
+    const { driver, conversation, host, events, emit } = setup();
+    host.readConversationSummary.mockResolvedValue(sdkSummary('child', { parentConversationId: 'conversation-a', agentNickname: 'Scout', agentRole: 'reviewer' }));
     await driver.loadConversation(sdkAgent());
     await driver.loadConversation(sdkAgent('agent-b', 'conversation-b'));
     events.length = 0;
@@ -40,8 +40,8 @@ describe(`Codex SDK → ${product.name} subagent ownership`, () => {
   });
 
   it('reads live child snapshots without inherited-history loads, but bounds cold historical children to the final message', async () => {
-    const { driver, adapter, conversation, surface, events, emit } = setup();
-    surface.readConversationSummary.mockResolvedValue(sdkSummary('child'));
+    const { driver, adapter, conversation, host, events, emit } = setup();
+    host.readConversationSummary.mockResolvedValue(sdkSummary('child'));
     await driver.loadConversation(sdkAgent());
     conversation('conversation-a').emit(spawn);
     emit(completed);
@@ -56,9 +56,9 @@ describe(`Codex SDK → ${product.name} subagent ownership`, () => {
   });
 
   it('does not publish a delayed child identity after its root is replaced', async () => {
-    const { driver, conversation, surface, events } = setup();
+    const { driver, conversation, host, events } = setup();
     let resolve!: (summary: ReturnType<typeof sdkSummary>) => void;
-    surface.readConversationSummary.mockReturnValue(new Promise((done) => { resolve = done; }));
+    host.readConversationSummary.mockReturnValue(new Promise((done) => { resolve = done; }));
     await driver.loadConversation(sdkAgent());
     conversation('conversation-a').emit(spawn);
     await driver.loadConversation(sdkAgent('agent-a', 'replacement'));

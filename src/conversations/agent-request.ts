@@ -26,8 +26,8 @@ export function isAgentRequestResponse(value: unknown): value is AgentRequestRes
 }
 
 export function approvalAgentRequest(approval: Omit<BackendApprovalRequest, 'requestedPermissions' | 'allowedScopes'> & {
-  requestedPermissions?: readonly import('../contracts').BackendRequestedPermission[];
-  allowedScopes?: readonly import('../contracts').BackendApprovalScope[];
+  requestedPermissions?: readonly import('../contracts/index').BackendRequestedPermission[];
+  allowedScopes?: readonly import('../contracts/index').BackendApprovalScope[];
 }): AgentRequest {
   const { requestedPermissions, allowedScopes, ...fields } = approval;
   return { id: approval.id, conversationId: approval.conversationId, turnId: approval.turnId, itemId: approval.itemId, kind: 'approval', approval: {
@@ -38,7 +38,7 @@ export function approvalAgentRequest(approval: Omit<BackendApprovalRequest, 'req
 }
 
 export function approvalOutcome(decision: 'approve' | 'deny' | null, scope: 'once' | 'session' | null, reason?: string): AgentRequestOutcome {
-  if (!decision && reason && ['conversation_closed', 'conversation_removed', 'surface_disconnected'].includes(reason)) return { kind: 'cancelled', reason };
+  if (!decision && reason && ['conversation_closed', 'conversation_removed', 'host_disconnected'].includes(reason)) return { kind: 'cancelled', reason };
   return decision ? { kind: 'decision', decision: decision === 'deny' ? 'deny' : scope === 'session' ? 'allow_conversation' : 'allow' }
     : { kind: 'completed', ...(reason ? { reason } : {}) };
 }

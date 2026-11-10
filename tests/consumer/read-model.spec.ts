@@ -5,7 +5,7 @@ import type { HarnessDriver as NativeDriver, HarnessEvent as NativeEvent } from 
 import type { HarnessContext } from '../../src/context';
 import { emptyCursorSnapshot } from '../../src/conversations/cursor-conversation-replica';
 import { emptyAntigravitySnapshot } from '../../src/conversations/antigravity-conversation-replica';
-import { sdkSnapshot } from '../native/codex/sdk-surface-fixture';
+import { sdkSnapshot } from '../native/codex/sdk-host-fixture';
 import type { ClaudeConversationSnapshot } from '../../src/contracts';
 
 const timing = { startedAt: '2026-11-10T01:00:00Z', completedAt: '2026-11-10T01:00:02Z', durationMs: 1875 };

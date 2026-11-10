@@ -54,7 +54,7 @@ it('does not admit an already-aborted scope', async () => {
 });
 
 it('Claude cancels a fresh native query before provider session admission', async () => {
-  const { createHarnessDriver } = await import('../../src');
+  const { createHarnessDriver } = await import('../../src/index');
   const { createQueryHarness } = await import('../native/claude/sdk-query-fixture');
   const harness = createQueryHarness();
   const driver = createHarnessDriver('claude', { client: { name: 'cpa' }, claude: { transportOptions: { createQuery: harness.createQuery } } });
@@ -72,9 +72,9 @@ it('Claude cancels a fresh native query before provider session admission', asyn
 });
 
 it.each(['before-admission', 'active'] as const)('Codex cancels a private native scope at %s without admitting late work', async phase => {
-  const { createHarnessDriver } = await import('../../src');
+  const { createHarnessDriver } = await import('../../src/index');
   const { CodexAppServerClient } = await import('@korus-dev/codex-sdk');
-  const { MockCodexAppServer, resumeResponse, thread, turn, deferred, requestsFor } = await import('../codex/helpers/codex-surface-fixture');
+  const { MockCodexAppServer, resumeResponse, thread, turn, deferred, requestsFor } = await import('../codex/helpers/host-fixture');
   const admission = deferred<ReturnType<typeof resumeResponse>>();
   const transport = new MockCodexAppServer({
     'thread/start': () => phase === 'before-admission' ? admission.promise : resumeResponse(thread('private-thread', false)),
@@ -83,7 +83,7 @@ it.each(['before-admission', 'active'] as const)('Codex cancels a private native
     'turn/start': () => ({ turn: turn('private-turn', 'inProgress', []) }),
     'turn/interrupt': () => { queueMicrotask(() => transport.emitNotification('turn/completed', { threadId: 'private-thread', turn: turn('private-turn', 'interrupted', []) })); return {}; },
   });
-  const driver = createHarnessDriver('codex', { client: { name: 'cpa' }, codex: { surface: { client: new CodexAppServerClient(transport) } } });
+  const driver = createHarnessDriver('codex', { client: { name: 'cpa' }, codex: { host: { client: new CodexAppServerClient(transport) } } });
   const main = driver.open({ id: 'main', folder: '/tmp' });
   const abort = new AbortController();
   try {

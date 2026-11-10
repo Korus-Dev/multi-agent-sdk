@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CodexConversationSnapshot } from '../../../src/index';
 
-import { codexSdkFixture, sdkAgent } from './sdk-surface-fixture';
+import { codexSdkFixture, sdkAgent } from './sdk-host-fixture';
 
 const metadata = { seq: 1, origin: 'notification' as const, occurredAt: '2026-09-16T00:00:00Z', conversationId: 'conversation-a', turnId: 'turn' };
 const goal = { threadId: 'conversation-a', objective: 'finish', status: 'active' as const, tokenBudget: null, tokensUsed: 2, timeUsedSeconds: 3, createdAt: 0, updatedAt: 1 };
@@ -94,11 +94,11 @@ describe('Codex SDK → app-owned projections', () => {
 
 
   it('waits for a terminal plugin catalog and releases its pending subscription', async () => {
-    const { driver, surface, emit } = setup();
-    const snapshot = surface.getSnapshot();
-    surface.getSnapshot.mockReturnValue({ ...snapshot, pluginCatalogStatus: 'loading' });
+    const { driver, host, emit } = setup();
+    const snapshot = host.getSnapshot();
+    host.getSnapshot.mockReturnValue({ ...snapshot, pluginCatalogStatus: 'loading' });
     const pending = driver.listPlugins(sdkAgent());
-    await vi.waitFor(() => expect(surface.onEvent).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(host.onEvent).toHaveBeenCalledTimes(2));
     const plugins = [{ id: 'plugin', name: 'plugin', displayName: 'Plugin', enabled: true }];
     emit({ seq: 1, origin: 'notification', occurredAt: metadata.occurredAt, type: 'catalog.pluginsChanged', payload: { plugins, status: 'loaded' } });
     await expect(pending).resolves.toStrictEqual(plugins);
@@ -121,12 +121,12 @@ describe('Codex SDK → app-owned projections', () => {
 
   it('closes the injected runtime owner once instead of independently closing its shared SDK', async () => {
     const closeRuntime = vi.fn(async () => undefined);
-    const { driver, surface, conversation } = codexSdkFixture(closeRuntime);
+    const { driver, host, conversation } = codexSdkFixture(closeRuntime);
     await driver.loadConversation(sdkAgent());
     await driver.close();
     await driver.close();
     expect(closeRuntime).toHaveBeenCalledOnce();
-    expect(surface.close).not.toHaveBeenCalled();
+    expect(host.close).not.toHaveBeenCalled();
     expect(conversation('conversation-a').listenerCount()).toBe(0);
   });
 });

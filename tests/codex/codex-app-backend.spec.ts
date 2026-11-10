@@ -1,34 +1,33 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CodexSurface } from '../../src/providers/codex/codex-surface';
+import { CodexHost } from '../../src/providers/codex/host';
 import {
   createCodexAppBackend,
-  type CodexAppBackendTtlCacheScheduler,
-  type CodexAppBackendTtlTimer,
 } from '../../src/providers/codex';
+import type { TtlCacheScheduler, TtlCacheTimer } from '../../src/core/ttl-cache';
 
 describe('CodexAppBackend', () => {
-  it('creates app modules over one shared surface and exposes them by namespace', () => {
-    const surface = new CodexSurface();
-    const create = vi.fn(({ surface: moduleSurface }) => ({ surface: moduleSurface, kind: 'teams' }));
+  it('creates app modules over one shared host and exposes them by namespace', () => {
+    const host = new CodexHost();
+    const create = vi.fn(({ host: moduleHost }) => ({ host: moduleHost, kind: 'teams' }));
     const backend = createCodexAppBackend({
-      surface,
+      host,
       modules: [{ id: 'app.teams', create }],
     });
 
-    expect(backend.surface).toBe(surface);
-    expect(backend.module<{ surface: CodexSurface; kind: string }>('app.teams')).toStrictEqual({
-      surface,
+    expect(backend.host).toBe(host);
+    expect(backend.module<{ host: CodexHost; kind: string }>('app.teams')).toStrictEqual({
+      host,
       kind: 'teams',
     });
     expect(create).toHaveBeenCalledOnce();
   });
 
   it('rejects ambiguous configuration and duplicate or missing module IDs', () => {
-    const surface = new CodexSurface();
+    const host = new CodexHost();
     const create = vi.fn(() => null);
-    expect(() => createCodexAppBackend({ surface, surfaceOptions: {} })).toThrow('either surface or surfaceOptions');
+    expect(() => createCodexAppBackend({ host, hostOptions: {} })).toThrow('either host or hostOptions');
     expect(() => createCodexAppBackend({
-      surface,
+      host,
       modules: [
         { id: ' app ', create },
         { id: 'app', create: () => null },
@@ -36,17 +35,17 @@ describe('CodexAppBackend', () => {
     })).toThrow("Duplicate Codex backend module 'app'");
     expect(create).not.toHaveBeenCalled();
     expect(() => createCodexAppBackend({
-      surface,
+      host,
       modules: [{ id: '   ', create }],
     })).toThrow('Codex backend module IDs cannot be empty');
-    expect(() => createCodexAppBackend({ surface }).module('missing')).toThrow("Unknown Codex backend module 'missing'");
+    expect(() => createCodexAppBackend({ host }).module('missing')).toThrow("Unknown Codex backend module 'missing'");
   });
 
   it('normalizes module lookup and exposes working cache and close helpers', async () => {
-    const surface = new CodexSurface();
-    const closeSurface = vi.spyOn(surface, 'close').mockResolvedValue();
+    const host = new CodexHost();
+    const closeHost = vi.spyOn(host, 'close').mockResolvedValue();
     const backend = createCodexAppBackend({
-      surface,
+      host,
       modules: [{
         id: ' app.worker ',
         create: ({ closeBackend, createTtlCache }) => ({ closeBackend, createTtlCache }),
@@ -68,7 +67,7 @@ describe('CodexAppBackend', () => {
     expect(closing).toBe(backend.close());
     await closing;
     expect(closeCache).toHaveBeenCalledOnce();
-    expect(closeSurface).toHaveBeenCalledOnce();
+    expect(closeHost).toHaveBeenCalledOnce();
     expect(() => backend.createTtlCache({
       ttlMs: 100,
       identity: (value: { id: string }) => value.id,
@@ -78,10 +77,10 @@ describe('CodexAppBackend', () => {
   });
 
   it('shares one idempotent close operation with modules', async () => {
-    const surface = new CodexSurface();
-    const close = vi.spyOn(surface, 'close').mockResolvedValue();
+    const host = new CodexHost();
+    const close = vi.spyOn(host, 'close').mockResolvedValue();
     const backend = createCodexAppBackend({
-      surface,
+      host,
       modules: [{ id: 'app', create: ({ closeBackend }) => ({ closeBackend }) }],
     });
     const module = backend.module<{ closeBackend(): Promise<void> }>('app');
@@ -95,7 +94,7 @@ describe('CodexAppBackend', () => {
     let now = 0;
     const canEvict = vi.fn(() => true);
     const onEvict = vi.fn();
-    const backend = createCodexAppBackend({ surface: new CodexSurface() });
+    const backend = createCodexAppBackend({ host: new CodexHost() });
     const cache = backend.createTtlCache({
       ttlMs: 100,
       identity: (value: { id: string }) => value.id,
@@ -126,7 +125,7 @@ describe('CodexAppBackend', () => {
     let now = 1000;
     let safe = false;
     const onEvict = vi.fn(async () => undefined);
-    const backend = createCodexAppBackend({ surface: new CodexSurface() });
+    const backend = createCodexAppBackend({ host: new CodexHost() });
     const cache = backend.createTtlCache({
       ttlMs: 10,
       identity: (value: { id: string }) => value.id,
@@ -146,8 +145,8 @@ describe('CodexAppBackend', () => {
   });
 
   it('uses an injectable unref scheduler and closes its timer cleanly', async () => {
-    const timers: Array<{ callback: () => void; handle: CodexAppBackendTtlTimer }> = [];
-    const scheduler: CodexAppBackendTtlCacheScheduler = {
+    const timers: Array<{ callback: () => void; handle: TtlCacheTimer }> = [];
+    const scheduler: TtlCacheScheduler = {
       set: vi.fn((callback) => {
         const handle = { unref: vi.fn() };
         timers.push({ callback, handle });
@@ -155,7 +154,7 @@ describe('CodexAppBackend', () => {
       }),
       clear: vi.fn(),
     };
-    const backend = createCodexAppBackend({ surface: new CodexSurface() });
+    const backend = createCodexAppBackend({ host: new CodexHost() });
     const cache = backend.createTtlCache({
       ttlMs: 100,
       sweepIntervalMs: 25,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizePromptContent, promptContentText, promptContentDispatchText, trimPromptContent, slicePromptContent, replacePromptContentRange, type CodexPromptPart } from '../../src/core/surface';
+import { normalizePromptContent, promptContentText, promptContentDispatchText, trimPromptContent, slicePromptContent, replacePromptContentRange, type PromptPart } from '../../src/core/codex-host';
 
 const mention = { type: 'mention' as const, kind: 'skill' as const, id: '/skills/cp/SKILL.md', label: 'Commit-Push', value: 'cp' };
 
@@ -11,7 +11,7 @@ describe('authored prompt content', () => {
     ])).toStrictEqual([{ type: 'text', text: 'Run ' }, mention, { type: 'text', text: ' now' }]);
   });
   it('keeps visible labels separate from selected execution targets and literal triggers', () => {
-    const parts: CodexPromptPart[] = [
+    const parts: PromptPart[] = [
       { type: 'text', text: '$cp then ' }, mention,
       { type: 'mention', kind: 'plugin', id: 'gmail@remote', label: 'Gmail', value: 'gmail' },
       { type: 'mention', kind: 'file', id: 'src/file.ts', label: 'file.ts', value: 'src/file.ts' },
@@ -26,7 +26,7 @@ describe('authored prompt content', () => {
   });
 
   it('serializes canonical references with Markdown-safe names and targets', () => {
-    const parts: CodexPromptPart[] = [{ type: 'text', text: '$cp and ' }, {
+    const parts: PromptPart[] = [{ type: 'text', text: '$cp and ' }, {
       ...mention, label: 'Commit and push', value: 'Commit-Push [cp]', id: '/skills/Commit Push (cp)#1/SKILL.md',
     }];
     expect(promptContentText(parts)).toBe('$cp and Commit and push');
@@ -43,7 +43,7 @@ describe('authored prompt content', () => {
   });
 
   it('projects an authored prompt prefix once and preserves host context verbatim', () => {
-    const parts: CodexPromptPart[] = [{ type: 'text', text: '$cp then ' }, mention];
+    const parts: PromptPart[] = [{ type: 'text', text: '$cp then ' }, mention];
     const context = '\n\n<context>Commit-Push and $cp stay untouched here.</context>';
     const expected = '$cp then [$cp](/skills/cp/SKILL.md)' + context;
     expect(promptContentDispatchText(parts, promptContentText(parts) + context)).toBe(expected);
@@ -52,7 +52,7 @@ describe('authored prompt content', () => {
   });
 
   it('slices by visible UTF-16 offsets and makes partial mentions literal', () => {
-    const parts: CodexPromptPart[] = [{ type: 'text', text: '😀 ' }, mention, { type: 'text', text: ' end' }];
+    const parts: PromptPart[] = [{ type: 'text', text: '😀 ' }, mention, { type: 'text', text: ' end' }];
     expect(slicePromptContent(parts, 3, 14)).toStrictEqual([mention]);
     expect(slicePromptContent(parts, 5, 9)).toStrictEqual([{ type: 'text', text: 'mmit' }]);
     expect(slicePromptContent(parts, 14)).toStrictEqual([{ type: 'text', text: ' end' }]);
@@ -64,7 +64,7 @@ describe('authored prompt content', () => {
   });
 
   it('trims surrounding text without rewriting selected labels or mutating drafts', () => {
-    const parts: CodexPromptPart[] = [{ type: 'text', text: ' ' }, { type: 'text', text: '\nRun ' }, mention, { type: 'text', text: '\t' }];
+    const parts: PromptPart[] = [{ type: 'text', text: ' ' }, { type: 'text', text: '\nRun ' }, mention, { type: 'text', text: '\t' }];
     expect(trimPromptContent(parts)).toStrictEqual([{ type: 'text', text: 'Run ' }, mention]);
     expect(parts[0]).toStrictEqual({ type: 'text', text: ' ' });
     expect(trimPromptContent([{ type: 'text', text: ' ' }])).toStrictEqual([]);

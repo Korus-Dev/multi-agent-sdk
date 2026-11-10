@@ -3,27 +3,27 @@ export {
   createCodexConversationReplica,
   type CodexConversationReplica,
 } from './conversation-replica';
-export type * from './surface';
+export type * from './codex-host';
 export {
-  applyCodexSurfaceStateChanges,
-  createCodexSurfaceStateMirror,
-  diffCodexSurfaceState,
-  isCodexSurfaceStatePatchSource,
-  subscribeCodexSurfaceState,
-  type CodexSurfaceStateMirror,
-  type CodexSurfaceStateMirrorResult,
-  type CodexSurfaceStatePatchSource,
-  type CodexSurfaceStateSource,
-  type SubscribeCodexSurfaceStateOptions,
-} from './surface-state';
+  applyCodexHostStateChanges,
+  createCodexHostStateMirror,
+  diffCodexHostState,
+  isCodexHostStatePatchSource,
+  subscribeCodexHostState,
+  type CodexHostStateMirror,
+  type CodexHostStateMirrorResult,
+  type CodexHostStatePatchSource,
+  type CodexHostStateSource,
+  type SubscribeCodexHostStateOptions,
+} from './codex-host-state';
 export {
   codexConversationBridgeOperations,
-  codexSurfaceBridgeArities,
-  codexSurfaceBridgeOperations,
+  codexHostBridgeArities,
+  codexHostBridgeOperations,
   invokeCodexConversationBridgeOperation,
-  invokeCodexSurfaceBridgeOperation,
+  invokeCodexHostBridgeOperation,
   isCodexConversationBridgeOperation,
-  isCodexSurfaceBridgeOperation,
+  isCodexHostBridgeOperation,
   subscribeCodexConversationBridge,
   subscribeCodexConversationReplicaBridge,
   type CodexConversationBridgeHandle,
@@ -32,12 +32,12 @@ export {
   type CodexConversationBridgeOperationArguments,
   type CodexConversationBridgeOperationResult,
   type CodexConversationBridgeTarget,
-  type CodexSurfaceBridgeAttachmentResolver,
-  type CodexSurfaceBridgeInvokeOptions,
-  type CodexSurfaceBridgeOperation,
-  type CodexSurfaceBridgeOperationArguments,
-  type CodexSurfaceBridgeOperationResult,
-  type CodexSurfaceBridgeTarget,
-} from './surface-bridge';
+  type CodexHostBridgeAttachmentResolver,
+  type CodexHostBridgeInvokeOptions,
+  type CodexHostBridgeOperation,
+  type CodexHostBridgeOperationArguments,
+  type CodexHostBridgeOperationResult,
+  type CodexHostBridgeTarget,
+} from './host-bridge';
 
 export { normalizePromptContent, promptContentText, promptContentDispatchText, trimPromptContent, slicePromptContent, replacePromptContentRange } from './prompt-content';

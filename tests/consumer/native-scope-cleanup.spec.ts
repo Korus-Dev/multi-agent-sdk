@@ -3,15 +3,15 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { expect, it, vi } from 'vitest';
 import { adaptHarnessDriver } from '../../src/consumer';
-import { codexSdkFixture, sdkSnapshot } from '../native/codex/sdk-surface-fixture';
-import { ClaudeConversationHost } from '../../src/providers/claude/host';
+import { codexSdkFixture, sdkSnapshot } from '../native/codex/sdk-host-fixture';
+import { ClaudeHost } from '../../src/providers/claude/host';
 import { ClaudeAgentSdkTransport } from '../../src/providers/claude/agent-sdk-transport';
 import { createQueryHarness } from '../native/claude/sdk-query-fixture';
 
 it('repeated Codex scoped execution/disposal removes adapter ownership and subscriptions, retaining main', async () => {
   const fixture = codexSdkFixture();
   let id = 0;
-  fixture.surface.createConversation.mockImplementation(async () => {
+  fixture.host.createConversation.mockImplementation(async () => {
     const nativeId = `scope-${++id}`; const conversation = fixture.conversation(nativeId);
     conversation.handle.sendMessage.mockImplementation(async () => {
       conversation.setSnapshot({ turnIds: ['finished'], turns: [{ id: 'finished', status: 'completed', error: null, willRetry: false, startedAt: null, completedAt: null, durationMs: null }], messages: [{ id: 'answer', role: 'assistant', status: 'complete', turnId: 'finished', parts: [{ type: 'text', text: 'Done' }] }] });
@@ -42,7 +42,7 @@ it('repeated Claude scoped execution/disposal releases host replicas, history an
   const home = await mkdtemp(path.join(tmpdir(), 'scope-cleanup-'));
   const query = createQueryHarness();
   const transport = new ClaudeAgentSdkTransport({ createQuery: query.createQuery, deleteSession: vi.fn().mockResolvedValue(undefined) });
-  const native = new ClaudeConversationHost(transport, undefined, { homeDir: home });
+  const native = new ClaudeHost(transport, undefined, { homeDir: home });
   const execute = vi.spyOn(native, 'executeScopedPrompt');
   const ownership = native as unknown as { liveSessionIdsByAgentId: Map<string, string>; conversationReplicasByAgentId: Map<string, unknown>; historyWindows: Map<string, unknown> };
   const driver = adaptHarnessDriver('claude', native);

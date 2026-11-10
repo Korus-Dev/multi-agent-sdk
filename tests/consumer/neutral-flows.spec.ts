@@ -5,7 +5,7 @@ import { expect, it, vi } from 'vitest';
 import { CodexAppServerClient } from '@korus-dev/codex-sdk';
 import { createHarnessDriver } from '../../src';
 import type { HarnessDriver, HarnessEvent, Session } from '../../src';
-import { MockCodexAppServer, requestsFor, resumeResponse, thread, turn } from '../codex/helpers/codex-surface-fixture';
+import { MockCodexAppServer, requestsFor, resumeResponse, thread, turn } from '../codex/helpers/host-fixture';
 import { createQueryHarness } from '../native/claude/sdk-query-fixture';
 import * as cursorRuntime from '../../src/providers/cursor/runtime';
 import { writeAntigravityRuntimeFixture } from '../native/antigravity/session-fixture';
@@ -19,7 +19,7 @@ it('Codex: CPA consumer observes native messages and completion through neutral 
     'thread/settings/update': () => ({}),
     'turn/start': () => ({ turn: turn('tax-turn', 'completed', [{ type: 'agentMessage', id: 'answer', text: 'Ledger verified.', phase: 'final_answer', memoryCitation: null, delivery: null, questions: null }]) }),
   });
-  const driver = createHarnessDriver('codex', { client: { name: 'cpa' }, codex: { surface: { client: new CodexAppServerClient(transport) } } });
+  const driver = createHarnessDriver('codex', { client: { name: 'cpa' }, codex: { host: { client: new CodexAppServerClient(transport) } } });
   const input = { id: 'tax', folder: '/accounting' }; const original = structuredClone(input);
   const session = driver.open(input); const events: HarnessEvent[] = []; driver.onEvent(e => events.push(e));
   try {
@@ -39,7 +39,7 @@ it('Codex: resuming and loading a native full-access chat never writes a default
     'thread/resume': () => ({ ...resumeResponse(thread('retained-access', false)), approvalPolicy: 'never', sandbox: { type: 'dangerFullAccess' } }),
     'thread/settings/update': () => ({}),
   });
-  const driver = createHarnessDriver('codex', { client: { name: 'cpa' }, codex: { surface: { client: new CodexAppServerClient(transport) } } });
+  const driver = createHarnessDriver('codex', { client: { name: 'cpa' }, codex: { host: { client: new CodexAppServerClient(transport) } } });
   const session = driver.open({ id: 'restored', folder: '/accounting' });
   try {
     const ref = driver.restoreRef({ provider: 'codex', data: { backend: 'codex', threadId: 'retained-access' } });

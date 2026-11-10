@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { codexSdkFixture, sdkAgent, sdkSnapshot } from './sdk-surface-fixture';
+import { codexSdkFixture, sdkAgent, sdkSnapshot } from './sdk-host-fixture';
 
 describe('Codex SDK image bridge', () => {
   const fixtures: ReturnType<typeof codexSdkFixture>[] = [];
@@ -8,11 +8,11 @@ describe('Codex SDK image bridge', () => {
   function setup() {
     const fixture = codexSdkFixture();
     fixtures.push(fixture);
-    fixture.surface.listModels.mockResolvedValue([
+    fixture.host.listModels.mockResolvedValue([
       { id: 'sol', model: 'gpt-6.1-sol', displayName: 'Sol', description: '', supportedReasoningEfforts: [], defaultReasoningEffort: 'low', isDefault: true },
       { id: 'luna', model: 'gpt-6-luna', displayName: 'Luna', description: '', supportedReasoningEfforts: [{ reasoningEffort: 'low', description: '' }], defaultReasoningEffort: 'low', isDefault: false },
     ]);
-    fixture.surface.createConversation.mockResolvedValue(sdkSnapshot('image-job'));
+    fixture.host.createConversation.mockResolvedValue(sdkSnapshot('image-job'));
     const job = fixture.conversation('image-job');
     job.setSnapshot({ turnIds: ['image-turn'], messages: [{ id: 'image-message', role: 'assistant', status: 'complete', turnId: 'image-turn', parts: [
       { type: 'tool', id: 'image', title: 'image_generation', status: 'completed' },
@@ -28,33 +28,33 @@ describe('Codex SDK image bridge', () => {
   }
 
   it('runs Luna through existing conversation operations, returns only generated media and deletes the internal chat', async () => {
-    const { driver, surface, job } = setup();
+    const { driver, host, job } = setup();
     const caller = sdkAgent();
     const before = structuredClone(caller);
     await expect(driver.generateImage(caller, { prompt: 'A transparent blue flower', cwd: '/repo', selection: { model: 'gpt-6-luna' } })).resolves.toStrictEqual({
       images: [{ data: 'aW1hZ2U=', mimeType: 'image/png' }],
     });
-    expect(surface.createConversation).toHaveBeenCalledWith(expect.objectContaining({ model: 'gpt-6-luna', cwd: '/repo', permissionMode: 'read-only' }), { mcpServers: [] });
+    expect(host.createConversation).toHaveBeenCalledWith(expect.objectContaining({ model: 'gpt-6-luna', cwd: '/repo', permissionMode: 'read-only' }), { mcpServers: [] });
     expect(job.handle.sendMessage).toHaveBeenCalledWith('A transparent blue flower');
-    expect(surface.deleteConversation).toHaveBeenCalledWith('image-job');
-    expect(surface.forgetConversation).toHaveBeenCalledWith('image-job');
+    expect(host.deleteConversation).toHaveBeenCalledWith('image-job');
+    expect(host.forgetConversation).toHaveBeenCalledWith('image-job');
     expect(job.listenerCount()).toBe(0);
     expect(caller).toStrictEqual(before);
   });
 
   it('cleans up an unsuccessful image job and never falls back to another model', async () => {
-    const { driver, surface, job } = setup();
+    const { driver, host, job } = setup();
     job.setSnapshot({ messages: [] });
     await expect(driver.generateImage(sdkAgent(), { prompt: 'A flower', cwd: '/repo', selection: { model: 'gpt-6-luna' } })).rejects.toThrow(/image/i);
-    expect(surface.deleteConversation).toHaveBeenCalledWith('image-job');
-    surface.createConversation.mockClear();
-    surface.listModels.mockResolvedValue([]);
+    expect(host.deleteConversation).toHaveBeenCalledWith('image-job');
+    host.createConversation.mockClear();
+    host.listModels.mockResolvedValue([]);
     await expect(driver.generateImage(sdkAgent(), { prompt: 'A flower', cwd: '/repo' })).rejects.toThrow(/model/);
-    expect(surface.createConversation).not.toHaveBeenCalled();
+    expect(host.createConversation).not.toHaveBeenCalled();
   });
 
   it('interrupts and deletes a cancelled internal chat', async () => {
-    const { driver, surface, job } = setup();
+    const { driver, host, job } = setup();
     const controller = new AbortController();
     job.handle.sendMessage.mockImplementation(async () => {
       controller.abort();
@@ -62,12 +62,12 @@ describe('Codex SDK image bridge', () => {
     });
     await expect(driver.generateImage(sdkAgent(), { prompt: 'A flower', cwd: '/repo', selection: { model: 'gpt-6-luna' } }, controller.signal)).rejects.toThrow(/abort|cancel/i);
     expect(job.handle.interrupt).toHaveBeenCalled();
-    expect(surface.deleteConversation).toHaveBeenCalledWith('image-job');
+    expect(host.deleteConversation).toHaveBeenCalledWith('image-job');
     expect(job.listenerCount()).toBe(0);
   });
 
   it('rejects an interactive approval even when completion arrives before the send acknowledgment', async () => {
-    const { driver, job, surface } = setup();
+    const { driver, job, host } = setup();
     job.handle.sendMessage.mockImplementation(async () => {
       job.emit({ type: 'approval.requested', origin: 'notification', seq: 1, occurredAt: '', conversationId: 'image-job',
         payload: { approval: { id: 'approval', itemId: 'command', kind: 'command', conversationId: 'image-job', title: 'Run command', allowedScopes: ['once'] } } });
@@ -76,6 +76,6 @@ describe('Codex SDK image bridge', () => {
       return job.handle.getSnapshot();
     });
     await expect(driver.generateImage(sdkAgent(), { prompt: 'Flower', cwd: '/repo', selection: { model: 'gpt-6-luna' } })).rejects.toThrow(/interactive/);
-    expect(surface.deleteConversation).toHaveBeenCalledWith('image-job');
+    expect(host.deleteConversation).toHaveBeenCalledWith('image-job');
   });
 });

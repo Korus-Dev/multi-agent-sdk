@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { codexSdkFixture, sdkAgent } from './sdk-surface-fixture';
+import { codexSdkFixture, sdkAgent } from './sdk-host-fixture';
 import type { HarnessContext, HarnessDriver, HarnessEvent } from '../../../src/driver';
 
 it('runs a caller-owned CPA scope and restores the normal native MCP configuration', async () => {

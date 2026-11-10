@@ -1,7 +1,7 @@
 import { appendFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { Message, MessagePart } from '../../contracts/index';
-import { normalizePromptContent } from '../../core/surface';
+import { normalizePromptContent } from '../../core/prompt-content';
 
 type Entry = { wireText: string; text: string; parts: MessagePart[]; metadata?: Message['metadata'] };
 

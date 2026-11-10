@@ -6,8 +6,6 @@ import type {
   ReasoningEffort,
 } from './shared';
 
-export type CodexApprovalPreset = ApprovalPreset;
-
 export type CodexApprovalsReviewer = 'user' | 'auto_review' | 'guardian_subagent';
 
 export type BackendSession =
@@ -36,7 +34,7 @@ type ProviderExecutionDefaults = {
 export type BackendDefaults = ProviderExecutionDefaults & { userSelectedModel?: boolean } & (
   | { kind: 'cursor'; permissionMode?: string }
   | { kind: 'antigravity'; permissionMode?: string }
-  | { kind: 'codex'; approvalPreset?: CodexApprovalPreset; approvalPolicy?: string; approvalsReviewer?: CodexApprovalsReviewer; sandboxMode?: string }
+  | { kind: 'codex'; approvalPreset?: ApprovalPreset; approvalPolicy?: string; approvalsReviewer?: CodexApprovalsReviewer; sandboxMode?: string }
   | { kind: 'claude'; permissionMode?: string; thinking?: { type: 'enabled' | 'disabled'; budgetTokens?: number } }
 );
 
@@ -229,3 +227,11 @@ export type BackendConnectionState = {
   status: 'connecting' | 'connected' | 'reconnecting' | 'error';
   detail?: AppText;
 };
+
+
+
+export type HostConnectionStatus = 'idle' | 'connecting' | 'ready' | 'error';
+
+
+
+export type HostEventOrigin = 'action' | 'notification' | 'lifecycle';

@@ -22,7 +22,7 @@ import type {
 } from '../../contracts/index';
 import { codexBackendCapabilities } from '../../capabilities';
 import type { HarnessDriver, HarnessApprovalPresetResult, HarnessConversationForkResult, HarnessConversationResumeResult, HarnessEvent, HarnessGoalResult, HarnessSendResult, HarnessConversationReplacementResult, HarnessTurnActionResult } from '../../driver';
-import type { CodexSurfaceAgentAdapter } from './host';
+import type { CodexHostAdapter } from './host-adapter';
 
 type CodexPromptCommand = { type: 'review'; prompt: string };
 
@@ -30,7 +30,7 @@ export class CodexBackendDriver<Context extends Agent = Agent> implements Harnes
   readonly backend = 'codex' as const;
 
   constructor(
-    protected readonly sessionManager: CodexSurfaceAgentAdapter<Context>,
+    protected readonly sessionManager: CodexHostAdapter<Context>,
   ) {}
 
   getBankedResets() { return this.sessionManager.getBankedResets(); }

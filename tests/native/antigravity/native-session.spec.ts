@@ -1,4 +1,4 @@
-import { promptContentDispatchText } from '../../../src/core/surface';
+import { promptContentDispatchText } from '../../../src/core/codex-host';
 import { appendFile, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';

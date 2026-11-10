@@ -1,6 +1,6 @@
 const product = { name: 'CPA workbench' };
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { codexSdkFixture, sdkAgent, sdkSnapshot, sdkSummary } from './sdk-surface-fixture';
+import { codexSdkFixture, sdkAgent, sdkSnapshot, sdkSummary } from './sdk-host-fixture';
 
 const metadata = { seq: 1, origin: 'notification' as const, occurredAt: '2026-09-16T00:00:00Z', conversationId: 'conversation-a', turnId: 'turn' };
 const completion = { status: 'completed' as const, error: null, willRetry: false, startedAt: null, completedAt: null, durationMs: null };
@@ -45,14 +45,14 @@ describe(`Codex SDK → ${product.name} session policy`, () => {
   });
 
   it('lists other active conversations with an explicit workspace filter', async () => {
-    const { driver, surface } = setup();
-    surface.listConversations.mockResolvedValueOnce([sdkSummary('conversation-a'), sdkSummary('another-live')])
+    const { driver, host } = setup();
+    host.listConversations.mockResolvedValueOnce([sdkSummary('conversation-a'), sdkSummary('another-live')])
       .mockResolvedValueOnce([sdkSummary('old', { updatedAt: '2026-09-01T00:00:00Z' }), sdkSummary('recent')]);
     const result = await driver.listConversations(sdkAgent(), { limit: 10, cwd: '/repo', searchTerm: ' query ' });
     expect(result.map(({ id, storageState }) => ({ id, storageState }))).toStrictEqual([
       { id: 'conversation-a', storageState: 'active' }, { id: 'another-live', storageState: 'active' },
     ]);
-    expect(surface.listConversations.mock.calls).toStrictEqual([
+    expect(host.listConversations.mock.calls).toStrictEqual([
       [{ cwd: '/repo', limit: 10, searchTerm: 'query' }],
     ]);
   });
@@ -104,7 +104,7 @@ describe(`Codex SDK → ${product.name} session policy`, () => {
   });
 
   it.each([false, true])('rolls over via a bounded handoff and archives only after replacement acceptance (failure=%s)', async (fail) => {
-    const { driver, surface, conversation, events } = setup();
+    const { driver, host, conversation, events } = setup();
     const session = conversation('conversation-a');
     const agent = { ...sdkAgent(), backendDefaults: { kind: 'codex' as const, model: 'original', reasoningEffort: 'high', serviceTier: 'fast' } };
     await driver.loadConversation(agent);
@@ -114,14 +114,14 @@ describe(`Codex SDK → ${product.name} session policy`, () => {
       session.emit({ ...metadata, turnId: 'handoff', type: 'turn.completed', payload: completion });
       return session.handle.getSnapshot();
     });
-    surface.createConversation.mockResolvedValue(sdkSnapshot('replacement'));
+    host.createConversation.mockResolvedValue(sdkSnapshot('replacement'));
     const order: string[] = [];
     conversation('replacement').handle.sendMessage.mockImplementationOnce(async () => {
       order.push('replacement-acceptance');
       if (fail) throw new Error('replacement rejected');
       return sdkSnapshot('replacement');
     });
-    surface.archiveConversation.mockImplementation(async (id) => { order.push(`archive:${id}`); return sdkSnapshot(id); });
+    host.archiveConversation.mockImplementation(async (id) => { order.push(`archive:${id}`); return sdkSnapshot(id); });
     if (fail) {
       await expect(driver.replaceConversationWithSummary(agent)).rejects.toThrow('replacement rejected');
       expect(order).toStrictEqual(['replacement-acceptance', 'archive:replacement']);
@@ -132,7 +132,7 @@ describe(`Codex SDK → ${product.name} session policy`, () => {
       expect(session.listenerCount()).toBe(0);
     }
     expect(session.handle.sendMessage).toHaveBeenCalledWith(expect.any(String), { model: 'gpt-5.6-luna', reasoningEffort: 'low' });
-    expect(surface.createConversation).toHaveBeenCalledWith({ cwd: '/repo', threadSource: 'user', model: 'original', reasoningEffort: 'high', serviceTier: 'fast' }, { extensionContext: agent });
+    expect(host.createConversation).toHaveBeenCalledWith({ cwd: '/repo', threadSource: 'user', model: 'original', reasoningEffort: 'high', serviceTier: 'fast' }, { extensionContext: agent });
     expect(conversation('replacement').handle.sendMessage).toHaveBeenCalledWith(expect.stringContaining('Carry this context forward.'));
     expect(events.filter((event) => event.type === 'codex.conversationEventReceived')).toStrictEqual([]);
     expect(agent.backendDefaults.model).toBe('original');

@@ -5,7 +5,7 @@ import { createCodexConversationReplica } from './core/conversation-replica';
 import { createClaudeConversationReplica } from './conversations/claude-conversation-replica';
 import { createCursorConversationReplica } from './conversations/cursor-conversation-replica';
 import { createAntigravityConversationReplica } from './conversations/antigravity-conversation-replica';
-import { surfaceMessages } from './providers/codex/host';
+import { conversationMessages } from './providers/codex/host-adapter';
 
 /** Only dispatches to native replicas. Transcript semantics stay provider-owned. */
 export function createConsumerProjection() {
@@ -34,7 +34,7 @@ export function createConsumerProjection() {
     revision = nextRevision;
     if (event.backend === 'codex' && codex) {
       const s = codex.getSnapshot();
-      return { messages: surfaceMessages(s.messages, event.agentId!), busy: s.busy, activeTurnId: s.activeTurnId, turns: s.turns satisfies Turn[], answeredClientRequestIds: s.answeredClientRequestIds, historyLoading: s.historyLoading, historyState: s.historyState,
+      return { messages: conversationMessages(s.messages, event.agentId!), busy: s.busy, activeTurnId: s.activeTurnId, turns: s.turns satisfies Turn[], answeredClientRequestIds: s.answeredClientRequestIds, historyLoading: s.historyLoading, historyState: s.historyState,
         requests: [...s.approvals.map(approvalAgentRequest), ...s.clientRequests.map(request => requestFromClientRequest(request, { conversationId: s.activeConversationId, turnId: request.turnId ?? undefined }))],
         selection: { model: s.models.find(model => model.id === s.selectedModelId)?.model ?? s.selectedModelId,
           reasoningEffort: s.selectedReasoningEffort, serviceTier: s.selectedServiceTier },

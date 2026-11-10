@@ -1,8 +1,8 @@
 import { BANKED_RESET_DETAIL_LIMIT, isBankedResets, type BankedResets } from '../../contracts/banked-resets';
-import type { CodexSurfaceRateLimits } from '../../core/surface';
+import type { CodexRateLimits } from '../../core/codex-host';
 
 /** Keep IDs/provider metadata out of the app DTO; validate exact counts and timestamps. */
-export function bankedResetsFromSurface(limits: CodexSurfaceRateLimits, redemptionToken?: (id: string) => string): BankedResets {
+export function bankedResetsFromHost(limits: CodexRateLimits, redemptionToken?: (id: string) => string): BankedResets {
   const summary = limits.rateLimitResetCredits;
   const result: BankedResets = { status: 'ready', accountCredits: limits.rateLimits.credits ? {
     hasCredits: limits.rateLimits.credits.hasCredits, unlimited: limits.rateLimits.credits.unlimited,

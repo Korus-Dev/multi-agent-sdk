@@ -4,7 +4,7 @@ import type { HarnessContext } from '../../src/context';
 import type { HarnessDriver, HarnessEvent } from '../../src/driver';
 import { emptyAntigravitySnapshot } from '../../src/conversations/antigravity-conversation-replica';
 import { emptyCursorSnapshot } from '../../src/conversations/cursor-conversation-replica';
-import { sdkSnapshot } from '../native/codex/sdk-surface-fixture';
+import { sdkSnapshot } from '../native/codex/sdk-host-fixture';
 import { approvalAgentRequest, requestFromClientRequest } from '../../src/conversations/agent-request';
 
 function fixture(provider: 'cursor' | 'antigravity' | 'codex' | 'claude' = 'cursor') {

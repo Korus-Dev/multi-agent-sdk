@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { homedir } from 'node:os';
-import { ClaudeConversationHost as ClaudeBackendDriver } from '../../../src/providers/claude/host';
+import { ClaudeHost as ClaudeBackendDriver } from '../../../src/providers/claude/host';
 import type { ClaudeSdkMessage } from '../../../src/providers/claude/protocol';
 import type { ClaudeTurnHandle, ClaudeTurnParams, ClaudeTurnTransport } from '../../../src/providers/claude/transport';
 import type { Agent } from '../../../src/contracts/index';

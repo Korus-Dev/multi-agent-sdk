@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { createHarnessDriver } from '../../src';
 import type { HarnessMcpEndpoint } from '../../src';
-import { codexSdkFixture, sdkAgent } from './codex/sdk-surface-fixture';
+import { codexSdkFixture, sdkAgent } from './codex/sdk-host-fixture';
 
 for (const provider of ['codex', 'claude', 'cursor', 'antigravity'] as const) it(`${provider} rejects unknown scoped trust policy before native execution`, async () => {
   const driver = createHarnessDriver(provider, { client: { name: 'cpa' } });
@@ -26,11 +26,11 @@ for (const provider of ['cursor', 'antigravity'] as const) it(`${provider} rejec
   } finally { await driver.close(); }
 });
 it.each(['inherit', 'auto'] as const)('Codex utility preserves explicit %s policy and optional requiredness', async approval => {
-  const { adapter, surface, driver } = codexSdkFixture();
-  surface.generateText.mockResolvedValue({ text: 'Done' });
+  const { adapter, host, driver } = codexSdkFixture();
+  host.generateText.mockResolvedValue({ text: 'Done' });
   try {
     await adapter.generateText(sdkAgent(), { cwd: '/tmp', prompt: 'Read', mcpServers: [{ name: 'ledger', url: 'http://127.0.0.1:1234', enabledTools: ['read'], approval }] });
-    const server = surface.generateText.mock.calls[0]![1]!.mcpServers![0]!;
+    const server = host.generateText.mock.calls[0]![1]!.mcpServers![0]!;
     expect(server).toMatchObject({ name: 'ledger', enabledTools: ['read'] });
     expect(server.toolApprovalMode).toBe(approval === 'auto' ? 'auto' : undefined);
     expect(server.required).toBeUndefined();

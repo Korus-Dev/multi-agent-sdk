@@ -1,5 +1,5 @@
-import type { CodexConversation, CodexSurface } from './index';
-import type { CodexSurfaceTurnStatus } from '../../core/surface';
+import type { CodexConversation, CodexHost } from './index';
+import type { TurnStatus } from '../../core/codex-host';
 import type { HarnessImageGenerationInput, HarnessImageGenerationResult } from '../../generation';
 import { fileURLToPath } from 'node:url';
 export type CodexImageGenerationOptions = {
@@ -10,7 +10,7 @@ export type CodexImageGenerationOptions = {
 /** Isolated native image generation; the caller chooses its model policy. */
 export class CodexImageGeneration {
   private readonly jobs = new Set<AbortController>();
-  constructor(private readonly surface: CodexSurface, private readonly options: CodexImageGenerationOptions = {}) {}
+  constructor(private readonly host: CodexHost, private readonly options: CodexImageGenerationOptions = {}) {}
 
   close(): void { for (const job of this.jobs) job.abort(new Error('Codex image generation was cancelled.')); }
 
@@ -24,12 +24,12 @@ export class CodexImageGeneration {
     let abort = () => {};
     try {
       signal.throwIfAborted();
-      await this.surface.connect();
-      const models = await this.surface.listModels({ includeHidden: false, forceReload: true });
+      await this.host.connect();
+      const models = await this.host.listModels({ includeHidden: false, forceReload: true });
       const selection = input.selection?.model ? input.selection : this.options.selectModel?.(models);
       if (!selection?.model) throw new Error('Select an image-generation model.');
       signal.throwIfAborted();
-      const created = await this.surface.createConversation({
+      const created = await this.host.createConversation({
         cwd: input.cwd, model: selection.model,
         ...(selection.reasoningEffort ? { reasoningEffort: selection.reasoningEffort } : {}),
         permissionMode: 'read-only', approvalMode: 'never',
@@ -38,13 +38,13 @@ export class CodexImageGeneration {
         threadSource: 'image_generation_bridge',
       }, { mcpServers: [] });
       if (!created.activeConversationId) throw new Error('Codex did not create the internal image conversation.');
-      conversation = this.surface.conversation(created.activeConversationId);
+      conversation = this.host.conversation(created.activeConversationId);
       signal.throwIfAborted();
-      const statuses = new Map<string, CodexSurfaceTurnStatus>();
+      const statuses = new Map<string, TurnStatus>();
       let target: string | undefined;
-      let resolve!: (status: CodexSurfaceTurnStatus) => void;
+      let resolve!: (status: TurnStatus) => void;
       let reject!: (error: unknown) => void;
-      const completion = new Promise<CodexSurfaceTurnStatus>((done, failed) => { resolve = done; reject = failed; });
+      const completion = new Promise<TurnStatus>((done, failed) => { resolve = done; reject = failed; });
       // Provider notifications can arrive before sendMessage resolves.
       void completion.catch(() => {});
       abort = () => reject(signal.reason);
@@ -84,10 +84,10 @@ export class CodexImageGeneration {
       this.jobs.delete(job);
       if (conversation) {
         if (!finished) await conversation.interrupt().catch(() => {});
-        await this.surface.deleteConversation(conversation.id).catch(error => {
+        await this.host.deleteConversation(conversation.id).catch(error => {
           this.options.log?.('conversation cleanup failed', { conversationId: conversation!.id, message: String(error) });
         });
-        this.surface.forgetConversation(conversation.id);
+        this.host.forgetConversation(conversation.id);
       }
     }
   }

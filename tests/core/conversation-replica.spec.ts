@@ -5,9 +5,9 @@ import {
 import type {
   CodexConversationEvent,
   CodexConversationSnapshot,
-  CodexSurfaceEventOrigin,
-  SurfaceMessage,
-} from '../../src/core/surface';
+  HostEventOrigin,
+  ConversationMessage,
+} from '../../src/core/codex-host';
 import { describe, expect, it } from 'vitest';
 
 describe('Codex conversation replica', () => {
@@ -505,7 +505,7 @@ describe('Codex conversation replica', () => {
   });
 
   it('writes resolved client-request results back to their tool parts', () => {
-    const toolMessage: SurfaceMessage = {
+    const toolMessage: ConversationMessage = {
       id: 'tool-message', role: 'assistant', status: 'streaming',
       parts: [{ type: 'tool', id: 'question-1', title: 'Question', status: 'running' }],
       metadata: { turnId: 'turn-1' },
@@ -554,7 +554,7 @@ function event<Type extends CodexConversationEvent['type']>(
   return {
     seq: nextSequence++,
     occurredAt: '2026-09-06T20:00:00.000Z',
-    origin: 'notification' as CodexSurfaceEventOrigin,
+    origin: 'notification' as HostEventOrigin,
     type,
     conversationId: 'conversation-1',
     ...(turnId ? { turnId } : {}),
@@ -621,7 +621,7 @@ function turn(id: string) {
   };
 }
 
-function userMessage(id: string, text: string, turnId: string): SurfaceMessage {
+function userMessage(id: string, text: string, turnId: string): ConversationMessage {
   return {
     id, role: 'user', status: 'complete', turnId,
     parts: [{ type: 'text', text }],
@@ -629,7 +629,7 @@ function userMessage(id: string, text: string, turnId: string): SurfaceMessage {
   };
 }
 
-function assistantMessage(id: string, text: string, turnId: string): SurfaceMessage {
+function assistantMessage(id: string, text: string, turnId: string): ConversationMessage {
   return {
     id, role: 'assistant', status: 'streaming', turnId,
     parts: [{ type: 'text', text, itemId: 'agent-1' }],

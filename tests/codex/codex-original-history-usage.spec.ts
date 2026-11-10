@@ -3,8 +3,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { expect, it, vi } from 'vitest';
 import { CodexAppServerClient } from '@korus-dev/codex-sdk';
-import { CodexSurface, CodexOriginalHistoryUsage } from '../../src/providers/codex';
-import { MockCodexAppServer, resumeResponse, thread, turn } from './helpers/codex-surface-fixture';
+import { CodexHost, CodexOriginalHistoryUsage } from '../../src/providers/codex';
+import { MockCodexAppServer, resumeResponse, thread, turn } from './helpers/host-fixture';
 
 const counts = (input: number, output: number) => ({ input_tokens: input, cached_input_tokens: 20,
   cache_write_input_tokens: 0, output_tokens: output, reasoning_output_tokens: 0, total_tokens: input + output });
@@ -24,21 +24,21 @@ it('recovers the first execution after resume, includes compaction charges and r
     'turn/start': () => ({ turn: turn(++started === 1 ? 'turn-live' : 'turn-second', 'inProgress', []) }),
     'thread/resume': () => resumeResponse(thread('thread-existing', false)),
   });
-  const surface = new CodexSurface({ client: new CodexAppServerClient(transport), originalHistoryUsage: true });
+  const host = new CodexHost({ client: new CodexAppServerClient(transport), originalHistoryUsage: true });
   const recovered: Array<number | null | undefined> = [];
-  surface.onEvent(event => {
+  host.onEvent(event => {
     if (event.type === 'conversation.executionUsageChanged' && event.origin === 'action') recovered.push(event.payload.usage.execution?.totalTokens);
   });
   try {
-    await surface.connect();
-    await surface.selectConversation('thread-existing');
-    await surface.sendMessage('Synthetic prompt');
+    await host.connect();
+    await host.selectConversation('thread-existing');
+    await host.sendMessage('Synthetic prompt');
     await appendFile(file, record().replaceAll('"cache_write_input_tokens":0,', ''));
     const usage = (total = packet(100, 60)) => transport.emitNotification('thread/tokenUsage/updated', {
       threadId: 'thread-existing', turnId: 'turn-live', tokenUsage: { total, last: packet(20, 5), modelContextWindow: 2000 },
     });
     usage();
-    await vi.waitFor(() => expect(surface.getSnapshot().turns.find(t => t.id === 'turn-live')?.executionUsage?.execution?.totalTokens).toBe(60));
+    await vi.waitFor(() => expect(host.getSnapshot().turns.find(t => t.id === 'turn-live')?.executionUsage?.execution?.totalTokens).toBe(60));
     recovered.length = 0;
     usage(packet(115, 65));
     await vi.waitFor(() => expect(recovered.length).toBeGreaterThan(0));
@@ -47,9 +47,9 @@ it('recovers the first execution after resume, includes compaction charges and r
     await appendFile(file, record(counts(60, 25), counts(130, 70)));
     usage(packet(115, 65));
     transport.emitNotification('turn/completed', { threadId: 'thread-existing', turn: turn('turn-live', 'completed', []) });
-    await vi.waitFor(() => expect(surface.getSnapshot().turns.find(t => t.id === 'turn-live')?.executionUsage?.execution?.totalTokens).toBe(85));
+    await vi.waitFor(() => expect(host.getSnapshot().turns.find(t => t.id === 'turn-live')?.executionUsage?.execution?.totalTokens).toBe(85));
     usage(packet(115, 65));
-    await vi.waitFor(() => expect(surface.getSnapshot().turns.find(t => t.id === 'turn-live')?.executionUsage?.execution?.totalTokens).toBe(85));
+    await vi.waitFor(() => expect(host.getSnapshot().turns.find(t => t.id === 'turn-live')?.executionUsage?.execution?.totalTokens).toBe(85));
     // Legacy live packets can omit cache writes too; never fill that unknown
     // counter from a previous known zero when extending native evidence.
     const legacy = { ...packet(130, 70) } as Partial<ReturnType<typeof packet>>;
@@ -59,16 +59,16 @@ it('recovers the first execution after resume, includes compaction charges and r
       threadId: 'thread-existing', turnId: 'turn-live', tokenUsage: { total: legacy, last: legacy, modelContextWindow: 2000 },
     } });
     await vi.waitFor(() => expect(recovered.length).toBeGreaterThan(0));
-    expect(surface.getSnapshot().turns.find(t => t.id === 'turn-live')?.executionUsage?.execution?.cacheWriteInputTokens).toBeNull();
+    expect(host.getSnapshot().turns.find(t => t.id === 'turn-live')?.executionUsage?.execution?.cacheWriteInputTokens).toBeNull();
     // A replay after reload is not a new observed execution. The next terminal
     // turn can still recover when its live usage packet was never delivered.
-    await surface.selectConversation('thread-existing');
+    await host.selectConversation('thread-existing');
     usage(packet(130, 70));
-    await surface.sendMessage('Synthetic second prompt');
+    await host.sendMessage('Synthetic second prompt');
     await appendFile(file, record(counts(60, 25), counts(190, 95)).replaceAll('turn-live', 'turn-second'));
     transport.emitNotification('turn/completed', { threadId: 'thread-existing', turn: turn('turn-second', 'completed', []) });
-    await vi.waitFor(() => expect(surface.getSnapshot().turns.find(t => t.id === 'turn-second')?.executionUsage?.execution?.totalTokens).toBe(85));
-  } finally { await surface.close(); await rm(dir, { recursive: true, force: true }); }
+    await vi.waitFor(() => expect(host.getSnapshot().turns.find(t => t.id === 'turn-second')?.executionUsage?.execution?.totalTokens).toBe(85));
+  } finally { await host.close(); await rm(dir, { recursive: true, force: true }); }
 });
 
 it('validates file ownership and numeric evidence, handles partial appends and invalidates replaced files', async () => {
@@ -139,18 +139,18 @@ it('retains public usage when optional native history is unavailable, without in
     'thread/resume': () => resumeResponse(thread('thread-existing', false)),
     'turn/start': () => ({ turn: turn('turn-live', 'inProgress', []) }),
   });
-  const surface = new CodexSurface({ client: new CodexAppServerClient(transport), originalHistoryUsage: true, onListenerError: failures });
+  const host = new CodexHost({ client: new CodexAppServerClient(transport), originalHistoryUsage: true, onListenerError: failures });
   const usage = (turnId: string, input: number, output: number) => transport.emitNotification('thread/tokenUsage/updated', {
     threadId: 'thread-existing', turnId, tokenUsage: { total: packet(input, output), last: packet(20, 5), modelContextWindow: 2000 },
   });
   try {
-    await surface.connect(); await surface.selectConversation('thread-existing');
+    await host.connect(); await host.selectConversation('thread-existing');
     usage('turn-history', 60, 40);
-    await surface.sendMessage('Synthetic prompt');
+    await host.sendMessage('Synthetic prompt');
     usage('turn-live', 100, 60);
     transport.emitNotification('turn/completed', { threadId: 'thread-existing', turn: turn('turn-live', 'completed', []) });
     await vi.waitFor(() => expect(historyRead).toHaveBeenCalled());
-    expect(surface.getSnapshot().turns.find(t => t.id === 'turn-live')).toMatchObject({ status: 'completed', executionUsage: { execution: { totalTokens: 60 } } });
+    expect(host.getSnapshot().turns.find(t => t.id === 'turn-live')).toMatchObject({ status: 'completed', executionUsage: { execution: { totalTokens: 60 } } });
     expect(failures).not.toHaveBeenCalled();
-  } finally { await surface.close(); }
+  } finally { await host.close(); }
 });

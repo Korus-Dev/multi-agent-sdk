@@ -4,12 +4,12 @@
 
 | Import | Contract |
 | --- | --- |
-| `@korus-dev/multi-agent-sdk` | Neutral factory and `TypedEventBus`; consumer/UI/native surface types, generation types, diagnostic types, and distinct `NativeHarnessEvent` / `NativeHarnessDriver` / `NativeHarnessContext` types. |
+| `@korus-dev/multi-agent-sdk` | Neutral factory, `TypedEventBus` and `TtlCache`; consumer/UI/native host types, generation types, diagnostic types, and distinct `NativeHarnessEvent` / `NativeHarnessDriver` / `NativeHarnessContext` types. |
 | `/prompt` | Pure prompt authoring helpers for browser consumers. |
 | `/renderer` | Browser-safe capability constants, work-phase helpers, Codex conversation replica, and provider presentation projections. |
-| `/surface-bridge` | Codex bridge operations and snapshot subscription helpers. |
+| `/host-bridge` | Codex bridge operations and snapshot subscription helpers. |
 | `/native` | `createNativeHarnessDriver`, Claude/Cursor/Antigravity hosts and native helpers, `sessionMcpServer`, and provider-native integration contracts. |
-| `/codex` | Native Codex surface/backend and runtime compatibility. |
+| `/codex` | Native Codex host/backend and runtime compatibility. |
 
 Paths in this table are appended to `@korus-dev/multi-agent-sdk`. An explicit exports map resolves the root and extensionless subpaths directly into the published build. `main` and `types` remain root fallbacks. Use root `import type` declarations for public types. Import optional values from the named modules to preserve browser/Node separation. Package metadata is available through `/package.json`.
 
@@ -27,11 +27,31 @@ the four `project*Conversation` helpers, capability constants and
 Its `CodexConversationReplica`, `ConversationPresentation` and `WorkPhasePart`
 types are also available there. This entry loads no native hosts or Node modules.
 
-Node integrations use `/native` for `ClaudeConversationHost`,
+Node integrations use `/native` for `ClaudeHost`,
 `ClaudeAgentSdkTransport`, `CursorHost`, `AntigravityHost`, `AcpRuntime`, `AcpSession`,
 `installAcpRuntime` and `sessionMcpServer`. Claude skills, transcript, launch and
 local authentication helpers are exported there with their option types.
 The ACP wire helpers `AcpConnection`, `AcpError` and `record` are available there too.
+
+## Provider hosts and shared contracts
+
+| Provider | Native host | Import |
+| --- | --- | --- |
+| Codex | `CodexHost` / `createCodexHost` | `/codex` |
+| Claude | `ClaudeHost` | `/native` |
+| Cursor | `CursorHost` | `/native` |
+| Antigravity | `AntigravityHost` | `/native` |
+
+The common application API is `HarnessDriver`, created by `createHarnessDriver`.
+Shared presentation contracts include `ConversationMessage`, `ConversationMessagePart`,
+`Approval`, `ClientAttachment`, `Turn`, `PromptPart` and `ModelDescriptor`.
+`Message` remains the agent-bound SDK message type; `ConversationMessage` describes
+the presentation transcript. Provider-specific snapshots, authentication and native
+operations retain their provider names.
+
+`TtlCache` and its `TtlCacheOptions`, `TtlCacheRecord`, `TtlCacheScheduler`,
+`TtlCacheTimer` and `TtlCacheEvictionContext` types are available from the root.
+The caller supplies cache identity, eviction policy and cleanup callbacks.
 
 ## Factory
 

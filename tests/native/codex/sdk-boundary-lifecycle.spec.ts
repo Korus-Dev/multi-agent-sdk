@@ -1,6 +1,6 @@
 const product = { name: 'CPA workbench' };
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { codexSdkFixture, sdkAgent, sdkSnapshot } from './sdk-surface-fixture';
+import { codexSdkFixture, sdkAgent, sdkSnapshot } from './sdk-host-fixture';
 
 describe(`Codex SDK → ${product.name} backend lifecycle`, () => {
   const fixtures: ReturnType<typeof codexSdkFixture>[] = [];
@@ -37,9 +37,9 @@ describe(`Codex SDK → ${product.name} backend lifecycle`, () => {
     await fixture.driver.loadConversation(agent);
     expect(session.handle.updateSettings).not.toHaveBeenCalled();
     expect(fixture.events.filter(event => event.type === 'conversation.settingsUpdated').at(-1)).toMatchObject({ payload: { settings: { model: 'native-model', reasoningEffort: 'low', approvalPreset: 'ask-for-approval' } } });
-    fixture.surface.createConversation.mockResolvedValue(sdkSnapshot('new'));
+    fixture.host.createConversation.mockResolvedValue(sdkSnapshot('new'));
     await fixture.driver.sendPrompt({ ...agent, id: 'new-agent', backendSession: undefined }, 'New conversation');
-    expect(fixture.surface.createConversation).toHaveBeenCalledWith(expect.objectContaining({ model: 'saved-model', reasoningEffort: 'high', serviceTier: 'fast' }), expect.anything());
+    expect(fixture.host.createConversation).toHaveBeenCalledWith(expect.objectContaining({ model: 'saved-model', reasoningEffort: 'high', serviceTier: 'fast' }), expect.anything());
   });
 
   it('returns the public canonical user-message binding for a shared submission', async () => {
@@ -53,13 +53,13 @@ describe(`Codex SDK → ${product.name} backend lifecycle`, () => {
   });
 
   it('creates a user conversation in the assigned folder and sends prepared options to that handle', async () => {
-    const { driver, surface, conversation } = setup();
+    const { driver, host, conversation } = setup();
     const agent = { ...sdkAgent(), backendSession: undefined };
-    surface.createConversation.mockResolvedValue(sdkSnapshot());
+    host.createConversation.mockResolvedValue(sdkSnapshot());
     conversation('conversation-a').handle.sendMessage.mockResolvedValue(sdkSnapshot('conversation-a', { turnIds: ['accepted'], activeTurnId: 'accepted' }));
     const options = driver.preparePromptOptions(agent, { planMode: true, selection: { model: 'model', reasoningEffort: 'high', serviceTier: 'fast' } });
     await expect(driver.sendPrompt(agent, 'Implement', options)).resolves.toStrictEqual({ backendSession: { kind: 'codex', threadId: 'conversation-a' }, turnId: 'accepted' });
-    expect(surface.createConversation).toHaveBeenCalledWith({ cwd: '/repo', threadSource: 'user' }, { extensionContext: agent });
+    expect(host.createConversation).toHaveBeenCalledWith({ cwd: '/repo', threadSource: 'user' }, { extensionContext: agent });
     expect(conversation('conversation-a').handle.updateSettings).toHaveBeenCalledWith({ planMode: true });
     expect(conversation('conversation-a').handle.sendMessage).toHaveBeenCalledWith('Implement', { model: 'model', reasoningEffort: 'high', serviceTier: 'fast', planMode: true });
     expect(conversation('conversation-a').handle.rename).toHaveBeenCalledWith('agent-a');
@@ -78,12 +78,12 @@ describe(`Codex SDK → ${product.name} backend lifecycle`, () => {
   });
 
   it('shares a fresh agent conversation between overlapping title synchronization and its first prompt', async () => {
-    const { driver, surface, conversation } = setup();
+    const { driver, host, conversation } = setup();
     const agent = { ...sdkAgent(), backendSession: undefined };
     let finishCreation!: () => void;
     const creation = new Promise<void>((resolve) => { finishCreation = resolve; });
     let created = 0;
-    surface.createConversation.mockImplementation(async () => {
+    host.createConversation.mockImplementation(async () => {
       const id = `created-${++created}`;
       await creation;
       return sdkSnapshot(id);
@@ -92,40 +92,40 @@ describe(`Codex SDK → ${product.name} backend lifecycle`, () => {
 
     const title = driver.setConversationTitle(agent, 'Issue 61');
     const prompt = driver.sendPrompt(agent, 'My custom instructions');
-    await vi.waitFor(() => expect(surface.createConversation).toHaveBeenCalled());
+    await vi.waitFor(() => expect(host.createConversation).toHaveBeenCalled());
     finishCreation();
     await title;
     await expect(prompt).resolves.toStrictEqual({ backendSession: { kind: 'codex', threadId: 'created-1' }, turnId: 'accepted' });
-    expect(surface.createConversation).toHaveBeenCalledOnce();
-    expect(surface.forgetConversation).not.toHaveBeenCalled();
+    expect(host.createConversation).toHaveBeenCalledOnce();
+    expect(host.forgetConversation).not.toHaveBeenCalled();
     expect(conversation('created-1').handle.rename).toHaveBeenCalledWith('Issue 61');
     expect(conversation('created-1').handle.sendMessage).toHaveBeenCalledWith('My custom instructions', {});
   });
 
   it('allows another agent to start while creation is pending and retries a failed initialization', async () => {
-    const { driver, surface, conversation } = setup();
+    const { driver, host, conversation } = setup();
     const firstAgent = { ...sdkAgent(), backendSession: undefined };
     const secondAgent = { ...sdkAgent('agent-b'), backendSession: undefined };
     let rejectCreation!: (error: Error) => void;
-    surface.createConversation.mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectCreation = reject; }));
-    surface.createConversation.mockResolvedValue(sdkSnapshot('independent'));
+    host.createConversation.mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectCreation = reject; }));
+    host.createConversation.mockResolvedValue(sdkSnapshot('independent'));
     const first = expect(driver.sendPrompt(firstAgent, 'first')).rejects.toThrow('creation failed');
-    await vi.waitFor(() => expect(surface.createConversation).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(host.createConversation).toHaveBeenCalledOnce());
     await expect(driver.sendPrompt(secondAgent, 'independent')).resolves.toMatchObject({ backendSession: { threadId: 'independent' } });
     rejectCreation(new Error('creation failed'));
     await first;
-    surface.createConversation.mockResolvedValue(sdkSnapshot('retry'));
+    host.createConversation.mockResolvedValue(sdkSnapshot('retry'));
     await expect(driver.sendPrompt(firstAgent, 'retry')).resolves.toMatchObject({ backendSession: { threadId: 'retry' } });
     expect(conversation('retry').handle.sendMessage).toHaveBeenCalledWith('retry', {});
-    expect(surface.forgetConversation).not.toHaveBeenCalledWith('independent');
+    expect(host.forgetConversation).not.toHaveBeenCalledWith('independent');
   });
 
   it.each(['release', 'close'] as const)('does not start the first prompt after %s during conversation creation', async (action) => {
-    const { driver, surface, conversation } = setup();
+    const { driver, host, conversation } = setup();
     let finishCreation!: () => void;
-    surface.createConversation.mockImplementation(() => new Promise((resolve) => { finishCreation = () => resolve(sdkSnapshot()); }));
+    host.createConversation.mockImplementation(() => new Promise((resolve) => { finishCreation = () => resolve(sdkSnapshot()); }));
     const prompt = expect(driver.sendPrompt({ ...sdkAgent(), backendSession: undefined }, 'cancelled')).rejects.toThrow(/initialization.*cancelled/i);
-    await vi.waitFor(() => expect(surface.createConversation).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(host.createConversation).toHaveBeenCalledOnce());
     if (action === 'close') await driver.close();
     else driver.releaseConversation('agent-a');
     finishCreation();
@@ -135,20 +135,20 @@ describe(`Codex SDK → ${product.name} backend lifecycle`, () => {
   });
 
   it('restores an archived target without archiving the previous conversation', async () => {
-    const { driver, surface, conversation } = setup();
+    const { driver, host, conversation } = setup();
     const order: string[] = [];
-    surface.unarchiveConversation.mockImplementation(async (id) => { order.push(`restore:${id}`); return sdkSnapshot(id); });
+    host.unarchiveConversation.mockImplementation(async (id) => { order.push(`restore:${id}`); return sdkSnapshot(id); });
     conversation('archived').handle.load.mockImplementation(async () => { order.push('load:archived'); return sdkSnapshot('archived'); });
-    surface.archiveConversation.mockImplementation(async (id) => { order.push(`archive:${id}`); return sdkSnapshot(id); });
+    host.archiveConversation.mockImplementation(async (id) => { order.push(`archive:${id}`); return sdkSnapshot(id); });
     await expect(driver.resumeConversation(sdkAgent(), { ref: { backend: 'codex', threadId: 'archived' }, storageState: 'archived' })).resolves.toMatchObject({ backendSession: { kind: 'codex', threadId: 'archived' } });
     expect(order).toStrictEqual(['restore:archived', 'load:archived']);
   });
 
   it('rolls back failed restoration and keeps subsequent prompts on the previous conversation', async () => {
-    const { driver, surface, conversation } = setup();
+    const { driver, host, conversation } = setup();
     conversation('broken').handle.load.mockRejectedValueOnce(new Error('cannot load'));
     await expect(driver.resumeConversation(sdkAgent(), { ref: { backend: 'codex', threadId: 'broken' }, storageState: 'archived' })).rejects.toThrow('cannot load');
-    expect(surface.archiveConversation).toHaveBeenCalledExactlyOnceWith('broken');
+    expect(host.archiveConversation).toHaveBeenCalledExactlyOnceWith('broken');
     await driver.sendPrompt(sdkAgent(), 'continue');
     expect(conversation('conversation-a').handle.sendMessage).toHaveBeenCalledOnce();
     expect(conversation('broken').handle.sendMessage).not.toHaveBeenCalled();
@@ -156,17 +156,17 @@ describe(`Codex SDK → ${product.name} backend lifecycle`, () => {
   });
 
   it('deletes the attached conversation through the SDK, and does nothing without a thread', async () => {
-    const { driver, surface } = setup();
+    const { driver, host } = setup();
     await driver.deleteAgentConversation(sdkAgent());
-    expect(surface.deleteConversation).toHaveBeenCalledExactlyOnceWith('conversation-a');
+    expect(host.deleteConversation).toHaveBeenCalledExactlyOnceWith('conversation-a');
     await driver.deleteAgentConversation({ ...sdkAgent(), backendSession: undefined });
-    expect(surface.deleteConversation).toHaveBeenCalledOnce();
+    expect(host.deleteConversation).toHaveBeenCalledOnce();
   });
 
   it('does not detach an attached conversation when archive fails', async () => {
-    const { driver, surface, conversation } = setup();
+    const { driver, host, conversation } = setup();
     await driver.loadConversation(sdkAgent());
-    surface.archiveConversation.mockRejectedValueOnce(new Error('archive failed'));
+    host.archiveConversation.mockRejectedValueOnce(new Error('archive failed'));
     await expect(driver.archiveAgentConversation(sdkAgent())).rejects.toThrow('archive failed');
     await driver.sendPrompt(sdkAgent(), 'still attached');
     expect(conversation('conversation-a').handle.load).toHaveBeenCalledOnce();

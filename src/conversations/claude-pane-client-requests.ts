@@ -1,11 +1,11 @@
 import type { ClaudeConversationSnapshot } from '../contracts';
-import type { CodexSurfaceClientRequest } from '../core/surface';
+import type { ClientRequest } from '../contracts/ui';
 
 /** Read-only presentation of Claude's existing normalized permission parts. */
-export function claudePaneClientRequests(snapshot: ClaudeConversationSnapshot | null | undefined): CodexSurfaceClientRequest[] {
+export function claudePaneClientRequests(snapshot: ClaudeConversationSnapshot | null | undefined): ClientRequest[] {
   if (!snapshot) return [];
   const seen = new Set(snapshot.answeredClientRequestIds);
-  const requests: CodexSurfaceClientRequest[] = [];
+  const requests: ClientRequest[] = [];
   for (const message of snapshot.messages) {
     for (const part of message.parts) {
       if (part.type !== 'tool' || part.status !== 'running') continue;

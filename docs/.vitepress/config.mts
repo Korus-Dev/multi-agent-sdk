@@ -18,7 +18,7 @@ export default defineConfig({
       ] },
       { text: 'Reference', items: [
         { text: 'Exports and operations', link: '/api/' },
-        { text: 'Native Codex surface', link: '/api/codex' },
+        { text: 'Native Codex host', link: '/api/codex' },
         { text: 'Consumer contract', link: '/consumer-contract' },
       ] },
       { text: 'Contribute', items: [

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { normalizePromptContent, promptContentText, type PromptPart } from '../../core/surface';
+import { normalizePromptContent, promptContentText, type PromptPart } from '../../core/prompt-content';
 import type { Message } from '../../contracts/index';
 
 export function promptContentDirectory(home: string, sessionId: string): string {

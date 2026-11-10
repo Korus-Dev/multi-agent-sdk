@@ -7,7 +7,7 @@ import type { Agent, RendererMessage } from '../../../src/contracts/index';
 import { createClaudeConversationReplica, type ClaudeConversationReplica } from '../../../src/conversations/claude-conversation-replica';
 import type { ClaudeSdkMessage } from '../../../src/providers/claude/protocol';
 import type { NativeHarnessEvent as HarnessEvent } from '../../../src/index';
-import { ClaudeConversationHost } from '../../../src/providers/claude/host';
+import { ClaudeHost } from '../../../src/providers/claude/host';
 import { loadClaudeTranscriptHistory, type ClaudeTranscriptHistory, claudeTranscriptToRendererMessages } from '../../../src/providers/claude/transcript-history-adapter';
 
 const session = { kind: 'claude' as const, sessionId: 'history-session', transport: 'stdio' as const };
@@ -41,7 +41,7 @@ describe('Claude history paging', () => {
           parent_tool_use_id: null, parent_agent_id: null };
       });
     });
-    const driver = new ClaudeConversationHost({ startTurn: vi.fn(), close: async () => {} },
+    const driver = new ClaudeHost({ startTurn: vi.fn(), close: async () => {} },
       (owner, options) => loadClaudeTranscriptHistory(owner, { ...options, projectsRoot: home, readSessionMessages }), { homeDir: home });
     let replica!: ClaudeConversationReplica;
     driver.onEvent(frame => {
@@ -73,7 +73,7 @@ describe('Claude history paging', () => {
     let entered!: () => void;
     const entering = new Promise<void>(resolve => { entered = resolve; });
     const startTurn = vi.fn();
-    const driver = new ClaudeConversationHost({ startTurn, close: async () => {} }, async (owner, options) => {
+    const driver = new ClaudeHost({ startTurn, close: async () => {} }, async (owner, options) => {
       const history = await loadClaudeTranscriptHistory(owner, { ...options, projectsRoot: home, readSessionMessages });
       if (history?.source?.loadEarlier) {
         const load = history.source.loadEarlier;
@@ -137,7 +137,7 @@ describe('Claude history paging', () => {
       const row = JSON.parse(line);
       return { type: row.type, uuid: row.uuid, session_id: session.sessionId, message: row.message, parent_tool_use_id: null, parent_agent_id: null };
     });
-    const driver = new ClaudeConversationHost({ startTurn: vi.fn(), close: async () => {} }, owner => loadClaudeTranscriptHistory(owner, { projectsRoot: home, recent, readSessionMessages }), { homeDir: home });
+    const driver = new ClaudeHost({ startTurn: vi.fn(), close: async () => {} }, owner => loadClaudeTranscriptHistory(owner, { projectsRoot: home, recent, readSessionMessages }), { homeDir: home });
     let replica!: ClaudeConversationReplica;
     driver.onEvent(frame => {
       if (frame.type === 'claude.conversationSnapshotChanged') replica = createClaudeConversationReplica(frame.payload.snapshot);
@@ -170,7 +170,7 @@ describe('Claude history paging', () => {
     let resolveNext!: (history: ClaudeTranscriptHistory) => void;
     const nextHistory = new Promise<ClaudeTranscriptHistory>(resolve => { resolveNext = resolve; });
     const nextAgent = { ...agent, backendSession: { ...session, sessionId: 'next-session' } };
-    const driver = new ClaudeConversationHost({ startTurn: vi.fn(), close: async () => {} }, owner => owner.backendSession?.kind === 'claude' && owner.backendSession.sessionId === session.sessionId ? Promise.resolve(original) : nextHistory);
+    const driver = new ClaudeHost({ startTurn: vi.fn(), close: async () => {} }, owner => owner.backendSession?.kind === 'claude' && owner.backendSession.sessionId === session.sessionId ? Promise.resolve(original) : nextHistory);
     const frames: HarnessEvent[] = []; let cancelled: Promise<unknown> | undefined;
     driver.onEvent(frame => {
       frames.push(frame);
@@ -195,7 +195,7 @@ describe('Claude history paging', () => {
 
   it('retains older history when an interrupted session continues before its conversation is opened', async () => {
     const messages = claudeTranscriptToRendererMessages(transcript(80, 'past output'), agent.id, session.sessionId);
-    const driver = new ClaudeConversationHost({ startTurn: () => ({ done: new Promise(() => {}), interrupt: async () => {} }), close: async () => {} },
+    const driver = new ClaudeHost({ startTurn: () => ({ done: new Promise(() => {}), interrupt: async () => {} }), close: async () => {} },
       async () => ({ backendSession: session, messages }));
     let replica!: ClaudeConversationReplica;
     driver.onEvent(frame => {
@@ -215,7 +215,7 @@ describe('Claude history paging', () => {
 
   it('prepends bounded pages without gaps or duplicate identities and exhausts idempotently', async () => {
     const messages: RendererMessage[] = Array.from({ length: 150 }, (_, i) => ({ id: `message-${i}`, agentId: agent.id, turnId: `turn-${i}`, role: 'user', status: 'complete', createdAt: '2026-01-01T00:00:00Z', parts: [{ type: 'text', text: 'x'.repeat(40_000) }] }));
-    const driver = new ClaudeConversationHost({ startTurn: vi.fn(), close: async () => {} }, async () => ({ backendSession: session, messages }));
+    const driver = new ClaudeHost({ startTurn: vi.fn(), close: async () => {} }, async () => ({ backendSession: session, messages }));
     let replica!: ClaudeConversationReplica;
     const frames: HarnessEvent[] = [];
     driver.onEvent((frame) => {
@@ -242,7 +242,7 @@ describe('Claude history paging', () => {
   it('reads a giant tool row losslessly in bounded chunks and rejects foreign, stale and invalid reads', async () => {
     const messages = claudeTranscriptToRendererMessages(transcript(1, '工具🙂\\\"\n'.repeat(700_000)), agent.id, session.sessionId);
     expect(Buffer.byteLength(JSON.stringify(messages[1]))).toBeGreaterThan(8 * 1024 * 1024);
-    const driver = new ClaudeConversationHost({ startTurn: vi.fn(), close: async () => {} }, async () => ({ backendSession: session, messages }));
+    const driver = new ClaudeHost({ startTurn: vi.fn(), close: async () => {} }, async () => ({ backendSession: session, messages }));
     let snapshot!: import('../../../src/contracts/index').ClaudeConversationSnapshot;
     driver.onEvent((frame) => { if (frame.type === 'claude.conversationSnapshotChanged') snapshot = frame.payload.snapshot; });
     try {
@@ -270,7 +270,7 @@ describe('Claude history paging', () => {
 
   it('ignores history reads invalidated by release or a newer session selection', async () => {
     const pending: Array<(value: { backendSession: typeof session; messages: RendererMessage[] }) => void> = [];
-    const driver = new ClaudeConversationHost({ startTurn: vi.fn(), close: async () => {} }, () => new Promise((resolve) => { pending.push(resolve); }));
+    const driver = new ClaudeHost({ startTurn: vi.fn(), close: async () => {} }, () => new Promise((resolve) => { pending.push(resolve); }));
     const frames: HarnessEvent[] = []; driver.onEvent((frame) => frames.push(frame));
     try {
       const obsolete = driver.loadConversation(agent);
@@ -291,7 +291,7 @@ describe('Claude history paging', () => {
   it('keeps live tool output authoritative across older pages, oversized events and reload', async () => {
     let emit!: (message: ClaudeSdkMessage) => void;
     const messages = claudeTranscriptToRendererMessages(transcript(60, 'small'), agent.id, session.sessionId);
-    const driver = new ClaudeConversationHost({ startTurn: (_params, listener) => { emit = listener; return { done: new Promise(() => {}), interrupt: async () => {} }; }, close: async () => {} }, async () => ({ backendSession: session, messages }));
+    const driver = new ClaudeHost({ startTurn: (_params, listener) => { emit = listener; return { done: new Promise(() => {}), interrupt: async () => {} }; }, close: async () => {} }, async () => ({ backendSession: session, messages }));
     let replica!: ClaudeConversationReplica;
     const frames: HarnessEvent[] = [];
     driver.onEvent((frame) => { frames.push(frame); if (frame.type === 'claude.conversationSnapshotChanged') replica = createClaudeConversationReplica(frame.payload.snapshot); if (frame.type === 'claude.conversationEventReceived') replica.apply(frame.payload.event); });
@@ -326,7 +326,7 @@ describe('Claude history paging', () => {
   it('opens a transcript larger than the companion limit with a bounded recent snapshot', async () => {
     const messages = claudeTranscriptToRendererMessages(transcript(80, '工具 output\n'.repeat(30_000)), agent.id, session.sessionId);
     expect(Buffer.byteLength(JSON.stringify(messages))).toBeGreaterThan(32 * 1024 * 1024);
-    const driver = new ClaudeConversationHost({ startTurn: vi.fn(), close: async () => {} }, async () => ({ backendSession: session, messages }));
+    const driver = new ClaudeHost({ startTurn: vi.fn(), close: async () => {} }, async () => ({ backendSession: session, messages }));
     const frames: HarnessEvent[] = [];
     driver.onEvent((frame) => frames.push(frame));
     try {
@@ -342,7 +342,7 @@ describe('Claude history paging', () => {
     const parts = Array.from({ length: 40 }, (_, i) => ({ type: 'tool' as const, id: `tool-${i}`, kind: 'command', title: `Ran command ${i}`, status: 'completed' as const, body: `output ${i} `.repeat(500) }));
     const message: RendererMessage = { id: 'long-turn', agentId: agent.id, turnId: 'turn', role: 'assistant', status: 'complete', createdAt: '2026-01-01T00:00:00Z', parts };
     expect(Buffer.byteLength(JSON.stringify(message))).toBeGreaterThan(100 * 1024);
-    const driver = new ClaudeConversationHost({ startTurn: vi.fn(), close: async () => {} }, async () => ({ backendSession: session, messages: [message] }));
+    const driver = new ClaudeHost({ startTurn: vi.fn(), close: async () => {} }, async () => ({ backendSession: session, messages: [message] }));
     let snapshot!: import('../../../src/contracts/index').ClaudeConversationSnapshot;
     driver.onEvent((frame) => { if (frame.type === 'claude.conversationSnapshotChanged') snapshot = frame.payload.snapshot; });
     try {
@@ -357,7 +357,7 @@ describe('Claude history paging', () => {
     const huge = { type: 'tool' as const, id: 'huge', kind: 'mcp', title: 'Screenshot', status: 'completed' as const, body: 'x'.repeat(300_000), output: [{ type: 'text', text: 'x'.repeat(300_000) }] };
     const message: RendererMessage = { id: 'mixed', agentId: agent.id, turnId: 'turn', role: 'assistant', status: 'complete', createdAt: '2026-01-01T00:00:00Z',
       parts: [{ type: 'text', text: 'Looking at it' }, ordinary(1), huge, ordinary(2)] };
-    const driver = new ClaudeConversationHost({ startTurn: vi.fn(), close: async () => {} }, async () => ({ backendSession: session, messages: [message] }));
+    const driver = new ClaudeHost({ startTurn: vi.fn(), close: async () => {} }, async () => ({ backendSession: session, messages: [message] }));
     let snapshot!: import('../../../src/contracts/index').ClaudeConversationSnapshot;
     driver.onEvent((frame) => { if (frame.type === 'claude.conversationSnapshotChanged') snapshot = frame.payload.snapshot; });
     try {

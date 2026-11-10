@@ -1,7 +1,7 @@
 import { validateMcpPolicy } from '../../mcp-policy';
 import type { HarnessContext, HarnessDriver, HarnessEvent, HarnessPromptScope, HarnessScopedPromptInput, HarnessScopedPromptResult } from '../../driver';
 import type { HarnessTextGenerationInput } from '../../generation';
-import type { PromptPart } from '../../core/surface';
+import type { PromptPart } from '../../core/prompt-content';
 import { defaultRuntimeDirectory } from '../../runtime/paths';
 export type AntigravityHostOptions<Context extends HarnessContext = HarnessContext> = {
   stateDirectory?: () => string;
@@ -15,7 +15,7 @@ export type AntigravityHostOptions<Context extends HarnessContext = HarnessConte
 };
 const sameScope = (left?: HarnessPromptScope, right?: HarnessPromptScope) => JSON.stringify(left) === JSON.stringify(right);
 
-import { normalizePromptContent, promptContentText, promptContentDispatchText } from '../../core/surface';
+import { normalizePromptContent, promptContentText, promptContentDispatchText } from '../../core/prompt-content';
 
 
 import type { ExecutionObservation } from '../../contracts/usage';

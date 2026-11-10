@@ -1,6 +1,6 @@
 import { validateMcpPolicy } from '../../mcp-policy';
 import type { HarnessHistoryLoadResult, HarnessPromptScope } from '../../driver';
-import { promptContentDispatchText, type PromptPart } from '../../core/surface';
+import { promptContentDispatchText, type PromptPart } from '../../core/prompt-content';
 import type { ClaudeToolPartOptions } from './claude-tool-part-adapter';
 export type ClaudeHistoryLoadResult = HarnessHistoryLoadResult<Extract<HarnessEvent, { type: 'claude.conversationEventReceived' }> & { seq: number; occurredAt: string }>;
 export type ClaudePromptConfiguration = { cwd?: string; title?: string; appendSystemPrompt?: string; mcpServerUrl?: string | null; mcpServerName?: string; hostedMcpServerUrls?: Record<string, string>; allowedTools?: string[]; enabledMcpTools?: Record<string, readonly string[]>; formatPrompt?: (prompt: string, content: readonly PromptPart[] | undefined) => string };
@@ -151,7 +151,7 @@ export type ClaudeHistoryLoader<Context extends Agent = Agent> = (agent: Context
 
 type ClaudeScopedTurnConfiguration = { mcpServerUrl?: string | null; mcpServerName?: string; hostedMcpServerUrls?: Record<string, string>; allowedTools: string[]; enabledMcpTools?: Record<string, readonly string[]>; appendSystemPrompt?: string };
 
-export class ClaudeConversationHost<Context extends Agent = Agent> implements HarnessDriver<Context, HarnessEvent, Extract<HarnessEvent, { type: 'claude.conversationEventReceived' }>> {
+export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<Context, HarnessEvent, Extract<HarnessEvent, { type: 'claude.conversationEventReceived' }>> {
   async authenticate(request: import('../../contracts/authentication').ProviderAuthenticationAction): Promise<import('../../contracts/authentication').ProviderAuthentication> {
     if (request.action === 'cancel') throw new Error('Manage Claude authentication through its CLI.');
     const state = await (request.action === 'logout' ? (this.driverOptions.authentication?.logout ?? logoutLocalClaude)() : (this.driverOptions.authentication?.check ?? getLocalClaudeAuthentication)());

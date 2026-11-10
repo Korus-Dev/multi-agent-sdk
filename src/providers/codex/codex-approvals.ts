@@ -1,14 +1,14 @@
 import type { CodexAppServerClient, v2 } from '@korus-dev/codex-sdk';
 import type {
-  CodexSurfaceApproval,
-  CodexSurfaceApprovalDecision,
-  CodexSurfaceApprovalScope,
-  CodexSurfaceRequestedPermission,
-} from '../../core/surface';
+  Approval,
+  ApprovalDecision,
+  ApprovalScope,
+  RequestedPermission,
+} from '../../core/codex-host';
 
 export type PendingCodexApproval = {
-  approval: CodexSurfaceApproval;
-  resolve(decision: CodexSurfaceApprovalDecision, scope: CodexSurfaceApprovalScope): void;
+  approval: Approval;
+  resolve(decision: ApprovalDecision, scope: ApprovalScope): void;
 };
 
 export function registerCodexApprovalHandlers(
@@ -97,7 +97,7 @@ export function registerCodexApprovalHandlers(
 function commandApproval(
   id: string | number,
   params: v2.CommandExecutionRequestApprovalParams,
-): CodexSurfaceApproval {
+): Approval {
   const availableDecisions = params.availableDecisions;
   const requiresHumanApproval = params.kind === 'humanCommand';
   const additionalPermissions = permissionDetails(params.additionalPermissions);
@@ -135,7 +135,7 @@ function commandApproval(
 function fileChangeApproval(
   id: string | number,
   params: v2.FileChangeRequestApprovalParams,
-): CodexSurfaceApproval {
+): Approval {
   return {
     id: String(id),
     kind: 'file-change',
@@ -152,7 +152,7 @@ function fileChangeApproval(
 function permissionsApproval(
   id: string | number,
   params: v2.PermissionsRequestApprovalParams,
-): CodexSurfaceApproval {
+): Approval {
   const requestedPermissions = permissionDetails(params.permissions);
   return {
     id: String(id),
@@ -169,8 +169,8 @@ function permissionsApproval(
 
 function commandDecision(
   params: v2.CommandExecutionRequestApprovalParams,
-  decision: CodexSurfaceApprovalDecision,
-  scope: CodexSurfaceApprovalScope,
+  decision: ApprovalDecision,
+  scope: ApprovalScope,
 ): v2.CommandExecutionApprovalDecision {
   const available = params.availableDecisions;
   if (params.kind === 'humanCommand' && decision === 'approve' && scope !== 'once') {
@@ -184,9 +184,9 @@ function commandDecision(
 
 function permissionDetails(
   profile: v2.RequestPermissionProfile | v2.AdditionalPermissionProfile | null | undefined,
-): CodexSurfaceRequestedPermission[] {
+): RequestedPermission[] {
   if (!profile) return [];
-  const permissions: CodexSurfaceRequestedPermission[] = [];
+  const permissions: RequestedPermission[] = [];
   if (profile.network) {
     permissions.push({ kind: 'network', enabled: profile.network.enabled ?? false });
   }

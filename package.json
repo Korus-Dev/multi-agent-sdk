@@ -1,6 +1,6 @@
 {
   "name": "@korus-dev/multi-agent-sdk",
-  "version": "0.25.1",
+  "version": "0.26.0",
   "description": "Unified native coding-agent harness interface and adapters.",
   "license": "Apache-2.0",
   "author": "Nicolas Bonamy",
@@ -49,9 +49,9 @@
       "types": "./dist/providers/codex/index.d.ts",
       "default": "./dist/providers/codex/index.js"
     },
-    "./surface-bridge": {
-      "types": "./dist/core/surface-bridge.d.ts",
-      "default": "./dist/core/surface-bridge.js"
+    "./host-bridge": {
+      "types": "./dist/core/host-bridge.d.ts",
+      "default": "./dist/core/host-bridge.js"
     },
     "./package.json": "./package.json"
   },
@@ -79,7 +79,7 @@
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "0.3.322",
     "@anthropic-ai/sdk": "1.8.0",
-    "@korus-dev/codex-sdk": "0.167.0",
+    "@korus-dev/codex-sdk": "0.167.1",
     "@modelcontextprotocol/sdk": "1.32.2",
     "image-size": "2.0.4",
     "yauzl": "3.4.0",

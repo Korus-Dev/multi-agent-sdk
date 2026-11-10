@@ -3,14 +3,14 @@ import { open, stat } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
 import type { FileHandle } from 'node:fs/promises';
 import type { CodexAppServerClient } from '@korus-dev/codex-sdk';
-import type { SurfaceMessage, SurfaceMessageMediaPart } from '../../core/surface';
+import type { ConversationMessage, ConversationMessageMediaPart } from '../../core/codex-host';
 import { codexImageDataUrl } from './codex-conversation-history';
 import { imageDimensions } from './conversation-content-transport';
 
 const MAX_RECORD = 32 * 1024 * 1024;
 const MAX_IMAGE = 20 * 1024 * 1024;
 const MAX_IMAGES = 2048;
-type Location = { offset: number; length: number; turnId: string; callId: string; imageIndex: number; byteLength: number; hash: string; part: SurfaceMessageMediaPart };
+type Location = { offset: number; length: number; turnId: string; callId: string; imageIndex: number; byteLength: number; hash: string; part: ConversationMessageMediaPart };
 type Index = { path: string; signature: string; images: Map<string, Location> };
 type RecordValue = { type?: string; payload?: Record<string, unknown> };
 
@@ -31,11 +31,11 @@ export class CodexOriginalHistoryImages {
     if (path !== undefined && path !== this.paths.get(threadId)) { this.indexes.delete(threadId); this.paths.delete(threadId); if (path && isAbsolute(path)) this.paths.set(threadId, path); }
   }
 
-  async prepare(threadId: string, path?: string | null): Promise<(messages: SurfaceMessage[]) => SurfaceMessage[]> {
+  async prepare(threadId: string, path?: string | null): Promise<(messages: ConversationMessage[]) => ConversationMessage[]> {
     this.rememberPath(threadId, path);
     let index: Index | undefined;
     try { index = await this.exclusive(() => this.index(threadId)); } catch { /* Unavailable provider history does not hide the normal transcript. */ }
-    const parts = new Map<string, SurfaceMessageMediaPart[]>();
+    const parts = new Map<string, ConversationMessageMediaPart[]>();
     for (const image of index?.images.values() ?? []) {
       const group = parts.get(image.turnId) ?? []; group.push(image.part); parts.set(image.turnId, group);
     }
@@ -199,7 +199,7 @@ async function* lines(file: FileHandle, size: number) {
 }
 
 /** Keep mutable viewed files as operations, not historical screenshot substitutes. */
-export function suppressViewedImagePreviews(messages: SurfaceMessage[]): SurfaceMessage[] {
+export function suppressViewedImagePreviews(messages: ConversationMessage[]): ConversationMessage[] {
   return messages.map(message => {
     const viewed = new Set(message.parts.filter(p => p.type === 'tool' && p.title === 'view_image').map(p => p.type === 'tool' ? p.id : ''));
     return viewed.size ? { ...message, parts: message.parts.filter(p => p.type !== 'media' || !viewed.has(p.itemId ?? '')) } : message;

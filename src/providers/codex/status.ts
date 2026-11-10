@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import type { ProviderSafetyReview } from '../../contracts/safety-review';
 import { providerSafetyBlockMessage } from '../../contracts/safety-review';
 import type { AgentStatus } from '../../contracts/index';
-import type { CodexConversationSnapshot } from '../../core/surface';
+import type { CodexConversationSnapshot } from '../../core/codex-host';
 
 /**
  * What a person should see for the conversation. An error with a turn still running is a retry in progress, not a failure:

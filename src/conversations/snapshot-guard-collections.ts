@@ -1,4 +1,4 @@
-import { normalizePromptContent } from '../core/surface';
+import { normalizePromptContent } from '../core/prompt-content';
 import { isRecord, optional, includes, isString, isArrayOf } from './snapshot-guard-primitives';
 export function isMessage(value: unknown): boolean {
   return isRecord(value) &&

@@ -29,11 +29,11 @@ try {
   execFileSync(process.execPath, ['imports.mjs'], { cwd: temporary, stdio: 'inherit' });
   execFileSync(process.execPath, ['--input-type=commonjs', '-e', entries.map(entry => `require(${JSON.stringify(entry)});`).join('\n')], { cwd: temporary, stdio: 'inherit' });
   fs.writeFileSync(path.join(temporary, 'consumer.ts'), entries.map((entry, index) => `import type * as Public${index} from '${entry}';`).join('\n') + `
-import { createHarnessDriver, TypedEventBus, type HarnessDriver, type Session, type SessionState, type CodexConversationSnapshot, type CodexSurface, type NativeHarnessEvent, type NativeHarnessDriver } from '${manifest.name}';
+import { createHarnessDriver, TypedEventBus, TtlCache, type HarnessDriver, type HarnessOptions, type Session, type SessionState, type CodexConversationSnapshot, type CodexHost, type CodexHostOptions, type CodexHostAdapterOptions, type ConversationMessage, type ModelDescriptor, type NativeHarnessEvent, type NativeHarnessDriver } from '${manifest.name}';
 import { normalizePromptContent } from '${manifest.name}/prompt';
-import { createCodexSurface } from '${manifest.name}/codex';
+import { createCodexHost } from '${manifest.name}/codex';
 import { codexBackendCapabilities, claudeBackendCapabilities, cursorBackendCapabilities, antigravityBackendCapabilities, withInferredWorkPhases, withInferredTurnWorkPhases, createCodexConversationReplica, projectSessionSelection, projectCodexConversation, projectClaudeConversation, projectCursorConversation, projectAntigravityConversation } from '${manifest.name}/renderer';
-import { AcpRuntime, AcpSession, installAcpRuntime, AntigravityHost, ClaudeConversationHost, ClaudeAgentSdkTransport, listClaudeSkills, claudeToolPart, loadClaudeTranscriptHistory, claudeTranscriptToRendererMessages, resolveClaudeLaunch, getLocalClaudeAuthentication, logoutLocalClaude, CursorHost, sessionMcpServer } from '${manifest.name}/native';
+import { AcpRuntime, AcpSession, installAcpRuntime, AntigravityHost, ClaudeHost, ClaudeAgentSdkTransport, listClaudeSkills, claudeToolPart, loadClaudeTranscriptHistory, claudeTranscriptToRendererMessages, resolveClaudeLaunch, getLocalClaudeAuthentication, logoutLocalClaude, CursorHost, sessionMcpServer } from '${manifest.name}/native';
 import { AcpConnection, AcpError, record } from '${manifest.name}/native';
 const driver: HarnessDriver = createHarnessDriver('codex', { client: { name: 'pack-check' } });
 const session: Session = driver.open({ id: 'test', folder: null });
@@ -41,10 +41,13 @@ const state: SessionState = driver.readSession(session);
 const text: string[] = state.messages.flatMap(message => message.parts.flatMap(part => part.type === 'text' ? [part.text] : []));
 const bus = new TypedEventBus<{ changed: string }>();
 bus.emit('changed', 'ready');
-const nativeTypes: [CodexConversationSnapshot?, CodexSurface?, NativeHarnessEvent?, NativeHarnessDriver?] = [];
-void [text, nativeTypes, normalizePromptContent, createCodexSurface];
+const nativeTypes: [CodexConversationSnapshot?, CodexHost?, NativeHarnessEvent?, NativeHarnessDriver?] = [];
+const hostOptions: CodexHostOptions = {}; const adapterOptions: CodexHostAdapterOptions = { inheritNativeSettings: true };
+const options: HarnessOptions = { client: { name: 'pack-check' }, codex: { host: hostOptions, adapter: adapterOptions } };
+const sharedTypes: [ConversationMessage?, ModelDescriptor?] = []; void [options, sharedTypes, TtlCache];
+void [text, nativeTypes, normalizePromptContent, createCodexHost];
 void [codexBackendCapabilities, claudeBackendCapabilities, cursorBackendCapabilities, antigravityBackendCapabilities, withInferredWorkPhases, withInferredTurnWorkPhases, createCodexConversationReplica, projectSessionSelection, projectCodexConversation, projectClaudeConversation, projectCursorConversation, projectAntigravityConversation];
-void [AcpRuntime, AcpSession, installAcpRuntime, AntigravityHost, ClaudeConversationHost, ClaudeAgentSdkTransport, listClaudeSkills, claudeToolPart, loadClaudeTranscriptHistory, claudeTranscriptToRendererMessages, resolveClaudeLaunch, getLocalClaudeAuthentication, logoutLocalClaude, CursorHost, sessionMcpServer];
+void [AcpRuntime, AcpSession, installAcpRuntime, AntigravityHost, ClaudeHost, ClaudeAgentSdkTransport, listClaudeSkills, claudeToolPart, loadClaudeTranscriptHistory, claudeTranscriptToRendererMessages, resolveClaudeLaunch, getLocalClaudeAuthentication, logoutLocalClaude, CursorHost, sessionMcpServer];
 void [AcpConnection, AcpError, record];
 `);
   fs.writeFileSync(path.join(temporary, 'tsconfig.json'), JSON.stringify({ compilerOptions: {

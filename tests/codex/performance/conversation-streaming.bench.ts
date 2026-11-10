@@ -3,8 +3,8 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { CodexAppServerClient } from '@korus-dev/codex-sdk';
-import { CodexSurface } from '../../../src/providers/codex';
-import { MockCodexAppServer, resumeResponse, thread, turn } from '../helpers/codex-surface-fixture';
+import { CodexHost } from '../../../src/providers/codex';
+import { MockCodexAppServer, resumeResponse, thread, turn } from '../helpers/host-fixture';
 
 const THREAD_COUNT = 5;
 const TURNS_PER_THREAD = 200;
@@ -33,13 +33,13 @@ describe('five active long conversations', () => {
         return resumeResponse(histories.get(threadId)!);
       },
     });
-    const surface = new CodexSurface({
+    const host = new CodexHost({
       autoSelectFirstConversation: false,
       client: new CodexAppServerClient(transport),
       codexHome: temporaryCodexHome,
     });
-    await surface.connect();
-    const conversations = threadIds.map((threadId) => surface.conversation(threadId));
+    await host.connect();
+    const conversations = threadIds.map((threadId) => host.conversation(threadId));
     let stateNotifications = 0;
     const unsubscribes = conversations.map((conversation) => conversation.onStateChange(() => {
       stateNotifications += 1;
@@ -66,7 +66,7 @@ describe('five active long conversations', () => {
       throw new Error('The benchmark did not observe every streamed delta');
     }
     for (const unsubscribe of unsubscribes) unsubscribe();
-    await surface.close();
+    await host.close();
   }, {
     iterations: 3,
     time: 0,

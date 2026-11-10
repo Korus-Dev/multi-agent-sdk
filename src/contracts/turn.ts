@@ -36,7 +36,7 @@ export type RequestUsage = {
 };
 
 export type TurnExecutionUsage = {
-  /** This surface instance observed the turn start, rather than only its replayed counters. */
+  /** This host instance observed the turn start, rather than only its replayed counters. */
   observedStart: boolean;
   /** Latest provider counters; no stable request identity or finality is supplied. */
   last: TokenUsage;

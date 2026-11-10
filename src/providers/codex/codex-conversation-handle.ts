@@ -1,18 +1,18 @@
-import type { ContinueCodexSafetyReviewOptions } from '../../core/surface';
+import type { ContinueCodexSafetyReviewOptions } from '../../core/codex-host';
 import type {
   CodexConversationEvent,
   CodexConversationHistory,
   CodexConversationHistoryPage,
   CodexConversationPromptHistory,
   CodexConversationSnapshot,
-  CodexSurfaceApprovalDecision,
-  CodexSurfaceApprovalScope,
-  CodexSurfaceClientRequestResponse,
-  SendCodexMessageOptions,
+  ApprovalDecision,
+  ApprovalScope,
+  ClientRequestResponse,
+  SendMessageOptions,
   StartCodexRealtimeOptions,
   StartCodexReviewOptions,
-  UpdateCodexConversationSettings,
-} from '../../core/surface';
+  UpdateConversationSettings,
+} from '../../core/codex-host';
 import type {
   CodexConversation,
   CodexConversationForkResult,
@@ -20,7 +20,7 @@ import type {
   CodexConversationLoadOptions,
   CodexRealtimeSession,
   ForkCodexConversationOptions,
-} from './codex-surface-contracts';
+} from './host-contracts';
 
 export type CodexConversationHandleOperations = {
   clearGoal(): Promise<void>;
@@ -29,8 +29,8 @@ export type CodexConversationHandleOperations = {
   continueAfterSafetyReview?(options: ContinueCodexSafetyReviewOptions): Promise<void>;
   deleteTurn(turnId: string): Promise<void>;
   deleteQueuedPrompt(promptId: string): Promise<void>;
-  updateQueuedPrompt(promptId: string, prompt: string, options?: SendCodexMessageOptions): Promise<void>;
-  editTurn(turnId: string, content: string, options?: SendCodexMessageOptions): Promise<void>;
+  updateQueuedPrompt(promptId: string, prompt: string, options?: SendMessageOptions): Promise<void>;
+  editTurn(turnId: string, content: string, options?: SendMessageOptions): Promise<void>;
   fork(
     options?: ForkCodexConversationOptions,
     hostOptions?: CodexConversationHostOptions,
@@ -53,19 +53,19 @@ export type CodexConversationHandleOperations = {
   rename(title: string): Promise<void>;
   resolveApproval(
     approvalId: string,
-    decision: CodexSurfaceApprovalDecision,
-    scope?: CodexSurfaceApprovalScope,
+    decision: ApprovalDecision,
+    scope?: ApprovalScope,
   ): Promise<void>;
-  respondToClientRequest(response: CodexSurfaceClientRequestResponse): Promise<void>;
+  respondToClientRequest(response: ClientRequestResponse): Promise<void>;
   retryTurn(turnId: string): Promise<void>;
   select(): Promise<void>;
-  sendMessage(prompt: string, options?: SendCodexMessageOptions): Promise<void>;
+  sendMessage(prompt: string, options?: SendMessageOptions): Promise<void>;
   setGoal(objective: string, tokenBudget?: number | null): Promise<void>;
   startRealtime(options: StartCodexRealtimeOptions): Promise<CodexRealtimeSession>;
   startReview(options?: StartCodexReviewOptions): Promise<void>;
-  steerMessage(prompt: string, options?: SendCodexMessageOptions): Promise<void>;
-  steerQueuedPrompt(promptId: string, prompt?: string, options?: SendCodexMessageOptions): Promise<void>;
-  updateSettings(settings: UpdateCodexConversationSettings): Promise<void>;
+  steerMessage(prompt: string, options?: SendMessageOptions): Promise<void>;
+  steerQueuedPrompt(promptId: string, prompt?: string, options?: SendMessageOptions): Promise<void>;
+  updateSettings(settings: UpdateConversationSettings): Promise<void>;
 };
 
 export function createCodexConversationHandle(

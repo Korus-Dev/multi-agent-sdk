@@ -1,6 +1,6 @@
 import { validateMcpPolicy } from '../../mcp-policy';
 import type { HarnessContext, HarnessDriver, HarnessEvent, HarnessPromptScope, HarnessScopedPromptInput, HarnessScopedPromptResult } from '../../driver';
-import type { PromptPart } from '../../core/surface';
+import type { PromptPart } from '../../core/prompt-content';
 import type { CursorSessionOptions } from './session';
 import { defaultRuntimeDirectory } from '../../runtime/paths';
 import { sessionMcpServer } from '../../acp/mcp-bridge';
@@ -23,7 +23,7 @@ import { randomUUID } from 'node:crypto';
 
 import { mkdir, realpath } from 'node:fs/promises';
 import path from 'node:path';
-import { normalizePromptContent, promptContentText, promptContentDispatchText } from '../../core/surface';
+import { normalizePromptContent, promptContentText, promptContentDispatchText } from '../../core/prompt-content';
 import type { BackendSession, SendPromptOptions, ConversationListInput, ConversationSummary, ConversationResumeTarget, BackendConversationRef, Message } from '../../contracts/index';
 
 import { cursorBackendCapabilities } from '../../capabilities';
