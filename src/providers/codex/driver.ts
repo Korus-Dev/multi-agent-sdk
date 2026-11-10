@@ -12,7 +12,7 @@ import type {
   BackendSkillSummary, ConversationListInput,
   ConversationResumeTarget,
   ConversationSummary,
-  RendererMessage,
+  Message,
   SendPromptOptions,
   CodexAuthentication,
   CodexChatGptLogin,
@@ -84,6 +84,8 @@ export class CodexBackendDriver<Context extends Agent = Agent> implements Harnes
 
 
 
+
+  cancelScopedPrompt(agent: Context): Promise<void> { return this.sessionManager.cancelScopedPrompt(agent); }
 
   executeScopedPrompt(agent: Context, input: import('../../driver').HarnessScopedPromptInput) { return this.sessionManager.executeScopedPrompt(agent, input); }
   disposeScopedSession(_agent: Context, session: BackendSession) { return this.sessionManager.disposeScopedSession(session); }
@@ -261,7 +263,7 @@ export class CodexBackendDriver<Context extends Agent = Agent> implements Harnes
     return this.sessionManager.loadOlderHistory(agent);
   }
 
-  async readConversationMessages(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]> {
+  async readConversationMessages(ref: BackendConversationRef, agentId: string): Promise<Message[]> {
     if (ref.backend !== 'codex') {
       throw new Error('Codex cannot read non-Codex conversation history.');
     }

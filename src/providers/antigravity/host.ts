@@ -1,6 +1,7 @@
+import { validateMcpPolicy } from '../../mcp-policy';
 import type { HarnessContext, HarnessDriver, HarnessEvent, HarnessPromptScope, HarnessScopedPromptInput, HarnessScopedPromptResult } from '../../driver';
 import type { HarnessTextGenerationInput } from '../../generation';
-import type { CodexPromptPart } from '../../core/surface';
+import type { PromptPart } from '../../core/surface';
 import { defaultRuntimeDirectory } from '../../runtime/paths';
 export type AntigravityHostOptions<Context extends HarnessContext = HarnessContext> = {
   stateDirectory?: () => string;
@@ -9,7 +10,7 @@ export type AntigravityHostOptions<Context extends HarnessContext = HarnessConte
   runtimeOptions?: () => Partial<Parameters<typeof AcpRuntime.open>[0]>;
   client?: { name: string; title?: string; version?: string; temporaryDirectory?: string; metadataDirectory?: string; trustedMcpServerName?: string };
   instructions?: (context: Context, options: { planMode: boolean }) => string | undefined;
-  formatPrompt?: (prompt: string, content: readonly CodexPromptPart[] | undefined) => string;
+  formatPrompt?: (prompt: string, content: readonly PromptPart[] | undefined) => string;
   mcpServers?: (context: Context) => unknown[];
 };
 const sameScope = (left?: HarnessPromptScope, right?: HarnessPromptScope) => JSON.stringify(left) === JSON.stringify(right);
@@ -117,16 +118,22 @@ export class AntigravityHost<Context extends HarnessContext = HarnessContext> im
     const submitted = await this.submitPrompt(agent, prompt, options);
     return { backendSession: submitted.backendSession, turnId: submitted.turnId };
   }
-  private async submitPrompt(agent: Context, prompt: string, options?: SendPromptOptions, scope?: HarnessPromptScope) {
+  private async submitPrompt(agent: Context, prompt: string, options?: SendPromptOptions, scope?: HarnessPromptScope, admissionGuard?: () => void) {
     if (options?.selection?.reasoningEffort != null || options?.selection?.serviceTier != null) throw new Error('Antigravity does not support reasoning effort or service tiers.');
+    admissionGuard?.();
     const content = options?.content === undefined ? undefined : normalizePromptContent(options.content);
     const attachments = await acpAttachments(options?.attachments ?? []);
+    admissionGuard?.();
     const session = await this.ensure(agent, scope);
+    admissionGuard?.();
+    admissionGuard?.();
     const model = options?.selection?.model ?? (agent.backendDefaults?.kind === this.backend ? agent.backendDefaults.model : undefined);
     if (model) await session.setModel(model);
+    admissionGuard?.();
     const permission = options?.backendOptions?.kind === this.backend ? options.backendOptions.permissionMode
       : agent.backendDefaults?.kind === this.backend ? agent.backendDefaults.permissionMode : undefined;
     if (permission) await session.setMode(permission);
+    admissionGuard?.();
     const planning = options?.planMode === true || /^\/plan(?:\s|$)/.test(prompt);
     const instructions = scope?.developerInstructions ?? this.options.instructions?.(agent, { planMode: planning }) ?? '';
     const dispatched = this.options.formatPrompt?.(prompt, content) ?? (content === undefined ? prompt : promptContentDispatchText(content, prompt));
@@ -159,12 +166,21 @@ export class AntigravityHost<Context extends HarnessContext = HarnessContext> im
     return { backendSession: this.reference(session), turnId };
   }
 
+  async cancelScopedPrompt(agent: Context): Promise<void> {
+    const session = this.sessions.get(agent.id);
+    try { if (session?.snapshot.activeTurnId) await session.interrupt(session.snapshot.activeTurnId); }
+    finally { await this.releaseConversation(agent.id); }
+  }
+
   async executeScopedPrompt(agent: Context, input: HarnessScopedPromptInput): Promise<HarnessScopedPromptResult> {
+    input.signal?.throwIfAborted();
+    validateMcpPolicy(input.scope.mcpServers ?? [], 'antigravity');
     input = { ...input, scope: structuredClone(input.scope) };
     if (input.session && input.session.kind !== this.backend) throw new Error('Antigravity cannot continue another provider execution.');
     const scopedContext = { ...agent, folder: input.cwd, backendSession: input.session };
-    const { session, turnId, completion } = await this.submitPrompt(scopedContext, input.prompt, input.options, input.scope);
+    const { session, turnId, completion } = await this.submitPrompt(scopedContext, input.prompt, input.options, input.scope, () => input.signal?.throwIfAborted());
     await completion;
+    input.signal?.throwIfAborted();
     if (session.snapshot.turns.find(candidate => candidate.id === turnId)?.status !== 'completed') throw new Error(session.snapshot.error ?? 'Antigravity execution was interrupted.');
     const text = session.snapshot.messages.filter(message => message.turnId === turnId && message.role === 'assistant')
       .flatMap(message => message.parts.flatMap(part => part.type === 'text' ? [part.text] : [])).join('\n');
@@ -197,7 +213,8 @@ export class AntigravityHost<Context extends HarnessContext = HarnessContext> im
     input.signal?.throwIfAborted();
     const inspect = input.tools === true;
     const servers = input.mcpServers ?? [];
-    const session = await this.openSession({ agentId: `generation-${randomUUID()}`, cwd: input.cwd, mcpServers: servers.map(server => sessionMcpServer(server.url, server.name, [...server.enabledTools])), utilityMcpTools: servers.map(server => ({server:server.name, tools:server.enabledTools})), tools: inspect ? 'read-only' : false, ...(input.timeoutMs === null ? {promptTimeoutMs:null} : {}), ephemeral: true, changed: () => {}, usage: event => this.observeUsage({ ...event, agentId: agent.id }) });
+    validateMcpPolicy(servers, 'antigravity');
+    const session = await this.openSession({ agentId: `generation-${randomUUID()}`, cwd: input.cwd, mcpServers: servers.map(server => sessionMcpServer(server.url, server.name, [...server.enabledTools])), utilityMcpTools: [], tools: inspect ? 'read-only' : false, ...(input.timeoutMs === null ? {promptTimeoutMs:null} : {}), ephemeral: true, changed: () => {}, usage: event => this.observeUsage({ ...event, agentId: agent.id }) });
     this.auxiliary.add(session);
     const abort = () => { void session.interrupt().catch(() => session.close()); };
     input.signal?.addEventListener('abort', abort, { once: true });
@@ -367,7 +384,7 @@ export class AntigravityHost<Context extends HarnessContext = HarnessContext> im
     catch (error) { if (error instanceof NativeLoginRequired) this.authState(false); throw error; }
   }
   private nativeRuntimeOptions(): Partial<Parameters<typeof AcpRuntime.open>[0]> {
-    return { client: this.options.client, ...this.options.runtimeOptions?.() };
+    return { client: this.options.client, ...(this.options.resolveRuntime ? { runtime: this.options.resolveRuntime() ?? undefined } : {}), ...this.options.runtimeOptions?.() };
   }
 
   private workingDirectory(agent: Pick<Context, 'folder' | 'id'>): string {

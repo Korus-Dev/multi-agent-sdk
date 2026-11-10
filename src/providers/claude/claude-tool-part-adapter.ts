@@ -1,13 +1,13 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import type { RendererToolPart, RendererToolPartUpdate } from '../../contracts/index';
+import type { ToolPart, ToolPartUpdate } from '../../contracts/index';
 import { classifyShellCommand, type ClassifiedShellCommand } from './claude-command-classifier';
 import { claudeToolSemantics } from './claude-tool-semantics';
 import { claudeConfigDirectory } from './config-directory';
 import type { ClaudeSdkContentBlock } from './protocol';
 
 type ClaudeToolUseBlock = Extract<ClaudeSdkContentBlock, { type: 'tool_use' }>;
-type ClaudeToolStatus = RendererToolPart['status'];
+type ClaudeToolStatus = ToolPart['status'];
 
 export type ClaudeToolFileActivity = {
   action: 'read' | 'edit' | 'create';
@@ -25,7 +25,7 @@ export type ClaudeToolPartOptions = {
 export function claudeToolPart(
   block: ClaudeToolUseBlock,
   options: ClaudeToolPartOptions = {},
-): RendererToolPart {
+): ToolPart {
   const status = options.status ?? 'running';
   const input = recordValue(block.input) ?? {};
   const metadata = {
@@ -293,7 +293,7 @@ function unique(values: string[]): string[] {
 
 
 
-export function claudeToolPartInputUpdate(toolPart: RendererToolPart): RendererToolPartUpdate {
+export function claudeToolPartInputUpdate(toolPart: ToolPart): ToolPartUpdate {
   return {
     itemId: toolPart.id,
     title: toolPart.title,
@@ -306,11 +306,11 @@ export function claudeToolPartInputUpdate(toolPart: RendererToolPart): RendererT
 }
 
 export function completedClaudeToolPart(
-  toolPart: RendererToolPart,
+  toolPart: ToolPart,
   status: Extract<ClaudeToolStatus, 'completed' | 'failed'>,
   output: unknown,
   body: string,
-): RendererToolPart {
+): ToolPart {
   return {
     ...toolPart,
     status,
@@ -320,7 +320,7 @@ export function completedClaudeToolPart(
   };
 }
 
-export function claudeToolFileActivity(toolPart: RendererToolPart): ClaudeToolFileActivity | null {
+export function claudeToolFileActivity(toolPart: ToolPart): ClaudeToolFileActivity | null {
   const input = recordValue(toolPart.input);
   const filePath = stringValue(input?.path) ?? stringValue(input?.file_path) ?? stringValue(input?.notebook_path);
   if (!filePath) {
@@ -354,7 +354,7 @@ function fileToolPart(
     status: ClaudeToolStatus;
     title: string;
   },
-): RendererToolPart {
+): ToolPart {
   const fullFilePath = values.filePath ? fullPath(values.filePath, values.options.cwd) : undefined;
   const normalizedInput = {
     ...values.input,
@@ -388,7 +388,7 @@ function fileChangeToolPart(
     options: ClaudeToolPartOptions;
     status: ClaudeToolStatus;
   },
-): RendererToolPart {
+): ToolPart {
   const fullFilePath = values.filePath ? fullPath(values.filePath, values.options.cwd) : undefined;
   const change = fullFilePath ? {
     kind: values.changeKind,
@@ -421,8 +421,8 @@ function fileChangeToolPart(
 
 function toolPart(
   block: ClaudeToolUseBlock,
-  values: Omit<RendererToolPart, 'id' | 'type'>,
-): RendererToolPart {
+  values: Omit<ToolPart, 'id' | 'type'>,
+): ToolPart {
   return {
     type: 'tool',
     id: block.id,

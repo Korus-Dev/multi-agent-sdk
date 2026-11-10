@@ -107,6 +107,15 @@ for (const provider of ['cursor', 'antigravity'] as const) it(`${provider}: fixt
       await expect.poll(() => host.readSession(recovered).busy).toBe(false);
       expect(host.readSession(recovered).requests).toEqual([]);
     }
+    const abort = new AbortController();
+    let privateScopeBusy = false;
+    const off = host.onEvent(event => { if (event.type === 'session.changed' && event.session !== recovered && event.state.busy) privateScopeBusy = true; });
+    const waiting = host.executeScopedPrompt(recovered, { cwd: root, prompt: 'wait', scope: { id: 'cancellable' }, signal: abort.signal });
+    const cancelled = expect(waiting).rejects.toMatchObject({ name: 'AbortError' });
+    await expect.poll(() => privateScopeBusy).toBe(true);
+    abort.abort();
+    await cancelled; off();
+    expect(host.readSession(recovered).busy).toBe(false);
     const running = await host.sendPrompt(recovered, 'wait');
     await host.interrupt(recovered, running.turnId);
     await expect.poll(() => host.readSession(recovered).busy).toBe(false);

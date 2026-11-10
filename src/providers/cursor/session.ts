@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { AgentRequestResponse } from '../../conversations/agent-request';
 import path from 'node:path';
 import { realpath } from 'node:fs/promises';
-import type { RendererMessage, RendererMessagePart } from '../../contracts/index';
+import type { Message, MessagePart } from '../../contracts/index';
 import type { CursorConversationEvent } from '../../contracts/cursor-conversation';
 import { AcpConnection, AcpError, record } from '../../acp/acp-connection';
 import { cursorEnvironment, resolveCursorExecutable, type CursorRuntime, cursorRuntime } from './runtime';
@@ -175,7 +175,7 @@ export class CursorSession {
   get sessionId() { return this.snapshot.sessionId; }
   get isClosed() { return this.disposed; }
   get cwd() { return this.options.cwd; }
-  prompt(text: string, wireText: string, metadata?: RendererMessage['metadata'], attachments: unknown[] = [], parts: RendererMessagePart[] = []): { turnId: string; completion: Promise<void> } {
+  prompt(text: string, wireText: string, metadata?: Message['metadata'], attachments: unknown[] = [], parts: MessagePart[] = []): { turnId: string; completion: Promise<void> } {
     if (this.disposed || this.active) throw new Error('Cursor session is closed or still finishing a turn.');
     this.interrupted = false;
     const turnId = this.transcript.start(text, metadata, parts);
@@ -203,7 +203,7 @@ export class CursorSession {
       if (this.interrupted) { this.transcript.finish(turnId, 'interrupted'); if (!this.closing) this.failed(error instanceof Error ? error : new Error('Cursor cancellation failed.')); }
       else if (error instanceof Error && isCursorQuotaFailure(error)) {
         // A rejected turn is not a dead transport or an expired login. Keep the
-        // session available for manual retry or the daemon's known-reset policy.
+        // session available for manual retry or the host's known-reset policy.
         this.cancelRequests();
         this.transcript.finish(turnId, 'failed', error.message);
       } else this.failed(error instanceof Error ? error : new Error('Cursor turn failed.'));

@@ -1,4 +1,4 @@
-import { normalizePromptContent, type CodexPromptPart } from '../../core/surface';
+import { normalizePromptContent, type PromptPart } from '../../core/surface';
 import type { v2 } from 'codex-sdk';
 import type {
   CodexSurfaceReviewTarget,
@@ -60,18 +60,18 @@ export function normalizeReviewTarget(target: CodexSurfaceReviewTarget): v2.Revi
   return { ...target };
 }
 
-export function authoredPromptContent(content?: readonly CodexPromptPart[]): CodexPromptPart[] | undefined {
+export function authoredPromptContent(content?: readonly PromptPart[]): PromptPart[] | undefined {
   if (content === undefined) return undefined;
   const normalized = normalizePromptContent(content);
   return normalized;
 }
 
-export function promptSkillInputsFromContent(content: readonly CodexPromptPart[] = []): CodexSurfaceSkillInput[] {
+export function promptSkillInputsFromContent(content: readonly PromptPart[] = []): CodexSurfaceSkillInput[] {
   return content.flatMap(part => part.type === 'mention' && part.kind === 'skill'
     ? [{ name: part.value, path: part.id }] : []);
 }
 
-export function promptMentionInputs(content: readonly CodexPromptPart[] = []): Extract<v2.UserInput, { type: 'mention' }>[] {
+export function promptMentionInputs(content: readonly PromptPart[] = []): Extract<v2.UserInput, { type: 'mention' }>[] {
   return content.flatMap(part => part.type === 'mention' && (part.kind === 'file' || part.kind === 'plugin')
     ? [{ type: 'mention' as const, name: part.label, path: part.kind === 'plugin' ? `plugin://${part.id}` : part.id }] : []);
 }

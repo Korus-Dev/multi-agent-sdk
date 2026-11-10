@@ -5,7 +5,7 @@ import { createClaudeHistorySource, type ClaudeHistorySource, type ClaudeTurnRan
 import { access, readFile, readdir, realpath, stat } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type { Agent, BackendSession, ClaudeConversationTurn, ConversationSummary, RendererMessage, RendererMessagePart, RendererToolPart, ThreadGoal } from '../../contracts/index';
+import type { Agent, BackendSession, ClaudeConversationTurn, ConversationSummary, Message, MessagePart, ToolPart, ThreadGoal } from '../../contracts/index';
 import { claudeWorkingDirectory } from './working-directory';
 import { claudeConfigDirectory } from './config-directory';
 import { claudeToolPart, completedClaudeToolPart, type ClaudeToolPartOptions } from './claude-tool-part-adapter';
@@ -16,7 +16,7 @@ import { ClaudeTaskPlan } from './claude-task-plan';
 
 export type ClaudeTranscriptHistory = {
   backendSession: BackendSession;
-  messages: RendererMessage[];
+  messages: Message[];
   source?: ClaudeHistorySource;
   turns?: ClaudeConversationTurn[];
   turnBoundaries?: Record<string, string>;
@@ -81,7 +81,7 @@ export async function loadClaudeTranscriptHistory(
     if (!isPathInside(path.join(project, sessionId, 'subagents'), child)) throw new Error('Claude subagent transcript is outside its session.');
     const content = await readFile(child, 'utf8');
     return { backendSession: agent.backendSession,
-      messages: claudeTranscriptToRendererMessages(content, agent.id, `${sessionId}-${options.subagentId}`, undefined, undefined, true, undefined, undefined, undefined, options.toolOptions),
+      messages: claudeTranscriptToMessages(content, agent.id, `${sessionId}-${options.subagentId}`, undefined, undefined, true, undefined, undefined, undefined, options.toolOptions),
     };
   }
 
@@ -131,9 +131,9 @@ async function decodeClaudeHistory(agent: Agent, sessionId: string, transcriptPa
   const taskPlan = new ClaudeTaskPlan();
   const turns: ClaudeConversationTurn[] = [];
   const ranges = new Map<string, ClaudeTurnRange>();
-  const messages = claudeTranscriptToRendererMessages(content, agent.id, sessionId, turnBoundaries, nativeMessageTurnIds, false, taskPlan, turns, ranges, toolOptions);
+  const messages = claudeTranscriptToMessages(content, agent.id, sessionId, turnBoundaries, nativeMessageTurnIds, false, taskPlan, turns, ranges, toolOptions);
   const source = await createClaudeHistorySource(transcriptPath, content, ranges,
-    text => claudeTranscriptToRendererMessages(text, agent.id, sessionId, undefined, undefined, undefined, undefined, undefined, undefined, toolOptions), snapshot);
+    text => claudeTranscriptToMessages(text, agent.id, sessionId, undefined, undefined, undefined, undefined, undefined, undefined, toolOptions), snapshot);
   return {
     backendSession: {
       ...session,
@@ -278,15 +278,15 @@ export async function listClaudeTranscriptSummaries(
   return summaries;
 }
 
-export function claudeTranscriptToRendererMessages(content: string, agentId: string, sessionId: string, turnBoundaries?: Record<string, string>, nativeMessageTurnIds?: Record<string, string>, includeSidechain = false, taskPlan?: ClaudeTaskPlan, turns?: ClaudeConversationTurn[], ranges?: Map<string, ClaudeTurnRange>, toolOptions?: ClaudeToolPartOptions): RendererMessage[] {
-  const messages: RendererMessage[] = [];
+export function claudeTranscriptToMessages(content: string, agentId: string, sessionId: string, turnBoundaries?: Record<string, string>, nativeMessageTurnIds?: Record<string, string>, includeSidechain = false, taskPlan?: ClaudeTaskPlan, turns?: ClaudeConversationTurn[], ranges?: Map<string, ClaudeTurnRange>, toolOptions?: ClaudeToolPartOptions): Message[] {
+  const messages: Message[] = [];
   let currentTurnId: string | null = null;
   let currentTurnCreatedAt: string | null = null;
   let currentTurn: ClaudeConversationTurn | null = null;
   let assistantCreatedAt: string | null = null;
   const assistantSegments = new Map<string, number>();
   const turnsById = new Map<string, ClaudeConversationTurn>();
-  const assistantParts: RendererMessagePart[] = [];
+  const assistantParts: MessagePart[] = [];
   const pendingTools = new Set<string>();
   let byteOffset = 0; let lineStart = 0; let lineEnd = 0;
   const rememberRange = () => {
@@ -553,8 +553,8 @@ async function findIndexedTranscriptPath(projectsRoot: string, folder: string, s
   return null;
 }
 
-function assistantMessageParts(message: ClaudeSdkMessage, cwd?: string, toolOptions?: ClaudeToolPartOptions): RendererMessagePart[] {
-  return claudeMessageContentBlocks(message).flatMap((block): RendererMessagePart[] => {
+function assistantMessageParts(message: ClaudeSdkMessage, cwd?: string, toolOptions?: ClaudeToolPartOptions): MessagePart[] {
+  return claudeMessageContentBlocks(message).flatMap((block): MessagePart[] => {
     if (block.type === 'text' && typeof block.text === 'string' && block.text) {
       return [{ type: 'text', text: block.text }];
     }
@@ -575,8 +575,8 @@ function messageText(message: ClaudeSdkMessage): string {
     .trim();
 }
 
-function applyToolResult(parts: RendererMessagePart[], block: Extract<ClaudeSdkContentBlock, { type: 'tool_result' }>): RendererToolPart | undefined {
-  const toolPart = parts.find((part): part is RendererToolPart => part.type === 'tool' && part.id === block.tool_use_id);
+function applyToolResult(parts: MessagePart[], block: Extract<ClaudeSdkContentBlock, { type: 'tool_result' }>): ToolPart | undefined {
+  const toolPart = parts.find((part): part is ToolPart => part.type === 'tool' && part.id === block.tool_use_id);
   if (!toolPart) {
     return;
   }
@@ -659,3 +659,6 @@ function isPathInside(parent: string, child: string): boolean {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
+
+/** @deprecated Use claudeTranscriptToMessages. */
+export { claudeTranscriptToMessages as claudeTranscriptToRendererMessages };

@@ -6,16 +6,16 @@ import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { open, type Entry, type ZipFile } from 'yauzl';
 import { AcpRuntime } from './acp-runtime';
-import { managedRuntimeDirectory, resolveAcpRuntime } from './runtime';
+import { managedRuntimeDirectory, resolveAcpRuntime, type AcpRuntimeConfiguration } from './runtime';
 import { resolveAcpReleaseAsset, type AcpReleaseAsset } from './release';
 
 /** Installs on explicit request; provider binaries are never app resources. */
-export async function installAcpRuntime(options: { dataDirectory?: string } = {}): Promise<void> {
+export async function installAcpRuntime(options: { dataDirectory?: string } & AcpRuntimeConfiguration = {}): Promise<void> {
   const asset = resolveAcpReleaseAsset();
   const destination = managedRuntimeDirectory(options.dataDirectory);
   if (!asset || !destination) throw new Error('Antigravity installation is unavailable for this platform.');
-  if (resolveAcpRuntime(options.dataDirectory)) return;
-  if (process.env.APP_ANTIGRAVITY_COMMAND?.trim() || process.env.ANTIGRAVITY_HARNESS_PATH?.trim()) {
+  if (resolveAcpRuntime(options.dataDirectory, options)) return;
+  if (options.command?.trim() || options.harnessPath?.trim() || process.env.ANTIGRAVITY_HARNESS_PATH?.trim()) {
     throw new Error('Clear the custom Antigravity runtime paths before using managed installation.');
   }
   const parent = path.dirname(destination);
@@ -43,7 +43,7 @@ export async function installAcpRuntime(options: { dataDirectory?: string } = {}
     await runtime.close();
     // Only the complete, verified pair becomes discoverable.
     await rename(pair, destination);
-    if (!resolveAcpRuntime(options.dataDirectory)) throw new Error('The installed Antigravity runtime could not be detected. Check custom runtime paths.');
+    if (!resolveAcpRuntime(options.dataDirectory, options)) throw new Error('The installed Antigravity runtime could not be detected. Check custom runtime paths.');
   } finally { await rm(staging, { recursive: true, force: true }); }
 }
 

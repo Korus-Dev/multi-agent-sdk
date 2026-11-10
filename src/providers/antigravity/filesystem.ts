@@ -1,7 +1,7 @@
 import { lstat, mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-/** ACP filesystem calls come from the native process, never from renderer paths. */
+/** ACP filesystem calls come from the native process, never from untrusted client paths. */
 export async function handleAcpFileRequest(method: string, params: Record<string, unknown>, roots: string[]): Promise<unknown> {
   if (typeof params.path !== 'string' || !path.isAbsolute(params.path)) throw new Error('ACP requires an absolute file path.');
   if (!['fs/read_text_file', 'fs/write_text_file'].includes(method)) throw new Error('Unsupported ACP client method.');

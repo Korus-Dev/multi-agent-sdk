@@ -1,3 +1,4 @@
+import { validateMcpPolicy } from '../../mcp-policy';
 import { notifyListeners } from 'codex-sdk';
 import type { HarnessDiagnostic } from '../../diagnostics';
 import { CodexImageGeneration } from './image-generation';
@@ -20,7 +21,7 @@ export type CodexHostOptions<Context extends Agent = Agent> = {
   images?: import('./image-generation').CodexImageGenerationOptions;
 };
 function defaultFormatPrompt(prompt: string, content?: SendPromptOptions['content'], _native?: boolean): string { return content === undefined ? prompt : promptContentDispatchText(content, prompt); }
-function scopedMcpServers(scope: HarnessPromptScope) { return (scope.mcpServers ?? []).map(server => ({ name: server.name, transport: { type: 'http' as const, url: server.url }, ...(server.enabledTools ? { enabledTools: [...server.enabledTools] } : {}), toolApprovalMode: 'auto' as const, required: true })); }
+function scopedMcpServers(scope: HarnessPromptScope) { return (scope.mcpServers ?? []).map(server => ({ name: server.name, transport: { type: 'http' as const, url: server.url }, ...(server.enabledTools ? { enabledTools: [...server.enabledTools] } : {}), ...(server.approval === 'auto' ? { toolApprovalMode: 'auto' as const } : {}), ...(server.required === undefined ? {} : { required: server.required }) })); }
 function nativeApprovalPreset(defaults: import('../../contracts').BackendDefaults | undefined): ApprovalPreset {
   if (defaults?.kind !== 'codex') return 'ask-for-approval';
   if (defaults.approvalPreset) return defaults.approvalPreset;
@@ -29,7 +30,7 @@ function nativeApprovalPreset(defaults: import('../../contracts').BackendDefault
 }
 import { providerSafetyBlockMessage, type ProviderSafetyReviewTarget } from '../../contracts/safety-review';
 
-import { ConversationContentTransport } from './index';
+import { ConversationContentTransport } from './conversation-content-transport';
 
 
 import { normalizePromptContent } from '../../core/surface';
@@ -59,9 +60,9 @@ import type {
   ConversationSummary,
   DevicePairingSession,
   DevicePairingStatus,
-  RendererMessage,
-  RendererMessagePart,
-  RendererToolPart,
+  Message,
+  MessagePart,
+  ToolPart,
   PairedDevice,
   SendPromptOptions,
   CodexAuthentication, SubagentActivityChange,
@@ -405,6 +406,7 @@ export class CodexSurfaceAgentAdapter<Context extends Agent = Agent> {
   async generateText(_agent: Context, input: HarnessTextGenerationInput): Promise<HarnessTextGenerationResult> {
     input.signal?.throwIfAborted();
     const servers = input.mcpServers ?? [];
+    validateMcpPolicy(servers, 'codex');
     const selection = input.selectModel ? input.selectModel(await this.listModels()) : input.selection ?? {};
     input.signal?.throwIfAborted();
     return this.surface.generateText(input.prompt, {
@@ -416,7 +418,7 @@ export class CodexSurfaceAgentAdapter<Context extends Agent = Agent> {
       serviceTier: null,
       ...(input.tools === true ? { tools: 'read-only' as const } : {}),
       ...(input.attachments ? { attachments: input.attachments } : {}),
-      ...(servers.length ? {mcpServers: servers.map(server => ({name: server.name, transport: {type: 'http' as const, url: server.url}, enabledTools: [...server.enabledTools], toolApprovalMode: 'auto' as const, required: true}))} : {}),
+      ...(servers.length ? {mcpServers: servers.map(server => ({name: server.name, transport: {type: 'http' as const, url: server.url}, enabledTools: [...server.enabledTools], ...(server.approval === 'auto' ? { toolApprovalMode: 'auto' as const } : {}), ...(server.required === undefined ? {} : { required: server.required })}))} : {}),
       ...(input.developerInstructions ? { developerInstructions: input.developerInstructions } : {}),
       ...(input.outputSchema ? { outputSchema: input.outputSchema } : {}),
     });
@@ -426,14 +428,25 @@ export class CodexSurfaceAgentAdapter<Context extends Agent = Agent> {
     return this.imageGeneration.generate(input, signal);
   }
 
+  async cancelScopedPrompt(agent: Context): Promise<void> {
+    const session = this.sessionsByAgentId.get(agent.id);
+    try {
+      if (session?.handle.getSnapshot().activeTurnId) await session.handle.interrupt();
+    } finally { this.releaseConversation(agent.id); }
+  }
+
   async executeScopedPrompt(agent: Context, input: HarnessScopedPromptInput): Promise<HarnessScopedPromptResult> {
+    input.signal?.throwIfAborted();
+    validateMcpPolicy(input.scope.mcpServers ?? [], 'codex');
     await this.start();
+    input.signal?.throwIfAborted();
     if (input.session && input.session.kind !== 'codex') {
       throw new Error('Codex cannot continue a non-Codex scoped conversation.');
     }
     const requestedAgent = { ...agent, folder: input.cwd, backendSession: input.session };
     const scopedExtensionContext = this.extensionContext(requestedAgent, input.scope);
     const session = await this.ensureSession(requestedAgent, scopedExtensionContext);
+    input.signal?.throwIfAborted();
     const current = session.handle.getSnapshot();
     if (current.busy || current.activeTurnId || current.queuedPrompts.length || current.approvals.length || current.clientRequests.length) throw new Error('Codex already has active work for this context.');
     session.agent = agent;
@@ -450,16 +463,19 @@ export class CodexSurfaceAgentAdapter<Context extends Agent = Agent> {
     });
     try {
       await conversation.load(this.conversationConfiguration(requestedAgent, input.scope));
+      input.signal?.throwIfAborted();
       const beforeTurnIds = conversation.getSnapshot().turnIds;
       const promptOptions = { ...scopedPromptOptions(agent), ...surfacePromptOptions(input.options) };
       const started = Object.keys(promptOptions).length > 0
         ? await conversation.sendMessage(input.prompt, promptOptions)
         : await conversation.sendMessage(input.prompt);
+      input.signal?.throwIfAborted();
       targetTurnId = resultTurnId(started, beforeTurnIds) ?? null;
       if (!targetTurnId) throw new Error('Codex did not start the scoped turn.');
       const immediate = completedBeforeTarget.get(targetTurnId)
         ?? started.turns.find((turn) => turn.id === targetTurnId && turn.status !== 'inProgress')?.status;
       const status = immediate ?? await completion;
+      input.signal?.throwIfAborted();
       const snapshot = conversation.getSnapshot();
       const completedFinalAnswer = sessionFinalAnswerText(snapshot.messages, targetTurnId);
       if (status !== 'completed' && !(status === 'interrupted' && completedFinalAnswer)) {
@@ -471,7 +487,7 @@ export class CodexSurfaceAgentAdapter<Context extends Agent = Agent> {
       };
     } finally {
       unsubscribe();
-      await conversation.load(this.conversationConfiguration(agent));
+      if (!input.signal?.aborted) await conversation.load(this.conversationConfiguration(agent));
     }
   }
 
@@ -702,7 +718,7 @@ export class CodexSurfaceAgentAdapter<Context extends Agent = Agent> {
     };
   }
 
-  async readConversationMessages(threadId: string, agentId: string): Promise<RendererMessage[]> {
+  async readConversationMessages(threadId: string, agentId: string): Promise<Message[]> {
     await this.start();
     const owner = this.subagentOwners.get(threadId);
     if (owner?.agentId === agentId && this.liveSubagentConversationIds.has(threadId)) {
@@ -1087,7 +1103,7 @@ export class CodexSurfaceAgentAdapter<Context extends Agent = Agent> {
         await this.renameSessionIfNeeded(session, this.displayName(agent));
       }
     } catch {
-      // Naming is best effort and must not prevent the first prompt. daemon
+      // Naming is best effort and must not prevent the first prompt. The host
       // retries through its normal post-session title synchronization.
     }
     if (this.closed || this.sessionsByAgentId.get(agent.id) !== session) {
@@ -1482,7 +1498,7 @@ export class CodexSurfaceAgentAdapter<Context extends Agent = Agent> {
 
   private handleConversationEvent(session: AgentConversation<Context>, event: CodexConversationEvent): void {
     if (session.suppressEvents) return;
-    if (isRendererConversationEvent(event)) this.publishConversationEvent(session, event);
+    if (isClientConversationEvent(event)) this.publishConversationEvent(session, event);
     this.historyHydratedAtByAgentId.set(session.agent.id, Date.now());
     const consumption=codexExecutionConsumption(event);
     const requestCoverage = codexRequestCoverage(event);
@@ -1996,7 +2012,7 @@ function subagentStatusFromTurn(
 
 function subagentStatusFromHistory(
   threadStatus: CodexSurfaceThreadStatus | null,
-  messages: readonly RendererMessage[],
+  messages: readonly Message[],
 ): SubagentStatusChange['status'] | null {
   if (threadStatus?.type === 'active') return 'running';
   if (threadStatus?.type === 'systemError') return 'errored';
@@ -2059,7 +2075,7 @@ export function surfaceMessages(
   agentId: string,
   completeStreaming = false,
   omitToolPayloads = false,
-): RendererMessage[] {
+): Message[] {
   return messages.map((message) => ({
     id: message.id,
     agentId,
@@ -2068,7 +2084,7 @@ export function surfaceMessages(
     status: completeStreaming && message.status === 'streaming' ? 'complete' : message.status,
     ...(message.turnId ? { turnId: message.turnId } : {}),
     ...(message.metadata?.promptContent === undefined ? {} : { metadata: { promptContent: normalizePromptContent(message.metadata.promptContent) } }),
-    parts: rendererParts(message.parts, omitToolPayloads),
+    parts: messageParts(message.parts, omitToolPayloads),
     createdAt: message.createdAt ?? new Date(0).toISOString(),
   }));
 }
@@ -2077,7 +2093,7 @@ function historicalSurfaceMessages(
   messages: readonly SurfaceMessage[],
   agentId: string,
   completeStreaming = false,
-): RendererMessage[] {
+): Message[] {
   return surfaceMessages(messages, agentId, completeStreaming, true);
 }
 
@@ -2085,7 +2101,7 @@ const MAX_TOOL_LABEL_BYTES = 4 * 1024;
 const MAX_TOOL_METADATA_BYTES = 32 * 1024;
 const MAX_TOOL_STATUS_BYTES = 64 * 1024;
 
-function rendererParts(parts: readonly SurfaceMessagePart[], omitToolPayloads = false): RendererMessagePart[] {
+function messageParts(parts: readonly SurfaceMessagePart[], omitToolPayloads = false): MessagePart[] {
   const generatedImagePaths = new Map<string, string>();
   for (const part of parts) {
     if (part.type !== 'tool') continue;
@@ -2096,7 +2112,7 @@ function rendererParts(parts: readonly SurfaceMessagePart[], omitToolPayloads = 
   }
 
   return parts.map((part) => {
-    const rendered = rendererPart(part, omitToolPayloads);
+    const rendered = messagePart(part, omitToolPayloads);
     if (
       rendered.type === 'media' &&
       rendered.itemId &&
@@ -2114,8 +2130,8 @@ function rendererParts(parts: readonly SurfaceMessagePart[], omitToolPayloads = 
   });
 }
 
-function rendererPart(part: SurfaceMessagePart, omitToolPayloads = false): RendererMessagePart {
-  if (part.type === 'tool') return rendererToolPart(part, omitToolPayloads);
+function messagePart(part: SurfaceMessagePart, omitToolPayloads = false): MessagePart {
+  if (part.type === 'tool') return toolPartProjection(part, omitToolPayloads);
   if (part.type === 'attachment') return { type: 'attachment', attachment: { ...part.attachment } };
   return { ...part };
 }
@@ -2142,7 +2158,7 @@ function backendSkillSummary(skill: CodexSurfaceSkill): BackendSkillSummary {
   };
 }
 
-function rendererToolPart(part: SurfaceMessageToolPart, omitPayloads = false): RendererToolPart {
+function toolPartProjection(part: SurfaceMessageToolPart, omitPayloads = false): ToolPart {
   const metadata = omitPayloads ? undefined : boundedToolMetadata(part.metadata);
   const input = omitPayloads ? undefined : toolInputProjection(part.input);
   const output = omitPayloads ? undefined : toolOutputProjection(part.output);
@@ -2306,7 +2322,7 @@ function conversationSnapshotForTransport(
   });
 }
 
-function isRendererConversationEvent(event: CodexConversationEvent): boolean {
+function isClientConversationEvent(event: CodexConversationEvent): boolean {
   switch (event.type) {
     case 'conversation.summaryUpserted':
     case 'conversation.summaryRemoved':

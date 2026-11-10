@@ -21,6 +21,7 @@ export type ClaudeTurnParams = {
   mcpServerName?: string;
   hostedMcpServerUrls?: Readonly<Record<string, string>>;
   allowedTools?: string[];
+  enabledMcpTools?: Readonly<Record<string, readonly string[]>>;
   attachments?: readonly PromptAttachment[];
 };
 

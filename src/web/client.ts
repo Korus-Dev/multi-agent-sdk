@@ -6,7 +6,7 @@ import {
 } from '../core/surface-bridge';
 import type {
   CodexSurfaceEvent,
-  CodexSurfaceRendererApi,
+  CodexSurfaceClientApi,
   CodexSurfaceSnapshot,
   CodexSurfaceStatePatch,
 } from '../core/surface';
@@ -45,7 +45,7 @@ export type CodexWebSurfaceClientConnectionState =
   | 'disconnected'
   | 'ready';
 
-export type CodexWebSurfaceClient = CodexSurfaceRendererApi & {
+export type CodexWebSurfaceClient = CodexSurfaceClientApi & {
   disconnect(code?: number, reason?: string): void;
   getConnectionState(): CodexWebSurfaceClientConnectionState;
 };
@@ -87,7 +87,20 @@ export function createCodexWebSurfaceClient(
   return Object.freeze(api) as CodexWebSurfaceClient;
 }
 
-export function createCodexBrowserWebSocketPort(socket: WebSocket): CodexWebSocketPort {
+export type BrowserWebSocketEvents = {
+  message: { data: unknown };
+  close: { code: number; reason: string; wasClean: boolean };
+  error: unknown;
+};
+/** Structural browser adapter; the harness core does not require DOM globals. */
+export type BrowserWebSocketLike = {
+  send(data: string): void;
+  close(code?: number, reason?: string): void;
+  addEventListener<Type extends keyof BrowserWebSocketEvents>(type: Type, listener: (event: BrowserWebSocketEvents[Type]) => void): void;
+  removeEventListener<Type extends keyof BrowserWebSocketEvents>(type: Type, listener: (event: BrowserWebSocketEvents[Type]) => void): void;
+};
+
+export function createCodexBrowserWebSocketPort(socket: BrowserWebSocketLike): CodexWebSocketPort {
   return {
     send: (data) => socket.send(data),
     close: (code, reason) => socket.close(code, reason),
@@ -399,10 +412,10 @@ type ReadyWaiter = {
   reject(error: unknown): void;
 };
 
-function listenBrowserSocket<Type extends keyof WebSocketEventMap>(
-  socket: WebSocket,
+function listenBrowserSocket<Type extends keyof BrowserWebSocketEvents>(
+  socket: BrowserWebSocketLike,
   type: Type,
-  listener: (event: WebSocketEventMap[Type]) => void,
+  listener: (event: BrowserWebSocketEvents[Type]) => void,
 ): () => void {
   socket.addEventListener(type, listener);
   return () => socket.removeEventListener(type, listener);

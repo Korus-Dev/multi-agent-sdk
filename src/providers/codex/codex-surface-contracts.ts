@@ -225,7 +225,7 @@ export type CodexSurfaceOptions = {
   loadingStrategy?: CodexConversationLoadingStrategy;
   /** Detail fetched for history pages; independent of turn pagination. Defaults to full. */
   historyItemsView?: 'full' | 'summary';
-  /** Trusted main-process CODEX_HOME for the app-server. Never expose this through renderer IPC. */
+  /** Trusted host-local CODEX_HOME for the app-server. Never expose this through client transports. */
   codexHome?: string;
   cwd?: string;
   autoSelectFirstConversation?: boolean;

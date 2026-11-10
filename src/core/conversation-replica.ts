@@ -8,7 +8,7 @@ import type {
 } from './surface';
 
 /**
- * A renderer-local projection initialized once from a conversation snapshot and
+ * A client-local projection initialized once from a conversation snapshot and
  * advanced with the much smaller semantic event stream.
  */
 export type CodexConversationReplica = {

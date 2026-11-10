@@ -1,14 +1,14 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { normalizePromptContent, promptContentText, type CodexPromptPart } from '../../core/surface';
-import type { RendererMessage } from '../../contracts/index';
+import { normalizePromptContent, promptContentText, type PromptPart } from '../../core/surface';
+import type { Message } from '../../contracts/index';
 
 export function promptContentDirectory(home: string, sessionId: string): string {
   return path.join(home, 'prompt-content', createHash('sha256').update(sessionId).digest('hex'));
 }
 
-export async function savePromptContent(home: string, sessionId: string, messageId: string, content: readonly CodexPromptPart[]): Promise<void> {
+export async function savePromptContent(home: string, sessionId: string, messageId: string, content: readonly PromptPart[]): Promise<void> {
   const directory = promptContentDirectory(home, sessionId);
   await mkdir(directory, { recursive: true, mode: 0o700 });
   const file = path.join(directory, `${messageId}.json`);
@@ -17,7 +17,7 @@ export async function savePromptContent(home: string, sessionId: string, message
 }
 
 /** Only native user UUIDs with authored records can recover chips; text is never inferred. */
-export async function restorePromptContent(home: string, sessionId: string, messages: RendererMessage[]): Promise<void> {
+export async function restorePromptContent(home: string, sessionId: string, messages: Message[]): Promise<void> {
   const directory = promptContentDirectory(home, sessionId);
   const names = new Set(await readdir(directory).catch(error => { if (error.code === 'ENOENT') return []; throw error; }));
   const prefix = `user-${sessionId}-`;

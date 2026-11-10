@@ -1,3 +1,4 @@
+import { validateMcpPolicy, mcpToolEnabled } from '../../mcp-policy';
 import { ClaudeRequestUsageObserver, type ClaudeRequestUsage, type ClaudeRequestUsageOwner } from './request-usage';
 import { ClaudeModelObserver } from './claude-model-observer';
 import { validConsumption, type Consumption } from '../../contracts/usage';
@@ -90,6 +91,7 @@ type ClaudeSdkSession = {
   effort: ClaudeTurnParams['effort'];
   permissionMode: PermissionMode;
   allowedTools: readonly string[];
+  enabledMcpTools?: Readonly<Record<string, readonly string[]>>;
   closed: boolean;
 };
 
@@ -327,9 +329,12 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
     const sessionId = this.createSessionId();
     const inspect = input.tools === true;
     const servers = this.options.validateMcpServers?.(input.mcpServers) ?? input.mcpServers ?? [];
-    const allowedTools = servers.flatMap(server => server.enabledTools.map(tool => `mcp__${server.name}__${tool}`));
+    validateMcpPolicy(servers, 'claude');
+    const enabledMcpTools = Object.fromEntries(servers.map(server => [server.name, server.enabledTools]));
+    const allowedTools = servers.filter(server => server.approval === 'auto').flatMap(server => server.enabledTools.map(tool => `mcp__${server.name}__${tool}`));
     const canUseTool: CanUseTool = async (name, args, context) => {
-      if (allowedTools.includes(name)) return {behavior: 'allow', updatedInput: args};
+      if (!mcpToolEnabled(name, enabledMcpTools)) return { behavior: 'deny', message: 'Tool unavailable in this scope.' };
+      if (allowedTools.some(pattern => toolMatchesPattern(name, pattern))) return {behavior: 'allow', updatedInput: args};
       if (!inspect) return denyInspectionToolUse(name, args, context);
       const updatedInput = await readOnlyWorkspaceTool(name, args, input.cwd);
       return updatedInput ? { behavior: 'allow', updatedInput } : { behavior: 'deny', message: 'This utility only inspects Git and source in its working folder.' };
@@ -413,6 +418,7 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
       effort: params.effort ?? null,
       permissionMode: normalizedPermissionMode(params.permissionMode) ?? 'default',
       allowedTools: params.allowedTools ?? [],
+      enabledMcpTools: params.enabledMcpTools,
       closed: false,
     };
     this.sessions.set(sessionId, session);
@@ -557,6 +563,7 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
     input: Record<string, unknown>,
     options: Parameters<CanUseTool>[2],
   ): Promise<PermissionResult> {
+    if (!mcpToolEnabled(toolName, session.enabledMcpTools)) return Promise.resolve({ behavior: 'deny', message: 'Tool unavailable in this scope.' });
     // Handled here rather than via the SDK's allowedTools, which would shadow canUseTool for every tool.
     if (session.allowedTools.some(pattern => toolMatchesPattern(toolName, pattern))) {
       return Promise.resolve({ behavior: 'allow', updatedInput: input });
@@ -696,7 +703,7 @@ function claudeQueryOptions(
 ): ClaudeQueryOptions {
   const permissionMode = normalizedPermissionMode(params.permissionMode);
   const launch = transportOptions.resolveLaunch?.(transportOptions.command, transportOptions.env) ?? { command: transportOptions.command, env: { ...process.env, ...transportOptions.env } };
-  const env = claudeEnvironment(launch.env, transportOptions.client);
+  const env = claudeEnvironment({ ...launch.env }, transportOptions.client, transportOptions.env?.CLAUDE_CODE_ENTRYPOINT);
   return {
     cwd: expandHome(params.cwd),
     ...(launch.command ? { pathToClaudeCodeExecutable: launch.command } : {}),
@@ -796,6 +803,7 @@ function sessionConfigurationKey(params: ClaudeTurnParams): string {
     mcpServerName: params.mcpServerName ?? null,
     hostedMcpServerUrls: params.hostedMcpServerUrls ?? {},
     allowedTools: params.allowedTools ?? [],
+    enabledMcpTools: params.enabledMcpTools,
     allowsBypassPermissions: normalizedPermissionMode(params.permissionMode) === 'bypassPermissions',
   });
 }
@@ -815,7 +823,7 @@ async function claudeUserMessage(
   prompt: string,
   attachments: ClaudeTurnParams['attachments'] = [],
 ): Promise<SDKUserMessage> {
-  const content: ClaudeUserContent = [];
+  const content: ClaudeUserContentBlock[] = [];
   if (prompt) {
     content.push({ type: 'text', text: prompt });
   }
@@ -997,10 +1005,12 @@ function normalizedPermissionMode(value: string | null | undefined): PermissionM
 function claudeEnvironment(
   env: NodeJS.ProcessEnv,
   client?: ClaudeAgentSdkTransportOptions['client'],
+  explicitEntrypoint?: string,
 ): NodeJS.ProcessEnv {
-  // Attribute queries to this app, including launches from inside a Claude session.
+  // Explicit embedding identity wins; callers without one can retain runtime/auth attribution.
   const inheritedEntrypoint = env.CLAUDE_CODE_ENTRYPOINT?.trim();
-  if (!inheritedEntrypoint || inheritedEntrypoint === 'cli' || inheritedEntrypoint.startsWith('sdk-')) env.CLAUDE_CODE_ENTRYPOINT = client?.entrypoint ?? 'sdk-multi-agents';
+  env.CLAUDE_CODE_ENTRYPOINT = client?.entrypoint?.trim() || explicitEntrypoint?.trim()
+    || (inheritedEntrypoint && inheritedEntrypoint !== 'cli' && !inheritedEntrypoint.startsWith('sdk-') ? inheritedEntrypoint : 'sdk-multi-agents');
   // Session mutations run in this process, so query-only home overrides would
   // send reads and deletes to a different store than the running conversation.
   env.CLAUDE_CONFIG_DIR = claudeConfigDirectoryOverride();

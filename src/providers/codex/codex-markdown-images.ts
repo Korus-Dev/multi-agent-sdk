@@ -10,10 +10,9 @@ const markdownImageRegex = /(?<!\[)!\[([^\]]*)\]\(([^)\s]+)(?:\s+["']([^"']*)["'
 const supportedImageExtensions = new Set(['.avif', '.gif', '.jpeg', '.jpg', '.png', '.webp']);
 
 /**
- * Converts filesystem-backed Markdown images into renderer-safe data URLs.
- * The app-server owns the filesystem, so reading through fs/readFile works for
- * local, Electron, and remotely hosted Web surfaces without exposing paths to
- * the renderer.
+ * Converts filesystem-backed Markdown images into bounded data URLs.
+ * The provider owns the filesystem and supplies content through fs/readFile;
+ * no local paths exposed.
  */
 export class CodexMarkdownImageHydrator {
   constructor(private readonly client: CodexAppServerClient) {}

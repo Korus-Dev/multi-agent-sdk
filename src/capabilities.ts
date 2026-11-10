@@ -56,28 +56,18 @@ export const claudeBackendCapabilities: BackendCapabilities = {
   permissionModes: [
     {
       id: 'default',
-      label: "Default",
-      description: "Default permission policy for claude.",
     },
     {
       id: 'acceptEdits',
-      label: "Accept edits",
-      description: "Accept edits permission policy for claude.",
     },
     {
       id: 'dontAsk',
-      label: "Do not ask",
-      description: "Do not ask permission policy for claude.",
     },
     {
       id: 'auto',
-      label: "Automatic",
-      description: "Automatic permission policy for claude.",
     },
     {
       id: 'bypassPermissions',
-      label: "Bypass permissions",
-      description: "Bypass permissions permission policy for claude.",
       dangerous: true,
     },
   ],
@@ -98,8 +88,8 @@ export const antigravityBackendCapabilities: BackendCapabilities = {
   conversationFork: false, deleteTurn: false, editTurn: false, retryTurn: false,
   approvals: true, approvalPresets: [],
   permissionModes: [
-    { id: 'default', label: "Default", description: "Default permission policy for antigravity." },
-    { id: 'auto_edit', label: "Automatic edits", description: "Automatic edits permission policy for antigravity." },
+    { id: 'default' },
+    { id: 'auto_edit' },
   ],
 };
 
@@ -112,7 +102,7 @@ export const cursorBackendCapabilities: BackendCapabilities = {
   goals: false, steerPrompt: false, interrupt: true, history: true, conversationFork: false,
   deleteTurn: false, editTurn: false, retryTurn: false, approvals: false,
   approvalPresets: [], permissionModes: [
-    { id: 'default', label: "Default", description: "Default permission policy for cursor." },
-    { id: 'full-access', label: "Full access", description: "Full access permission policy for cursor.", dangerous: true },
+    { id: 'default' },
+    { id: 'full-access', dangerous: true },
   ],
 };

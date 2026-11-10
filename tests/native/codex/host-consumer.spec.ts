@@ -15,7 +15,7 @@ it('runs a caller-owned CPA scope and restores the normal native MCP configurati
     return conversation.handle.getSnapshot();
   });
   try {
-    await expect(driver.executeScopedPrompt!(context, { cwd: '/accounting', session: context.backendSession, prompt: 'Check the ledger', scope: { id: 'ledger', mcpServers: [{ name: 'ledger', url: 'http://127.0.0.1:1234/ledger', enabledTools: ['lookup'] }] } })).resolves.toStrictEqual({ text: 'Totals verified.', session: context.backendSession });
+    await expect(driver.executeScopedPrompt!(context, { cwd: '/accounting', session: context.backendSession, prompt: 'Check the ledger', scope: { id: 'ledger', mcpServers: [{ name: 'ledger', url: 'http://127.0.0.1:1234/ledger', approval: 'auto', required: true, enabledTools: ['lookup'] }] } })).resolves.toStrictEqual({ text: 'Totals verified.', session: context.backendSession });
     expect(conversation.handle.load).toHaveBeenNthCalledWith(2, { cwd: '/accounting', extensionContext: { ...context, folder: '/accounting' }, mcpServers: [{ name: 'ledger', transport: { type: 'http', url: 'http://127.0.0.1:1234/ledger' }, enabledTools: ['lookup'], toolApprovalMode: 'auto', required: true }] });
     expect(conversation.handle.load).toHaveBeenLastCalledWith({ cwd: '/repo', extensionContext: context, mcpServers: undefined });
     expect(driver.getCapabilities(context)).not.toHaveProperty('codeReview');

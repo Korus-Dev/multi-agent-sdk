@@ -414,7 +414,8 @@ function normalizedOrigin(value: string): string | null {
 function socketReason(value: unknown): string | undefined {
   if (typeof value === 'string') return value;
   if (value instanceof ArrayBuffer || ArrayBuffer.isView(value)) {
-    const reason = new TextDecoder().decode(value).trim();
+    const bytes = ArrayBuffer.isView(value) ? new Uint8Array(value.buffer, value.byteOffset, value.byteLength) : new Uint8Array(value);
+    const reason = new TextDecoder().decode(bytes).trim();
     return reason || undefined;
   }
   return undefined;

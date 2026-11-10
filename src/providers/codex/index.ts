@@ -80,3 +80,7 @@ export {
 
 
 export { ConversationContentTransport } from "./conversation-content-transport";
+export { CodexSurfaceAgentAdapter, type CodexHostOptions } from './host';
+export { CodexBackendDriver } from './driver';
+export { codexExecutionConsumption } from './execution-usage';
+export { statusFromSnapshot, safetyReviewFromSnapshot } from './status';

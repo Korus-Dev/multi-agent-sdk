@@ -1,4 +1,4 @@
-import type { AgentContextUsage, ClientRequest, RendererMessage } from './conversation';
+import type { AgentContextUsage, ClientRequest, Message } from './conversation';
 import type { AgentRequestResponse } from '../conversations/agent-request';
 
 export type AntigravityTurn = {
@@ -16,7 +16,7 @@ export type AntigravityConversationSnapshot = {
   sessionId: string;
   activeTurnId: string | null;
   turns: AntigravityTurn[];
-  messages: RendererMessage[];
+  messages: Message[];
   clientRequests: ClientRequest[];
   answeredClientRequestIds: string[];
   busy: boolean;
@@ -30,7 +30,7 @@ type Identity = { agentId: string; sessionId: string; turnId: string; occurredAt
 export type AntigravityConversationEvent = Identity & (
   | { type: 'turn.started'; payload: { turn: { id: string } } }
   | { type: 'turn.completed'; payload: { turn: { id: string; status: 'completed' | 'interrupted' | 'failed' }; error?: string } }
-  | { type: 'message.upsert'; payload: { message: RendererMessage } }
+  | { type: 'message.upsert'; payload: { message: Message } }
   | { type: 'request.created'; payload: { request: ClientRequest } }
   | { type: 'request.resolved'; payload: Pick<AgentRequestResponse, 'id' | 'outcome'> }
   | { type: 'context.updated'; payload: { usage: AgentContextUsage } }

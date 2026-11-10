@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { RendererMessage, RendererMessagePart, RendererToolPart } from '../../contracts/index';
+import type { Message, MessagePart, ToolPart } from '../../contracts/index';
 import type { AntigravityConversationEvent } from '../../contracts/antigravity-conversation';
 import { createAntigravityConversationReplica, emptyAntigravitySnapshot } from '../../conversations/antigravity-conversation-replica';
 import { record } from '../../acp/acp-connection';
@@ -9,12 +9,12 @@ type Change = AntigravityConversationEvent extends infer Event ? Event extends A
 /** Projects only ACP updates; every load builds a fresh replica with its replay IDs. */
 export class AcpTranscript {
   readonly replica;
-  private message?: RendererMessage;
+  private message?: Message;
   private turnId = '';
   private replaying = false;
 
   constructor(readonly agentId: string, readonly sessionId: string, private readonly changed: (event: AntigravityConversationEvent) => void,
-    private readonly displayUser: (text: string) => { text: string; parts: RendererMessagePart[]; metadata?: RendererMessage['metadata'] } = text => ({ text, parts: [] })) {
+    private readonly displayUser: (text: string) => { text: string; parts: MessagePart[]; metadata?: Message['metadata'] } = text => ({ text, parts: [] })) {
     this.replica = createAntigravityConversationReplica(emptyAntigravitySnapshot(agentId, sessionId));
   }
 
@@ -23,7 +23,7 @@ export class AcpTranscript {
     this.replica.apply(event); this.changed(event);
   }
 
-  start(text?: string, parts: RendererMessagePart[] = [], metadata?: RendererMessage['metadata']): string {
+  start(text?: string, parts: MessagePart[] = [], metadata?: Message['metadata']): string {
     if (text !== undefined) this.replaying = false;
     this.turnId = randomUUID(); this.message = undefined;
     this.event({ type: 'turn.started', payload: { turn: { id: this.turnId } } });
@@ -75,7 +75,7 @@ export class AcpTranscript {
     this.event({ type: 'message.upsert', payload: { message } });
   }
 
-  private attach(parts: RendererMessagePart[], metadata?: RendererMessage['metadata']): void {
+  private attach(parts: MessagePart[], metadata?: Message['metadata']): void {
     if (!parts.length && !metadata) return;
     const message = this.current('user'); message.parts.push(...parts);
     if (metadata) message.metadata = metadata;
@@ -86,8 +86,8 @@ export class AcpTranscript {
     if (typeof update.toolCallId !== 'string') throw new Error('Invalid Antigravity tool identity.');
     const existingMessage = this.replica.getSnapshot().messages.find(message => message.parts.some(part => part.type === 'tool' && part.id === update.toolCallId));
     const message = existingMessage ? structuredClone(existingMessage) : this.current('assistant');
-    const previous = message.parts.find((part): part is RendererToolPart => part.type === 'tool' && part.id === update.toolCallId);
-    const part: RendererToolPart = previous ?? { type: 'tool', id: update.toolCallId, kind: 'tool', title: 'Antigravity tool', status: 'running' };
+    const previous = message.parts.find((part): part is ToolPart => part.type === 'tool' && part.id === update.toolCallId);
+    const part: ToolPart = previous ?? { type: 'tool', id: update.toolCallId, kind: 'tool', title: 'Antigravity tool', status: 'running' };
     if (typeof update.title === 'string') part.title = update.title;
     if (typeof update.kind === 'string') part.kind = update.kind;
     if (typeof update.status === 'string') part.status = update.status === 'failed' ? 'failed' : update.status === 'completed' ? 'completed' : 'running';
@@ -102,7 +102,7 @@ export class AcpTranscript {
     this.event({ type: 'message.upsert', payload: { message } });
   }
 
-  private current(role: 'user' | 'assistant'): RendererMessage {
+  private current(role: 'user' | 'assistant'): Message {
     if (this.message?.role !== role) this.message = { id: randomUUID(), agentId: this.agentId, role,
       status: role === 'user' ? 'complete' : 'streaming', turnId: this.turnId, parts: [], createdAt: this.replaying ? '' : new Date().toISOString() };
     return this.message;

@@ -25,4 +25,6 @@ export type BackendApprovalRequest = {
   requestedPermissions?: BackendRequestedPermission[];
   allowedScopes?: BackendApprovalScope[];
   canDeny?: boolean;
+  /** Native mandatory-human evidence; never reinterpret as an automatic approval. */
+  requiresHumanApproval?: boolean;
 };

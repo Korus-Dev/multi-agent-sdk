@@ -1,4 +1,4 @@
-import type { RendererToolPart, ThreadPlan, ThreadPlanStepStatus } from '../../contracts/index';
+import type { ToolPart, ThreadPlan, ThreadPlanStepStatus } from '../../contracts/index';
 
 /** `doneIn` is the turn ordinal in which the task was first seen completed. */
 type Task = { subject: string; status: ThreadPlanStepStatus; activeForm?: string; doneIn?: number };
@@ -55,7 +55,7 @@ export class ClaudeTaskPlan {
     return task.status === 'completed' && this.retired.has(id);
   }
 
-  apply(tool: RendererToolPart, result: unknown, threadId: string, turnId: string, updatedAt: string): boolean {
+  apply(tool: ToolPart, result: unknown, threadId: string, turnId: string, updatedAt: string): boolean {
     if (tool.status !== 'completed') return false;
     const input = record(tool.input);
     const output = record(result);

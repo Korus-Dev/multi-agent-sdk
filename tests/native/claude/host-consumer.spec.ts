@@ -32,7 +32,7 @@ it('keeps CPA instructions and MCP scopes caller-owned through the unified Claud
     context.backendSession = (await sending).backendSession;
     await vi.waitFor(() => expect(events.some(event => event.type === 'agent.statusChanged' && event.payload.type === 'idle')).toBe(true));
     const scoped = host.executeScopedPrompt!(context, { cwd: root, prompt: 'Verify ledger totals', session: context.backendSession,
-      scope: { id: 'ledger-verification', mcpServers: [{ name: 'ledger', url: 'http://127.0.0.1:1234/ledger', enabledTools: ['lookup'] }] },
+      scope: { id: 'ledger-verification', mcpServers: [{ name: 'ledger', url: 'http://127.0.0.1:1234/ledger', approval: 'auto', enabledTools: ['lookup'] }] },
     });
     await vi.waitFor(() => expect(harness.inputs).toHaveLength(2));
     const index = harness.options.length - 1;

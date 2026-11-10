@@ -1,5 +1,6 @@
 import type { ExecutionSelectionOverrides } from './execution';
-import type { CodexPromptPart, SurfaceMessageQuestionPart } from '../core/surface';
+import type { PromptPart } from './prompt';
+import type { SurfaceMessageQuestionPart } from './ui';
 
 export type ThreadGoalStatus = 'active' | 'paused' | 'blocked' | 'usageLimited' | 'budgetLimited' | 'complete';
 
@@ -232,7 +233,7 @@ export type PromptReferenceAttachment =
   };
 
 export type SendPromptOptions = {
-  content?: readonly CodexPromptPart[];
+  content?: readonly PromptPart[];
   attachments?: readonly PromptAttachment[];
   selection?: ExecutionSelectionOverrides;
   planMode?: boolean;
@@ -319,7 +320,7 @@ export type ToolPartUpdate = {
 };
 
 export type Message = {
-  metadata?: { promptContent?: readonly CodexPromptPart[] };
+  metadata?: { promptContent?: readonly PromptPart[] };
   id: string;
   agentId: string;
   kind?: 'compaction' | 'steer';

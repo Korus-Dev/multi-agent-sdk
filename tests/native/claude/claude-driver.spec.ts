@@ -168,12 +168,15 @@ describe('ClaudeBackendDriver', () => {
     };
 
     expect(driver.getCapabilities(configuredAgent).permissionModes).toStrictEqual([
-      expect.objectContaining({ id: 'default', label: 'Default' }),
-      expect.objectContaining({ id: 'acceptEdits', label: 'Accept edits' }),
-      expect.objectContaining({ id: 'dontAsk', label: 'Do not ask' }),
-      expect.objectContaining({ id: 'auto', label: 'Automatic' }),
-      expect.objectContaining({ id: 'bypassPermissions', dangerous: true }),
+      { id: 'default' },
+      { id: 'acceptEdits' },
+      { id: 'dontAsk' },
+      { id: 'auto' },
+      { id: 'bypassPermissions', dangerous: true },
     ]);
+    for (const mode of driver.getCapabilities(configuredAgent).permissionModes ?? []) {
+      expect(mode).not.toHaveProperty('label'); expect(mode).not.toHaveProperty('description');
+    }
     await expect(driver.setPermissionMode(configuredAgent, 'acceptEdits')).resolves.toStrictEqual({
       backendDefaults: {
         kind: 'claude',

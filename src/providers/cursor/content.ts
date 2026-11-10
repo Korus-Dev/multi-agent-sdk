@@ -1,7 +1,7 @@
-import type { RendererMessagePart } from '../../contracts/index';
+import type { MessagePart } from '../../contracts/index';
 import { record } from '../../acp/acp-connection';
 
-type Media = Extract<RendererMessagePart, {type:'media'}>;
+type Media = Extract<MessagePart, {type:'media'}>;
 type FileChange = {path:string;kind:'add'|'update'|'delete';oldText:string|null;newText:string};
 
 /** Content stays presentation-only: no resource fetches, filesystem access or permission inference. */

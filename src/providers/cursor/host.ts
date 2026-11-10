@@ -1,5 +1,6 @@
+import { validateMcpPolicy } from '../../mcp-policy';
 import type { HarnessContext, HarnessDriver, HarnessEvent, HarnessPromptScope, HarnessScopedPromptInput, HarnessScopedPromptResult } from '../../driver';
-import type { CodexPromptPart } from '../../core/surface';
+import type { PromptPart } from '../../core/surface';
 import type { CursorSessionOptions } from './session';
 import { defaultRuntimeDirectory } from '../../runtime/paths';
 import { sessionMcpServer } from '../../acp/mcp-bridge';
@@ -11,7 +12,7 @@ export type CursorHostOptions<Context extends HarnessContext = HarnessContext> =
   steeringFallbackEnabled?: () => boolean;
   trustedMcpServerName?: string;
   instructions?: (context: Context) => string | undefined;
-  formatPrompt?: (prompt: string, content: readonly CodexPromptPart[] | undefined) => string;
+  formatPrompt?: (prompt: string, content: readonly PromptPart[] | undefined) => string;
   mcpServers?: (context: Context) => unknown[];
 };
 const sameScope = (left?: HarnessPromptScope, right?: HarnessPromptScope) => JSON.stringify(left) === JSON.stringify(right);
@@ -23,7 +24,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { normalizePromptContent, promptContentText, promptContentDispatchText } from '../../core/surface';
-import type { BackendSession, SendPromptOptions, ConversationListInput, ConversationSummary, ConversationResumeTarget, BackendConversationRef, RendererMessage } from '../../contracts/index';
+import type { BackendSession, SendPromptOptions, ConversationListInput, ConversationSummary, ConversationResumeTarget, BackendConversationRef, Message } from '../../contracts/index';
 
 import { cursorBackendCapabilities } from '../../capabilities';
 import type { CursorConversationEvent } from '../../contracts/cursor-conversation';
@@ -49,7 +50,7 @@ export class CursorHost<Context extends HarnessContext = HarnessContext> impleme
   private readonly sessions = new Map<string, CursorSession>();
   private readonly opening = new Map<string, { abort: AbortController; done: Promise<CursorSession> }>();
   private readonly resuming = new Set<string>();
-  private readonly readers = new Map<string, { abort: AbortController; done: Promise<RendererMessage[]> }>();
+  private readonly readers = new Map<string, { abort: AbortController; done: Promise<Message[]> }>();
   private observedIdentity?: string;
   private authenticated = false;
   private readonly sessionIdentities = new Map<string, string | undefined>();
@@ -133,6 +134,7 @@ export class CursorHost<Context extends HarnessContext = HarnessContext> impleme
       admissionGuard?.();
       await session.setPromptMode(options?.planMode === true);
       admissionGuard?.();
+      admissionGuard?.();
       session.assertSelection(selection.model,selection.reasoningEffort,options?.planMode === true);
       const content = options?.content === undefined ? undefined : normalizePromptContent(options.content);
       const instructions = scope?.developerInstructions ?? this.options.instructions?.(agent) ?? '';
@@ -148,7 +150,15 @@ export class CursorHost<Context extends HarnessContext = HarnessContext> impleme
       return { backendSession: this.reference(session), turnId: turn.turnId, completion: turn.completion, session };
     } catch (error) { settle(); throw error; }
   }
+  async cancelScopedPrompt(agent: Context): Promise<void> {
+    const session = this.sessions.get(agent.id);
+    try { if (session?.snapshot.activeTurnId) await session.interrupt(session.snapshot.activeTurnId); }
+    finally { await this.releaseConversation(agent.id); }
+  }
+
   async executeScopedPrompt(agent: Context, input: HarnessScopedPromptInput): Promise<HarnessScopedPromptResult> {
+    input.signal?.throwIfAborted();
+    validateMcpPolicy(input.scope.mcpServers ?? [], 'cursor');
     input = { ...input, scope: structuredClone(input.scope) };
     if (input.session && input.session.kind !== this.backend) throw new Error('Cursor cannot continue another provider execution.');
     if (this.runningScopes.has(agent.id)) throw new Error('Cursor execution is already running.');
@@ -156,9 +166,10 @@ export class CursorHost<Context extends HarnessContext = HarnessContext> impleme
     this.runningScopes.set(agent.id, execution);
     try {
       const scopedContext = { ...agent, folder: input.cwd, backendSession: input.session };
-      let started = await this.sendPromptInScope(scopedContext, input.prompt, input.options, undefined, input.scope);
+      let started = await this.sendPromptInScope(scopedContext, input.prompt, input.options, () => input.signal?.throwIfAborted(), input.scope);
       for (;;) {
         await started.completion;
+        input.signal?.throwIfAborted();
         const replacement = execution.replacement;
         if (!replacement) break;
         execution.replacement = undefined;
@@ -222,7 +233,7 @@ export class CursorHost<Context extends HarnessContext = HarnessContext> impleme
     await session.interrupt(expectedTurnId);
     return { backendSession: this.reference(session), turnId };
   }
-  async readConversationMessages(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]> {
+  async readConversationMessages(ref: BackendConversationRef, agentId: string): Promise<Message[]> {
     if (ref.backend !== this.backend || this.closed) throw new Error('Invalid Cursor conversation reference.');
     const current = this.sessions.get(agentId);
     const cwd = ref.folder ?? path.join((this.options.stateDirectory?.() ?? defaultRuntimeDirectory()), 'cursor-quick-chats', encodeURIComponent(agentId));
@@ -390,7 +401,7 @@ export class CursorHost<Context extends HarnessContext = HarnessContext> impleme
       return;
     }
     const identity = { backend: this.backend, agentId: event.agentId, backendSessionId: event.sessionId, conversationId: event.sessionId, turnId: event.turnId };
-    // Start before transcript output reaches the daemon clock, finish after its
+    // Start before transcript output reaches the host clock, finish after its
     // terminal events. Snapshot reads and replay never produce observations.
     if (event.type === 'turn.started') this.observeUsage(event, 'started');
     this.emit({ ...identity, type: 'cursor.conversationEventReceived', payload: { revision: this.nextRevision(event.agentId), event } });

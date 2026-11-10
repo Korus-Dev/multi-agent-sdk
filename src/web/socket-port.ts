@@ -22,7 +22,7 @@ export function codexWebSocketText(data: unknown, maximumBytes: number): string 
   } else if (data instanceof ArrayBuffer) {
     value = new TextDecoder().decode(data);
   } else if (ArrayBuffer.isView(data)) {
-    value = new TextDecoder().decode(data);
+    value = new TextDecoder().decode(new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
   } else {
     throw new TypeError('Codex WebSocket messages must contain text or UTF-8 bytes');
   }

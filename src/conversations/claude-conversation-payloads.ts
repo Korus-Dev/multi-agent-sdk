@@ -1,6 +1,4 @@
-import type { RendererToolPart } from '../contracts';
-
-export type ToolPart = RendererToolPart;
+export type { ToolPart } from '../contracts';
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));

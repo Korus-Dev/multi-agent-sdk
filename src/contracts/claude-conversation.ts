@@ -1,10 +1,10 @@
 import type {
   AgentContextUsage,
   ClientRequest,
-  RendererMessage,
-  RendererMessagePart,
-  RendererToolPart,
-  RendererToolPartUpdate,
+  Message,
+  MessagePart,
+  ToolPart,
+  ToolPartUpdate,
   ThreadPlan,
 } from './conversation';
 
@@ -27,7 +27,7 @@ export type ClaudeConversationSnapshot = {
   activeTurnId: string | null;
   turnIds: string[];
   turns: ClaudeConversationTurn[];
-  messages: RendererMessage[];
+  messages: Message[];
   answeredClientRequestIds: string[];
   busy: boolean;
   historyLoading: boolean;
@@ -58,11 +58,11 @@ export type ClaudeConversationEvent =
     }
   | ClaudeConversationEventBase & {
       type: 'history.prepended';
-      payload: { messages: RendererMessage[]; hasOlder: boolean };
+      payload: { messages: Message[]; hasOlder: boolean };
     }
   | ClaudeConversationEventBase & {
       type: 'message.replaced';
-      payload: { message: RendererMessage; beforeMessageId?: string };
+      payload: { message: Message; beforeMessageId?: string };
     }
   | ClaudeConversationEventBase & {
       type: 'context.usageUpdated';
@@ -107,22 +107,22 @@ export type ClaudeConversationEvent =
         delta: string;
         messageId?: string;
         itemId?: string;
-        phase?: Extract<RendererMessagePart, { type: 'text' }>['phase'];
+        phase?: Extract<MessagePart, { type: 'text' }>['phase'];
       };
     }
   | ClaudeConversationEventBase & {
       type: 'message.userSubmitted';
-      payload: { message: RendererMessage };
+      payload: { message: Message };
     }
   | ClaudeConversationEventBase & {
       type: 'item.started';
       turnId: string;
-      payload: { messageId?: string; toolPart: RendererToolPart };
+      payload: { messageId?: string; toolPart: ToolPart };
     }
   | ClaudeConversationEventBase & {
       type: 'item.updated';
       turnId: string;
-      payload: RendererToolPartUpdate & { messageId?: string };
+      payload: ToolPartUpdate & { messageId?: string };
     }
   | ClaudeConversationEventBase & {
       type: 'approval.requested';

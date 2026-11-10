@@ -75,10 +75,6 @@
       "types": "./dist/acp/*.d.ts",
       "import": "./dist/acp/*.js"
     },
-    "./tools/*": {
-      "types": "./dist/tools/*.d.ts",
-      "import": "./dist/tools/*.js"
-    },
     "./generation": {
       "types": "./dist/generation.d.ts",
       "import": "./dist/generation.js"
@@ -119,114 +115,6 @@
       "types": "./dist/providers/antigravity/index.d.ts",
       "import": "./dist/providers/antigravity/index.js"
     },
-    "./providers/antigravity/acp-runtime": {
-      "types": "./dist/providers/antigravity/acp-runtime.d.ts",
-      "import": "./dist/providers/antigravity/acp-runtime.js"
-    },
-    "./providers/antigravity/host": {
-      "types": "./dist/providers/antigravity/host.d.ts",
-      "import": "./dist/providers/antigravity/host.js"
-    },
-    "./providers/antigravity/installer": {
-      "types": "./dist/providers/antigravity/installer.d.ts",
-      "import": "./dist/providers/antigravity/installer.js"
-    },
-    "./providers/antigravity/runtime": {
-      "types": "./dist/providers/antigravity/runtime.d.ts",
-      "import": "./dist/providers/antigravity/runtime.js"
-    },
-    "./providers/antigravity/session": {
-      "types": "./dist/providers/antigravity/session.d.ts",
-      "import": "./dist/providers/antigravity/session.js"
-    },
-    "./providers/claude/account-usage": {
-      "types": "./dist/providers/claude/account-usage.d.ts",
-      "import": "./dist/providers/claude/account-usage.js"
-    },
-    "./providers/claude/agent-sdk-transport": {
-      "types": "./dist/providers/claude/agent-sdk-transport.d.ts",
-      "import": "./dist/providers/claude/agent-sdk-transport.js"
-    },
-    "./providers/claude/authentication": {
-      "types": "./dist/providers/claude/authentication.d.ts",
-      "import": "./dist/providers/claude/authentication.js"
-    },
-    "./providers/claude/claude-command": {
-      "types": "./dist/providers/claude/claude-command.d.ts",
-      "import": "./dist/providers/claude/claude-command.js"
-    },
-    "./providers/claude/claude-model-observer": {
-      "types": "./dist/providers/claude/claude-model-observer.d.ts",
-      "import": "./dist/providers/claude/claude-model-observer.js"
-    },
-    "./providers/claude/claude-task-plan": {
-      "types": "./dist/providers/claude/claude-task-plan.d.ts",
-      "import": "./dist/providers/claude/claude-task-plan.js"
-    },
-    "./providers/claude/claude-tool-part-adapter": {
-      "types": "./dist/providers/claude/claude-tool-part-adapter.d.ts",
-      "import": "./dist/providers/claude/claude-tool-part-adapter.js"
-    },
-    "./providers/claude/claude-tool-semantics": {
-      "types": "./dist/providers/claude/claude-tool-semantics.d.ts",
-      "import": "./dist/providers/claude/claude-tool-semantics.js"
-    },
-    "./providers/claude/config-directory": {
-      "types": "./dist/providers/claude/config-directory.d.ts",
-      "import": "./dist/providers/claude/config-directory.js"
-    },
-    "./providers/claude/host": {
-      "types": "./dist/providers/claude/host.d.ts",
-      "import": "./dist/providers/claude/host.js"
-    },
-    "./providers/claude/models": {
-      "types": "./dist/providers/claude/models.d.ts",
-      "import": "./dist/providers/claude/models.js"
-    },
-    "./providers/claude/protocol": {
-      "types": "./dist/providers/claude/protocol.d.ts",
-      "import": "./dist/providers/claude/protocol.js"
-    },
-    "./providers/claude/skills": {
-      "types": "./dist/providers/claude/skills.d.ts",
-      "import": "./dist/providers/claude/skills.js"
-    },
-    "./providers/claude/transcript-history-adapter": {
-      "types": "./dist/providers/claude/transcript-history-adapter.d.ts",
-      "import": "./dist/providers/claude/transcript-history-adapter.js"
-    },
-    "./providers/claude/transport": {
-      "types": "./dist/providers/claude/transport.d.ts",
-      "import": "./dist/providers/claude/transport.js"
-    },
-    "./providers/codex/driver": {
-      "types": "./dist/providers/codex/driver.d.ts",
-      "import": "./dist/providers/codex/driver.js"
-    },
-    "./providers/codex/execution-usage": {
-      "types": "./dist/providers/codex/execution-usage.d.ts",
-      "import": "./dist/providers/codex/execution-usage.js"
-    },
-    "./providers/codex/host": {
-      "types": "./dist/providers/codex/host.d.ts",
-      "import": "./dist/providers/codex/host.js"
-    },
-    "./providers/codex/status": {
-      "types": "./dist/providers/codex/status.d.ts",
-      "import": "./dist/providers/codex/status.js"
-    },
-    "./providers/cursor/account-usage": {
-      "types": "./dist/providers/cursor/account-usage.d.ts",
-      "import": "./dist/providers/cursor/account-usage.js"
-    },
-    "./providers/cursor/host": {
-      "types": "./dist/providers/cursor/host.d.ts",
-      "import": "./dist/providers/cursor/host.js"
-    },
-    "./providers/cursor/runtime": {
-      "types": "./dist/providers/cursor/runtime.d.ts",
-      "import": "./dist/providers/cursor/runtime.js"
-    },
     "./capabilities": {
       "types": "./dist/capabilities.d.ts",
       "import": "./dist/capabilities.js"
@@ -234,15 +122,32 @@
     "./diagnostics": {
       "types": "./dist/diagnostics.d.ts",
       "import": "./dist/diagnostics.js"
+    },
+    "./ui-types": {
+      "types": "./dist/ui-types.d.ts",
+      "import": "./dist/ui-types.js"
+    },
+    "./prompt": {
+      "types": "./dist/prompt.d.ts",
+      "import": "./dist/prompt.js"
     }
   },
   "dependencies": {
     "codex-sdk": "file:../codex-sdk",
     "image-size": "2.0.4",
-    "ws": "8.22.2",
     "@anthropic-ai/claude-agent-sdk": "0.3.319",
-    "@modelcontextprotocol/sdk": "1.29.0",
-    "zod": "4.4.3",
     "yauzl": "3.4.0"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "description": "Unified native coding-agent harness interface and adapters.",
+  "devDependencies": {
+    "@types/node": "25.9.5",
+    "@vitest/coverage-v8": "4.1.10",
+    "typescript": "6.0.3",
+    "vite": "8.1.5",
+    "vitest": "4.1.10",
+    "@types/yauzl": "2.10.3"
   }
 }

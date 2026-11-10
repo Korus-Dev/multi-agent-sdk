@@ -2,8 +2,8 @@ import { isAbsolute, resolve } from 'node:path';
 import type {
   CodexSurfaceFileActivityAction,
   CodexSurfaceFileActivityStatus,
-  SurfaceMessageToolPart as RendererToolPart,
-  SurfaceMessageToolPartUpdate as RendererToolPartUpdate,
+  SurfaceMessageToolPart as ToolPart,
+  SurfaceMessageToolPartUpdate as ToolPartUpdate,
 } from '../../core/surface';
 import { toolOutputText } from './tool-output';
 
@@ -22,7 +22,7 @@ export type CodexFileActivity = {
 };
 
 export function codexToolPartFileActivities(
-  toolPart: RendererToolPart,
+  toolPart: ToolPart,
   cwd?: string | null,
 ): CodexFileActivity[] {
   const status = toolPart.status;
@@ -52,14 +52,14 @@ export function codexToolPartFileActivities(
   });
 }
 
-export function codexThreadItemToToolPart(item: unknown, options: CodexToolPartAdapterOptions = {}): RendererToolPart | null {
+export function codexThreadItemToToolPart(item: unknown, options: CodexToolPartAdapterOptions = {}): ToolPart | null {
   if (!isRecord(item) || typeof item.id !== 'string') {
     return null;
   }
 
   if (item.type === 'commandExecution') {
     const command = typeof item.command === 'string' ? item.command : 'command';
-    const status = rendererToolStatus(item.status);
+    const status = toolStatus(item.status);
     const statusText = commandStatusText(status, item.commandActions, command);
     const body = options.includeCommandOutput && typeof item.aggregatedOutput === 'string' ? item.aggregatedOutput : undefined;
     return {
@@ -97,7 +97,7 @@ export function codexThreadItemToToolPart(item: unknown, options: CodexToolPartA
       id: item.id,
       kind: 'mcp',
       title: `${server}.${tool}`,
-      status: rendererToolStatus(item.status),
+      status: toolStatus(item.status),
       body: errorMessage ?? boundedToolText(mcpResultText(output)),
       ...(input !== undefined ? { input } : {}),
       ...(output !== undefined ? { output } : {}),
@@ -121,7 +121,7 @@ export function codexThreadItemToToolPart(item: unknown, options: CodexToolPartA
       id: item.id,
       kind: 'dynamic',
       title: namespace ? `${namespace}.${tool}` : tool,
-      status: rendererToolStatus(item.status),
+      status: toolStatus(item.status),
       body: boundedToolText(dynamicToolContentText(output)),
       ...(input !== undefined ? { input } : {}),
       ...(output !== undefined ? { output } : {}),
@@ -136,7 +136,7 @@ export function codexThreadItemToToolPart(item: unknown, options: CodexToolPartA
 
   if (item.type === 'fileChange') {
     const changes = Array.isArray(item.changes) ? item.changes : [];
-    const status = rendererToolStatus(item.status);
+    const status = toolStatus(item.status);
     const statusText = fileChangeStatusText(status, changes);
     return {
       type: 'tool',
@@ -182,7 +182,7 @@ export function codexThreadItemToToolPart(item: unknown, options: CodexToolPartA
       id: item.id,
       kind: 'dynamic',
       title: 'image_generation',
-      status: rendererToolStatus(item.status),
+      status: toolStatus(item.status),
       body: typeof item.revisedPrompt === 'string' ? item.revisedPrompt : undefined,
       input: {
         revisedPrompt: item.revisedPrompt,
@@ -206,7 +206,7 @@ export function shouldForwardCommandExecutionOutput(item: unknown): boolean {
   return isApplyPatchCommand(command) || isShellRedirectWriteCommand(command) || isTeeWriteCommand(command);
 }
 
-export function commandOutputDeltaToToolPartUpdate(itemId: string, delta: string): RendererToolPartUpdate {
+export function commandOutputDeltaToToolPartUpdate(itemId: string, delta: string): ToolPartUpdate {
   return {
     itemId,
     bodyDelta: delta,
@@ -220,7 +220,7 @@ export function commandOutputDeltaToToolPartUpdate(itemId: string, delta: string
   };
 }
 
-export function fileChangePatchToToolPartUpdate(itemId: string, changes: unknown[]): RendererToolPartUpdate {
+export function fileChangePatchToToolPartUpdate(itemId: string, changes: unknown[]): ToolPartUpdate {
   const statusText = fileChangeStatusText('running', changes);
   return {
     itemId,
@@ -242,7 +242,7 @@ export function fileChangePatchToToolPartUpdate(itemId: string, changes: unknown
   };
 }
 
-export function mcpProgressToToolPartUpdate(itemId: string, message: string): RendererToolPartUpdate {
+export function mcpProgressToToolPartUpdate(itemId: string, message: string): ToolPartUpdate {
   return {
     itemId,
     bodyAppend: message,
@@ -256,13 +256,13 @@ export function mcpProgressToToolPartUpdate(itemId: string, message: string): Re
   };
 }
 
-export function rawOutputToToolPartUpdate(itemId: string, output: unknown, title?: string, status: unknown = 'completed'): RendererToolPartUpdate {
+export function rawOutputToToolPartUpdate(itemId: string, output: unknown, title?: string, status: unknown = 'completed'): ToolPartUpdate {
   const boundedOutput = boundedToolPayload(output);
   const body = boundedToolText(toolOutputText(boundedOutput));
   return {
     itemId,
     title: title && title.trim() ? title : undefined,
-    status: rendererToolStatus(status),
+    status: toolStatus(status),
     body,
     ...(boundedOutput !== undefined ? { output: boundedOutput } : {}),
     fallbackToolPart: {
@@ -270,14 +270,14 @@ export function rawOutputToToolPartUpdate(itemId: string, output: unknown, title
       id: itemId,
       kind: 'generic',
       title: title && title.trim() ? title : 'Tool output',
-      status: rendererToolStatus(status),
+      status: toolStatus(status),
       body,
       ...(boundedOutput !== undefined ? { output: boundedOutput } : {}),
     },
   };
 }
 
-function rendererToolStatus(status: unknown): RendererToolPart['status'] {
+function toolStatus(status: unknown): ToolPart['status'] {
   if (status === 'completed' || status === 'succeeded' || status === 'success') {
     return 'completed';
   }
@@ -289,14 +289,14 @@ function rendererToolStatus(status: unknown): RendererToolPart['status'] {
   return 'running';
 }
 
-function commandStatusText(status: RendererToolPart['status'], commandActions: unknown, command: string): string | undefined {
+function commandStatusText(status: ToolPart['status'], commandActions: unknown, command: string): string | undefined {
   const descriptor = commandStatusDescriptor(status, commandActions, command);
   return descriptor ? JSON.stringify(descriptor) : undefined;
 }
 
-function commandStatusDescriptor(status: RendererToolPart['status'], commandActions: unknown, command: string): {
+function commandStatusDescriptor(status: ToolPart['status'], commandActions: unknown, command: string): {
   action: 'edit' | 'explore' | 'list' | 'read' | 'run' | 'search';
-  phase: RendererToolPart['status'];
+  phase: ToolPart['status'];
   params: Record<string, unknown>;
   source: 'codex';
 } | undefined {
@@ -441,14 +441,14 @@ function formatFileTargetList(values: string[], fallback: string): string {
   return formatTargetList(names, fallback);
 }
 
-function fileChangeStatusText(status: RendererToolPart['status'], changes: unknown[]): string | undefined {
+function fileChangeStatusText(status: ToolPart['status'], changes: unknown[]): string | undefined {
   const descriptor = fileChangeStatusDescriptor(status, changes);
   return descriptor ? JSON.stringify(descriptor) : undefined;
 }
 
-function fileChangeStatusDescriptor(status: RendererToolPart['status'], changes: unknown[]): {
+function fileChangeStatusDescriptor(status: ToolPart['status'], changes: unknown[]): {
   action: 'create' | 'delete' | 'edit';
-  phase: RendererToolPart['status'];
+  phase: ToolPart['status'];
   params: Record<string, unknown>;
   source: 'codex';
 } | undefined {

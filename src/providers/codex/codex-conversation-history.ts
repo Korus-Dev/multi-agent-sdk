@@ -38,8 +38,7 @@ export function codexThreadToSurfaceMessages(thread: Thread): SurfaceMessage[] {
 /**
  * Keep bounded data previews from optimistic messages when app-server history
  * rematerializes the same user attachment from its local filesystem path.
- * Filesystem URLs are not renderer-safe in Electron and are intentionally not
- * used as image sources.
+ * Bounded data previews are used as image sources; no local paths exposed.
  */
 export function preserveHistoricalAttachmentPreviews(
   previousMessages: readonly SurfaceMessage[],
@@ -49,7 +48,7 @@ export function preserveHistoricalAttachmentPreviews(
   for (const message of previousMessages) {
     for (const part of message.parts) {
       if (part.type !== 'attachment' || part.attachment.kind !== 'image' || !part.attachment.path) continue;
-      if (isRendererSafeImagePreview(part.attachment.url)) {
+      if (isSafeImagePreview(part.attachment.url)) {
         previewsByPath.set(part.attachment.path, part.attachment.url);
       }
     }
@@ -672,7 +671,7 @@ export function codexImageDataUrl(result: string): { url: string; mimeType: stri
   return { url: `data:${mimeType};base64,${compact}`, mimeType };
 }
 
-function isRendererSafeImagePreview(value: string | undefined): value is string {
+function isSafeImagePreview(value: string | undefined): value is string {
   return Boolean(
     value
     && value.length <= 16 * 1024 * 1024

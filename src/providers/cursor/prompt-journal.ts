@@ -1,9 +1,9 @@
 import { appendFile, mkdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
-import type { RendererMessage, RendererMessagePart } from '../../contracts/index';
+import type { Message, MessagePart } from '../../contracts/index';
 import { normalizePromptContent } from '../../core/surface';
 
-type Entry = { wireText: string; text: string; parts: RendererMessagePart[]; metadata?: RendererMessage['metadata'] };
+type Entry = { wireText: string; text: string; parts: MessagePart[]; metadata?: Message['metadata'] };
 
 /** Presentation metadata for our own admitted prompts; native ACP owns history. */
 export class CursorPromptJournal {
@@ -34,7 +34,7 @@ export class CursorPromptJournal {
     this.entries.push(structuredClone(entry));
   }
 
-  display(nativeText: string): { text: string; parts: RendererMessagePart[]; metadata?: RendererMessage['metadata'] } {
+  display(nativeText: string): { text: string; parts: MessagePart[]; metadata?: Message['metadata'] } {
     const index = this.entries.findIndex((candidate, index) => {
       if (index < this.replayIndex) return false;
       return nativeText === candidate.wireText;

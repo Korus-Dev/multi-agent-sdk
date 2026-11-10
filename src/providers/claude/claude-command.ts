@@ -1,20 +1,21 @@
 import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { resolveRuntimeExecutable, resolveRuntimeLaunch, type RuntimeDiscoveryDependencies } from '../../runtime/discovery';
 
-/** Keep queries, authentication and version inspection on the same runtime. */
+/** Keep queries, authentication and version inspection on the same runtime.
+ * The host supplies packaged/custom paths explicitly. Otherwise discover the CLI on
+ * the native runtime PATH, then try the vendor optional native package.
+ */
 export function resolveClaudeLaunch(
   configuredPath?: string,
   overrides?: NodeJS.ProcessEnv,
   dependencies: RuntimeDiscoveryDependencies = {},
   discoverLaunch = resolveRuntimeLaunch,
 ): ReturnType<typeof resolveRuntimeLaunch> {
-  const configured = configuredPath?.trim() || process.env.APP_CLAUDE_COMMAND?.trim();
+  const configured = configuredPath?.trim();
   const launch = discoverLaunch(configured || 'claude', overrides, dependencies);
   if (configured || launch.command !== 'claude') return launch;
-  const executable = bundledClaudeExecutable(launch.env);
+  const executable = bundledClaudeExecutable();
   return executable ? { ...launch, command: executable } : launch;
 }
 
@@ -22,14 +23,9 @@ export function resolveClaudeExecutable(): string | null {
   return resolveRuntimeExecutable(resolveClaudeLaunch().command);
 }
 
-function bundledClaudeExecutable(env: NodeJS.ProcessEnv): string | null {
+function bundledClaudeExecutable(): string | null {
   const executable = process.platform === 'win32' ? 'claude.exe' : 'claude';
-  // Packaged daemon.mjs lives beside the Claude resource directory. APP_ASSETS_PATH
-  // also covers the desktop adapter's explicit resource location.
-  const packaged = env.APP_ASSETS_PATH
-    ? path.join(env.APP_ASSETS_PATH, 'claude', executable)
-    : fileURLToPath(new URL(`../claude/${executable}`, import.meta.url));
-  if (existsSync(packaged)) return packaged;
+  // Neutral fallback: the vendor optional native package, resolved by Node.
   try {
     const native = createRequire(import.meta.url).resolve(`@anthropic-ai/claude-agent-sdk-${process.platform}-${process.arch}/${executable}`);
     return existsSync(native) ? native : null;

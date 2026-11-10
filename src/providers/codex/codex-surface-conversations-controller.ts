@@ -342,7 +342,7 @@ export class CodexSurfaceConversationsController {
     for (let index = messages.length; index > 0;) {
       const start = Math.max(0, index - HISTORY_MESSAGE_BATCH_SIZE);
       this.host.emitHistoryPrepended(threadId, messages.slice(start, index), 'lifecycle');
-      await yieldToRenderer();
+      await yieldToClient();
       index = start;
     }
   }
@@ -448,7 +448,7 @@ export class CodexSurfaceConversationsController {
   }
 }
 
-function yieldToRenderer(): Promise<void> {
+function yieldToClient(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 

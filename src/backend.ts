@@ -1,7 +1,7 @@
 import type { AgentBackend } from './contracts';
 import type { HarnessContext, HarnessDriver, HarnessEvent, HarnessPromptScope } from './driver';
 import type { HarnessMcpEndpoint } from './generation';
-import type { CodexPromptPart } from './core/surface';
+import type { PromptPart } from './core/surface';
 import { createCodexSurface, type CodexSurfaceOptions } from './providers/codex';
 import { mcpServerConfig } from './providers/codex/codex-surface-mcp';
 import { CodexSurfaceAgentAdapter, type CodexHostOptions } from './providers/codex/host';
@@ -11,6 +11,7 @@ import { ClaudeAgentSdkTransport, type ClaudeAgentSdkTransportOptions } from './
 import type { ClaudeTurnTransport } from './providers/claude/transport';
 import { CursorHost, type CursorHostOptions } from './providers/cursor/host';
 import { AntigravityHost, type AntigravityHostOptions } from './providers/antigravity/host';
+import { validateMcpPolicy } from './mcp-policy';
 import { sessionMcpServer } from './acp/mcp-bridge';
 
 /** Shared app ports; provider-specific transport configuration stays in the named adapter options. */
@@ -19,7 +20,7 @@ export type HarnessOptions<Context extends HarnessContext = HarnessContext> = {
   stateDirectory?: () => string;
   instructions?: (context: Context) => string | undefined;
   mcpServers?: (context: Context) => readonly HarnessMcpEndpoint[];
-  formatPrompt?: (prompt: string, content: readonly CodexPromptPart[] | undefined) => string;
+  formatPrompt?: (prompt: string, content: readonly PromptPart[] | undefined) => string;
   codex?: { surface?: CodexSurfaceOptions; host?: CodexHostOptions<Context> };
   claude?: { transport?: ClaudeTurnTransport; transportOptions?: ClaudeAgentSdkTransportOptions; host?: ClaudeHostOptions<Context> };
   cursor?: CursorHostOptions<Context>;
@@ -27,9 +28,15 @@ export type HarnessOptions<Context extends HarnessContext = HarnessContext> = {
 };
 type CodexContext<Context> = { context: Context; scope?: HarnessPromptScope };
 
-/** Creates a native adapter without connecting, authenticating or executing a model turn. */
+/** Creates a native adapter without connecting, authenticating or executing a model turn.
+ * @deprecated Prefer createNativeHarnessDriver from /native; the root factory is neutral.
+ */
 export function createHarnessDriver<Context extends HarnessContext = HarnessContext>(backend: AgentBackend, options: HarnessOptions<Context>): HarnessDriver<Context, HarnessEvent> {
-  const endpoints = (context: Context) => options.mcpServers?.(context) ?? [];
+  const endpoints = (context: Context) => {
+    const servers = options.mcpServers?.(context) ?? [];
+    validateMcpPolicy(servers, backend);
+    return servers;
+  };
   const bridges = (context: Context) => endpoints(context).map(server => sessionMcpServer(server.url, server.name, server.enabledTools ? [...server.enabledTools] : undefined));
   if (backend === 'cursor') return new CursorHost({ ...options.cursor,
     stateDirectory: options.stateDirectory ?? options.cursor?.stateDirectory,
@@ -49,13 +56,15 @@ export function createHarnessDriver<Context extends HarnessContext = HarnessCont
     ...options.claude?.host,
     configurePrompt: context => {
       const defaults = options.claude?.host?.configurePrompt?.(context) ?? {};
-      const [primary, ...hosted] = endpoints(context);
+      const servers = endpoints(context);
+      const [primary, ...hosted] = servers;
       return { ...defaults,
         ...(options.instructions ? { appendSystemPrompt: options.instructions(context) } : {}),
         ...(options.formatPrompt ? { formatPrompt: options.formatPrompt } : {}),
         ...(options.mcpServers ? { mcpServerUrl: primary?.url ?? null, mcpServerName: primary?.name,
           hostedMcpServerUrls: Object.fromEntries(hosted.map(server => [server.name, server.url])),
-          allowedTools: endpoints(context).flatMap(server => (server.enabledTools ?? ['*']).map(tool => `mcp__${server.name}__${tool}`)),
+          enabledMcpTools: Object.fromEntries(servers.filter(server => server.enabledTools !== undefined).map(server => [server.name, [...server.enabledTools!]])),
+          allowedTools: servers.filter(server => server.approval === 'auto').flatMap(server => (server.enabledTools ?? ['*']).map(tool => `mcp__${server.name}__${tool}`)),
         } : {}),
       };
     },
@@ -69,7 +78,7 @@ export function createHarnessDriver<Context extends HarnessContext = HarnessCont
       if (!binding?.context) return {};
       const instructions = binding.scope?.developerInstructions ?? options.instructions?.(binding.context);
       return {
-        ...(!binding.scope && options.mcpServers ? { config: mcpServerConfig(endpoints(binding.context).map(server => ({ name: server.name, transport: { type: 'http', url: server.url }, ...(server.enabledTools ? { enabledTools: [...server.enabledTools] } : {}), toolApprovalMode: 'auto', required: true }))) } : {}),
+        ...(!binding.scope && options.mcpServers ? { config: mcpServerConfig(endpoints(binding.context).map(server => ({ name: server.name, transport: { type: 'http', url: server.url }, ...(server.enabledTools ? { enabledTools: [...server.enabledTools] } : {}), ...(server.approval === 'auto' ? { toolApprovalMode: 'auto' as const } : {}), ...(server.required === undefined ? {} : { required: server.required }) }))) } : {}),
         ...(instructions === undefined ? {} : { developerInstructions: instructions }),
       };
     } }],

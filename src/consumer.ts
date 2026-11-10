@@ -12,7 +12,7 @@ export type HarnessOptions = Omit<NativeOptions, 'instructions' | 'mcpServers'> 
 };
 
 const emptyState = (): SessionState => ({ messages: [], busy: false, activeTurnId: null, turns: [], requests: [], error: null, title: null, goal: null, contextUsage: null, plan: null });
-type Binding = { context: NativeContext; state: SessionState; project: ReturnType<typeof createConsumerProjection>; recovery?: boolean };
+type Binding = { kind: 'main' | 'scope'; parent?: Session; operation?: 'executing' | 'disposing' | 'releasing' | 'hydrating'; nativeDisposed?: boolean; context: NativeContext; state: SessionState; project: ReturnType<typeof createConsumerProjection>; recovery?: boolean };
 
 /** Adapts native lifecycle operations without changing admission or completion semantics. */
 export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriver<NativeContext, NativeEvent>): HarnessDriver {
@@ -22,6 +22,16 @@ export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriv
   const listeners = new Set<(event: HarnessEvent) => void>();
   const emit = (event: HarnessEvent) => { for (const listener of listeners) { try { listener(event); } catch (error) { process.emitWarning(error instanceof Error ? error : String(error)); } } };
   const get = (session: Session) => { const b = bindings.get(session); if (!b) throw new Error('Session does not belong to this driver.'); return b; };
+  const interactive = (session: Session) => {
+    const binding = get(session);
+    if (binding.nativeDisposed || binding.operation === 'disposing' || binding.operation === 'releasing') throw new Error('Session cleanup is in progress.');
+    return binding;
+  };
+  const main = (session: Session) => {
+    const binding = interactive(session);
+    if (binding.kind !== 'main') throw new Error('Scoped sessions require scoped continuation through their parent.');
+    return binding;
+  };
   const changed = (session: Session) => emit({ type: 'session.changed', session, state: structuredClone(get(session).state) });
   const unsubscribe = native.onEvent(event => {
     const session = event.agentId ? byId.get(event.agentId) : undefined;
@@ -31,7 +41,13 @@ export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriv
     if (!b.recovery || snapshotFrame) {
       try {
         const state = b.project(event);
-        if (state) { b.recovery = false; b.state = { ...b.state, ...structuredClone(state) }; changed(session); }
+        if (state) {
+          b.recovery = false; b.state = { ...b.state, ...structuredClone(state) };
+          // Claude has no pending-request snapshot list. Only native answered evidence can prune it.
+          const answered = new Set(b.state.answeredClientRequestIds ?? []);
+          b.state.requests = b.state.requests.filter(request => !answered.has(request.id));
+          changed(session);
+        }
       } catch (error) {
         b.recovery = true;
         const reason = error instanceof Error ? error.message : String(error);
@@ -40,6 +56,7 @@ export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriv
     }
     if (event.type === 'plan.readyForReview') emit({ type: 'plan.readyForReview', session, turnId: event.turnId, ...event.payload });
     else if (event.type === 'agentRequest.created') {
+      if (b.state.answeredClientRequestIds?.includes(event.payload.request.id)) return;
       b.state.requests = [...b.state.requests.filter(r => r.id !== event.payload.request.id), structuredClone(event.payload.request)];
       emit({ type: 'request.created', session, request: structuredClone(event.payload.request) }); changed(session);
     } else if (event.type === 'agentRequest.resolved') {
@@ -58,11 +75,11 @@ export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriv
     return { session, ...(result.turnId ? { turnId: result.turnId } : {}), ...(result.messageId ? { messageId: result.messageId } : {}) };
   };
   const capabilities = (session: Session): HarnessCapabilities => {
-    const { approvalPresets, permissionModes, ...caps } = native.getCapabilities(get(session).context);
+    const { approvalPresets, permissionModes, ...caps } = native.getCapabilities(interactive(session).context);
     return { ...caps, remoteControl: false, permissions: [...(approvalPresets ?? []).map(id => ({ id, ...(id === 'full-access' ? { dangerous: true } : {}) })), ...(permissionModes ?? []).map(({ id, dangerous }) => ({ id, ...(dangerous ? { dangerous } : {}) }))] };
   };
   const permission = async (session: Session, id: string) => {
-    const b = get(session); const caps = native.getCapabilities(b.context);
+    const b = main(session); const caps = native.getCapabilities(b.context);
     if (!capabilities(session).permissions.some(p => p.id === id)) throw new Error('Unsupported permission option.');
     if (caps.approvalPresets?.includes(id as never)) {
       if (!native.setApprovalPreset) throw new Error('Permission updates are unavailable.');
@@ -74,6 +91,14 @@ export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriv
       b.context.backendDefaults = (await native.setPermissionMode(b.context, id)).backendDefaults;
     }
   };
+  const hydrate = async <T>(session: Session, action: (binding: Binding) => Promise<T>): Promise<T> => {
+    const binding = interactive(session);
+    const scoped = binding.kind === 'scope';
+    if (scoped && (binding.operation || binding.state.busy || binding.state.activeTurnId)) throw new Error('Scope is busy.');
+    if (scoped) binding.operation = 'hydrating';
+    try { return await action(binding); }
+    finally { if (scoped) binding.operation = undefined; }
+  };
   const unavailable = (operation: string): never => { throw new Error(`${operation} is unavailable for this harness.`); };
   const turnAction = (session: Session, result: import('./driver').HarnessTurnActionResult) => {
     admitted(session, result); return { session, activeTurnId: result.activeTurnId };
@@ -84,7 +109,7 @@ export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriv
     const { defaults, ...context } = input;
     const { permission: mode, ...selection } = defaults ?? {};
     const backendDefaults = { kind: provider, ...selection, ...(mode ? provider === 'codex' ? { approvalPreset: mode } : { permissionMode: mode } : {}) } as BackendDefaults;
-    bindings.set(session, { context: { ...context, backend: provider, backendDefaults }, state: emptyState(), project: createConsumerProjection() }); byId.set(input.id, session);
+    bindings.set(session, { kind: 'main', context: { ...context, backend: provider, backendDefaults }, state: emptyState(), project: createConsumerProjection() }); byId.set(input.id, session);
     if (mode && !capabilities(session).permissions.some(p => p.id === mode)) { bindings.delete(session); byId.delete(input.id); throw new Error('Unsupported permission option.'); }
     return session;
   };
@@ -103,90 +128,164 @@ export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriv
     getRuntimeStatus() { const { detail, capabilities: _capabilities, ...status } = native.getRuntimeStatus(); return { ...status, ...(typeof detail === 'string' ? { detail } : {}) }; },
     async authenticate(action) { const state = await (native.authenticate?.(action) ?? unavailable('Authentication')); return { connected: state.connected, native: state }; },
     getAccountRateLimits: () => native.getAccountRateLimits?.() ?? Promise.resolve(null),
-    listModels: session => native.listModels?.(get(session).context) ?? unavailable('Model catalog'),
-    listSkills: (session, forceReload) => native.listSkills?.(get(session).context, forceReload) ?? unavailable('Skill catalog'),
-    listPlugins: session => native.listPlugins?.(get(session).context) ?? unavailable('Plugin catalog'),
-    generateText: (session, input) => native.generateText?.(get(session).context, input) ?? unavailable('Text generation'),
-    generateImage: (session, input, signal) => native.generateImage?.(get(session).context, input, signal) ?? unavailable('Image generation'),
-    setConversationTitle: (session, title) => native.setConversationTitle?.(get(session).context, title) ?? unavailable('Conversation title'),
+    listModels: session => native.listModels?.(main(session).context) ?? unavailable('Model catalog'),
+    listSkills: (session, forceReload) => native.listSkills?.(main(session).context, forceReload) ?? unavailable('Skill catalog'),
+    listPlugins: session => native.listPlugins?.(main(session).context) ?? unavailable('Plugin catalog'),
+    generateText: (session, input) => native.generateText?.(main(session).context, input) ?? unavailable('Text generation'),
+    generateImage: (session, input, signal) => native.generateImage?.(main(session).context, input, signal) ?? unavailable('Image generation'),
+    setConversationTitle: (session, title) => native.setConversationTitle?.(main(session).context, title) ?? unavailable('Conversation title'),
     async setGoal(session, objective) {
-      const result = await (native.setGoal?.(get(session).context, objective) ?? unavailable('Goals'));
+      const result = await (native.setGoal?.(main(session).context, objective) ?? unavailable('Goals'));
       return { ...admitted(session, result), ...(result.goal ? { goal: result.goal } : {}) };
     },
     async clearGoal(session) {
-      const result = await (native.clearGoal?.(get(session).context) ?? unavailable('Goals'));
+      const result = await (native.clearGoal?.(main(session).context) ?? unavailable('Goals'));
       return { ...admitted(session, result), ...(result.cleared === undefined ? {} : { cleared: result.cleared }) };
     },
-    async steerPrompt(session, prompt, options) { return admitted(session, await (native.steerPrompt?.(get(session).context, prompt, options) ?? unavailable('Steering'))); },
-    async deleteTurn(session, turnId) { return turnAction(session, await (native.deleteTurn?.(get(session).context, turnId) ?? unavailable('Turn deletion'))); },
-    async editTurn(session, turnId, content, options) { return turnAction(session, await (native.editTurn?.(get(session).context, turnId, content, options) ?? unavailable('Turn editing'))); },
-    async retryTurn(session, turnId) { return turnAction(session, await (native.retryTurn?.(get(session).context, turnId) ?? unavailable('Turn retry'))); },
-    async forkConversation(session, target, turnId) { return admitted(target, await (native.forkConversation?.(get(session).context, get(target).context, turnId) ?? unavailable('Conversation fork'))); },
-    async replaceConversationWithSummary(session) { return admitted(session, await (native.replaceConversationWithSummary?.(get(session).context) ?? unavailable('Conversation summary replacement'))); },
-    archiveConversation: session => native.archiveAgentConversation?.(get(session).context) ?? unavailable('Conversation archive'),
-    deleteConversation: session => native.deleteAgentConversation?.(get(session).context) ?? unavailable('Conversation deletion'),
+    async steerPrompt(session, prompt, options) { return admitted(session, await (native.steerPrompt?.(main(session).context, prompt, options) ?? unavailable('Steering'))); },
+    async deleteTurn(session, turnId) { return turnAction(session, await (native.deleteTurn?.(main(session).context, turnId) ?? unavailable('Turn deletion'))); },
+    async editTurn(session, turnId, content, options) { return turnAction(session, await (native.editTurn?.(main(session).context, turnId, content, options) ?? unavailable('Turn editing'))); },
+    async retryTurn(session, turnId) { return turnAction(session, await (native.retryTurn?.(main(session).context, turnId) ?? unavailable('Turn retry'))); },
+    async forkConversation(session, target, turnId) { return admitted(target, await (native.forkConversation?.(main(session).context, main(target).context, turnId) ?? unavailable('Conversation fork'))); },
+    async replaceConversationWithSummary(session) { return admitted(session, await (native.replaceConversationWithSummary?.(main(session).context) ?? unavailable('Conversation summary replacement'))); },
+    archiveConversation: session => native.archiveAgentConversation?.(main(session).context) ?? unavailable('Conversation archive'),
+    deleteConversation: session => native.deleteAgentConversation?.(main(session).context) ?? unavailable('Conversation deletion'),
     readConversationMessages(session, ref) {
       const value = refs.get(ref); if (!value) throw new Error('Unknown conversation reference.');
-      return native.readConversationMessages?.(value, get(session).context.id) ?? unavailable('Conversation messages');
+      return native.readConversationMessages?.(value, interactive(session).context.id) ?? unavailable('Conversation messages');
     },
     readConversationContent(session, input) {
-      const context = get(session).context; const binding = context.backendSession;
+      const context = interactive(session).context; const binding = context.backendSession;
       if (!binding) throw new Error('Session has not been admitted.');
       const sessionId = binding.kind === 'codex' ? binding.threadId : binding.sessionId;
       return native.readConversationContent?.(context, { ...input, sessionId }) ?? unavailable('Conversation content');
     },
-    serializeSession(session) { const data = get(session).context.backendSession; if (!data) throw new Error('Session has not been admitted.'); return JSON.stringify({ ...JSON.parse(encode('session', data)), defaults: consumerContext(get(session).context).defaults }); },
-    restoreSession(context, serialized) { const data = decode(serialized, 'session'); const session = open({ ...context, defaults: context.defaults ?? JSON.parse(serialized).defaults }); get(session).context.backendSession = data as BackendSession; return session; },
+    serializeSession(session) {
+      const binding = get(session); const data = binding.context.backendSession;
+      if (!data) throw new Error('Session has not been admitted.');
+      if (binding.nativeDisposed || binding.operation === 'disposing' || binding.operation === 'releasing') throw new Error('Scope disposal has already started.');
+      const parentId = binding.parent ? get(binding.parent).context.id : undefined;
+      return JSON.stringify({ ...JSON.parse(encode('session', data)), defaults: consumerContext(binding.context).defaults, role: binding.kind, ...(parentId ? { parentId } : {}) });
+    },
+    restoreSession(context, serialized) {
+      const data = decode(serialized, 'session'); const saved = JSON.parse(serialized);
+      if (saved.role !== undefined && saved.role !== 'main' && saved.role !== 'scope') throw new Error('Invalid persisted session role.');
+      const parent = saved.role === 'scope' ? byId.get(saved.parentId) : undefined;
+      if (saved.role === 'scope' && (!parent || get(parent).kind !== 'main')) throw new Error('Restore the main scope parent first.');
+      if (parent) main(parent);
+      const session = open({ ...context, defaults: context.defaults ?? saved.defaults });
+      const binding = get(session); binding.context.backendSession = data as BackendSession;
+      if (parent) { binding.kind = 'scope'; binding.parent = parent; }
+      return session;
+    },
     serializeRef(ref) { const data = refs.get(ref); if (!data) throw new Error('Unknown conversation reference.'); return encode('ref', data); },
     restoreRef(serialized) { const data = decode(serialized, 'ref'); const ref = Object.freeze({}) as ConversationRef; refs.set(ref, data as BackendConversationRef); return ref; },
     open, getCapabilities: capabilities, readSession: session => structuredClone(get(session).state),
-    async sendPrompt(session, prompt, options) { return admitted(session, await native.sendPrompt(get(session).context, prompt, options)); },
-    async interrupt(session, expectedTurnId) { return admitted(session, await native.interrupt(get(session).context, expectedTurnId)); },
+    async sendPrompt(session, prompt, options) { return admitted(session, await native.sendPrompt(main(session).context, prompt, options)); },
+    async interrupt(session, expectedTurnId) { return admitted(session, await native.interrupt(interactive(session).context, expectedTurnId)); },
     async respondToRequest(session, response) {
-      const b = get(session);
+      const b = interactive(session);
       if (!b.state.requests.some(r => r.id === response.id)) throw new Error('Request does not belong to this session.');
       await native.respondToAgentRequest({ ...response, agentId: b.context.id });
     },
     setPermission: permission,
-    async loadConversation(session) {
+    loadConversation(session) {
       if (!native.loadConversation) throw new Error('Conversation loading is unavailable.');
-      const result = await native.loadConversation(get(session).context);
-      if (result) get(session).context.backendSession = result;
-      return result !== null;
+      return hydrate(session, async binding => {
+        const result = await native.loadConversation!(binding.context);
+        if (result) binding.context.backendSession = result;
+        return result !== null;
+      });
     },
-    loadTurnHistory: (session, turnId) => native.loadTurnHistory?.(get(session).context, turnId) ?? unavailable('Turn history'),
-    async loadOlderHistory(session) {
+    loadTurnHistory: (session, turnId) => hydrate(session, binding => native.loadTurnHistory?.(binding.context, turnId) ?? unavailable('Turn history')),
+    loadOlderHistory(session) {
       if (!native.loadOlderHistory) throw new Error('History paging is unavailable.');
-      const result = await native.loadOlderHistory(get(session).context); return { hasOlder: result.hasOlder };
+      return hydrate(session, async binding => { const result = await native.loadOlderHistory!(binding.context); return { hasOlder: result.hasOlder }; });
     },
     async listConversations(session, input) {
       if (!native.listConversations) throw new Error('Conversation listing is unavailable.');
-      return (await native.listConversations(get(session).context, input)).map(({ ref, ...summary }) => {
+      return (await native.listConversations(main(session).context, input)).map(({ ref, ...summary }) => {
         const handle = Object.freeze({}) as ConversationRef; refs.set(handle, ref); return { ...summary, ref: handle };
       });
     },
     async resumeConversation(session, target) {
       const ref = refs.get(target.ref); if (!ref) throw new Error('Conversation reference does not belong to this driver.');
       if (!native.resumeConversation) throw new Error('Conversation resume is unavailable.');
-      const result = await native.resumeConversation(get(session).context, { ...target, ref }); get(session).context.backendSession = result.backendSession;
+      const result = await native.resumeConversation(main(session).context, { ...target, ref }); main(session).context.backendSession = result.backendSession;
     },
     async executeScopedPrompt(session, input) {
+      const parent = main(session);
+      if (parent.kind !== 'main') throw new Error('Scoped execution requires a main parent session.');
+      input.signal?.throwIfAborted();
       if (!native.executeScopedPrompt) throw new Error('Scoped execution is unavailable.');
-      const scoped = input.session ?? open({ id: `${get(session).context.id}:scope:${crypto.randomUUID()}`, folder: input.cwd });
+      if (input.signal && !native.cancelScopedPrompt) throw new Error('Scoped cancellation is unavailable.');
+      const scoped = input.session ?? open({ id: `${parent.context.id}:scope:${crypto.randomUUID()}`, folder: input.cwd });
       const binding = get(scoped);
+      if (input.session) {
+        if (binding.kind !== 'scope') throw new Error('Only a scoped session can continue scoped execution.');
+        if (binding.parent !== session) throw new Error('Scope belongs to another parent session.');
+        if (binding.context.folder !== input.cwd) throw new Error('Scope belongs to another workspace.');
+      } else {
+        binding.kind = 'scope'; binding.parent = session;
+        binding.context.backendDefaults = structuredClone(parent.context.backendDefaults);
+      }
+      if (binding.operation || binding.state.busy || binding.state.activeTurnId) throw new Error('Scope is busy.');
+      if (binding.nativeDisposed) throw new Error('Scope disposal has already started.');
+      binding.operation = 'executing';
+      let cancellation: Promise<void> | undefined;
+      const cancel = () => {
+        cancellation ??= (async () => {
+          await native.cancelScopedPrompt!(binding.context);
+        })();
+        // Settlement below owns cleanup errors, without an unhandled rejection in the meantime.
+        void cancellation.catch(() => {});
+      };
+      input.signal?.addEventListener('abort', cancel, { once: true });
       try {
+        input.signal?.throwIfAborted();
         const result = await native.executeScopedPrompt(binding.context, { ...input, session: binding.context.backendSession });
+        input.signal?.throwIfAborted();
         binding.context.backendSession = result.session; return { text: result.text, session: scoped };
       } catch (error) {
-        if (!input.session) { await native.releaseConversation?.(binding.context.id); byId.delete(binding.context.id); bindings.delete(scoped); }
+        try { await cancellation; }
+        finally {
+          if (!input.session || input.signal?.aborted) {
+            // A native initialization can finish after the first abort cleanup; release it again.
+            await native.releaseConversation?.(binding.context.id); byId.delete(binding.context.id); bindings.delete(scoped);
+          }
+        }
+        input.signal?.throwIfAborted();
         throw error;
+      } finally {
+        input.signal?.removeEventListener('abort', cancel);
+        binding.operation = undefined;
+        await cancellation;
       }
     },
     async disposeScopedSession(session) {
-      const b = get(session); if (!native.disposeScopedSession || !b.context.backendSession) throw new Error('Scoped disposal is unavailable.');
-      await native.disposeScopedSession(b.context, b.context.backendSession); byId.delete(b.context.id); bindings.delete(session);
+      const b = get(session);
+      if (b.kind !== 'scope') throw new Error('Only scoped sessions can be disposed as scopes.');
+      if (b.operation || b.state.busy || b.state.activeTurnId) throw new Error('Scope is busy.');
+      if (!native.disposeScopedSession || !native.releaseConversation || !b.context.backendSession) throw new Error('Scoped disposal is unavailable.');
+      b.operation = 'disposing';
+      try {
+        if (!b.nativeDisposed) {
+          await native.disposeScopedSession(b.context, b.context.backendSession);
+          b.nativeDisposed = true;
+        }
+        await native.releaseConversation(b.context.id);
+        byId.delete(b.context.id); bindings.delete(session);
+      } finally { b.operation = undefined; }
     },
-    async release(session) { const b = get(session); await native.releaseConversation?.(b.context.id); byId.delete(b.context.id); bindings.delete(session); },
+    async release(session) {
+      const b = get(session);
+      if (b.operation) throw new Error('Session is busy.');
+      if (b.kind === 'main' && [...bindings.values()].some(child => child.parent === session)) throw new Error('Release or dispose child scopes before releasing their parent.');
+      b.operation = 'releasing';
+      try {
+        await native.releaseConversation?.(b.context.id); byId.delete(b.context.id); bindings.delete(session);
+      } finally { b.operation = undefined; }
+    },
     onEvent(listener) { listeners.add(listener); return () => { listeners.delete(listener); }; },
     async close() { try { await native.close(); } finally { unsubscribe(); offUsage?.(); offRequests?.(); listeners.clear(); bindings.clear(); byId.clear(); refs.clear(); } },
   };

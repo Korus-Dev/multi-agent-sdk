@@ -151,7 +151,7 @@ export class CodexSurfaceCatalogController {
       this.host.emitConversationSkills(runtime.threadId, 'notification');
     }
     // Keep catalogs already requested by clients fresh without discovering any
-    // unopened workspace. Older renderer clients rely on pushed refreshes.
+    // unopened workspace. Older clients rely on pushed refreshes.
     for (const cwd of discoveredScopes) {
       void this.listSkills({ ...(cwd ? { cwd } : {}), forceReload: true }).catch(() => undefined);
     }

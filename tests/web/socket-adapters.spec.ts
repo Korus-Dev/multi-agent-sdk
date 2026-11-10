@@ -3,6 +3,7 @@ import {
   createCodexBrowserWebSocketPort,
   createCodexNodeWebSocketPort,
   type CodexNodeWebSocketLike,
+  type BrowserWebSocketLike,
 } from '../../src/web';
 import {
   codexWebSocketText,
@@ -16,6 +17,7 @@ describe('Codex WebSocket data helpers', () => {
     expect(codexWebSocketText('hello', 5)).toBe('hello');
     expect(codexWebSocketText(encoded.buffer, 5)).toBe('hello');
     expect(codexWebSocketText(encoded.subarray(1, 4), 5)).toBe('ell');
+    expect(codexWebSocketText(new DataView(encoded.buffer, 1, 3), 5)).toBe('ell');
     expect(defaultCodexWebSocketMaximumMessageBytes).toBe(64 * 1024 * 1024);
   });
 
@@ -40,7 +42,7 @@ describe('Codex WebSocket data helpers', () => {
 describe('browser WebSocket adapter', () => {
   it('forwards data, close metadata, errors, and listener cleanup', () => {
     const socket = new BrowserSocketStub();
-    const port = createCodexBrowserWebSocketPort(socket as unknown as WebSocket);
+    const port = createCodexBrowserWebSocketPort(socket as unknown as BrowserWebSocketLike);
     const message = vi.fn();
     const close = vi.fn();
     const error = vi.fn();

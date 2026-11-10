@@ -1,3 +1,4 @@
+import { approvalAgentRequest, requestFromClientRequest } from './conversations/agent-request';
 import type { HarnessEvent as NativeEvent } from './contracts/events';
 import type { SessionState, Turn } from './consumer-types';
 import { createCodexConversationReplica } from './core/conversation-replica';
@@ -33,13 +34,15 @@ export function createConsumerProjection() {
     revision = nextRevision;
     if (event.backend === 'codex' && codex) {
       const s = codex.getSnapshot();
-      return { messages: surfaceMessages(s.messages, event.agentId!), busy: s.busy, activeTurnId: s.activeTurnId, turns: s.turns satisfies Turn[], answeredClientRequestIds: s.answeredClientRequestIds, historyLoading: s.historyLoading, historyState: s.historyState, error: s.error, contextUsage: s.contextUsage, goal: s.goal,
+      return { messages: surfaceMessages(s.messages, event.agentId!), busy: s.busy, activeTurnId: s.activeTurnId, turns: s.turns satisfies Turn[], answeredClientRequestIds: s.answeredClientRequestIds, historyLoading: s.historyLoading, historyState: s.historyState,
+        requests: [...s.approvals.map(approvalAgentRequest), ...s.clientRequests.map(request => requestFromClientRequest(request, { conversationId: s.activeConversationId, turnId: request.turnId ?? undefined }))],
+        error: s.error, contextUsage: s.contextUsage, goal: s.goal,
         plan: s.executionPlan ? { threadId: s.activeConversationId, turnId: s.executionPlan.turnId, kind: 'execution',
           status: s.turns.find(t => t.id === s.executionPlan!.turnId)?.status ?? 'inProgress',
           explanation: s.executionPlan.explanation ?? '', steps: [...s.executionPlan.steps], markdown: s.executionPlan.markdown, updatedAt: s.executionPlan.updatedAt } : null };
     }
     const s = event.backend === 'claude' ? claude?.getSnapshot() : event.backend === 'cursor' ? cursor?.getSnapshot() : antigravity?.getSnapshot();
     if (!s) return;
-    return { messages: s.messages, busy: s.busy, activeTurnId: s.activeTurnId, turns: s.turns satisfies Turn[], answeredClientRequestIds: s.answeredClientRequestIds, historyLoading: s.historyLoading, historyState: s.historyState, error: s.error, contextUsage: s.contextUsage, ...('plan' in s ? { plan: s.plan } : {}) };
+    return { messages: s.messages, busy: s.busy, activeTurnId: s.activeTurnId, turns: s.turns satisfies Turn[], answeredClientRequestIds: s.answeredClientRequestIds, historyLoading: s.historyLoading, historyState: s.historyState, ...('clientRequests' in s ? { requests: s.clientRequests.map(request => requestFromClientRequest(request, { conversationId: s.sessionId!, turnId: s.activeTurnId ?? undefined })) } : {}), error: s.error, contextUsage: s.contextUsage, ...('plan' in s ? { plan: s.plan } : {}) };
   };
 }

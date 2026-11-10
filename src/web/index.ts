@@ -36,3 +36,5 @@ export {
   type CodexWebSocketStatePatch,
   type CodexWebSocketSuccess,
 } from './protocol';
+
+export type { BrowserWebSocketLike, BrowserWebSocketEvents } from './client';

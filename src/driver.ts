@@ -1,21 +1,15 @@
-import type { ApprovalPreset, BackendCapabilities, BackendConversationRef, BackendDefaults, BackendModelOption, BackendPluginSummary, BackendRuntimeStatus, BackendSession, BackendSkillSummary, ConversationListInput, ConversationResumeTarget, ConversationSummary, RendererMessage, SendPromptOptions, ThreadGoal } from './contracts';
+import type { ApprovalPreset, BackendCapabilities, BackendConversationRef, BackendDefaults, BackendModelOption, BackendPluginSummary, BackendRuntimeStatus, BackendSession, BackendSkillSummary, ConversationListInput, ConversationResumeTarget, ConversationSummary, Message, SendPromptOptions, ThreadGoal } from './contracts';
 import type { AgentRequestResponse } from './conversations/agent-request';
 import type { HarnessContext } from './context';
-import type { HarnessMcpEndpoint, HarnessTextGenerationInput, HarnessTextGenerationResult } from './generation';
+import type { HarnessPromptScope, HarnessTextGenerationInput, HarnessTextGenerationResult } from './generation';
 export type { HarnessContext } from './context';
 export type { HarnessEvent } from './contracts/events';
 
 /** Caller-owned context: the SDK never requires an application Agent record. */
 export type HarnessSessionContext = HarnessContext;
 
-/** Caller-owned tool scope; identity changes require a native configuration transition. */
-export type HarnessPromptScope = {
-  id: string;
-  mcpServers?: HarnessMcpEndpoint[];
-  allowedTools?: string[];
-  developerInstructions?: string;
-};
-export type HarnessScopedPromptInput = { prompt: string; cwd: string; session?: BackendSession; scope: HarnessPromptScope; options?: SendPromptOptions };
+export type { HarnessPromptScope } from './generation';
+export type HarnessScopedPromptInput = { prompt: string; cwd: string; session?: BackendSession; scope: HarnessPromptScope; options?: SendPromptOptions; signal?: AbortSignal };
 export type HarnessScopedPromptResult = { text: string; session: BackendSession };
 
 export type HarnessSendResult = {
@@ -61,6 +55,8 @@ export type HarnessDriver<Context = HarnessSessionContext, Event = unknown, Hist
   getCapabilities(agent: Context): BackendCapabilities;
   sendPrompt(agent: Context, prompt: string, options?: SendPromptOptions): Promise<HarnessSendResult>;
   executeScopedPrompt?(agent: Context, input: HarnessScopedPromptInput): Promise<HarnessScopedPromptResult>;
+  /** Cancels pending admission and active work for this scope only. */
+  cancelScopedPrompt?(agent: Context): Promise<void>;
   disposeScopedSession?(agent: Context, session: BackendSession): Promise<void>;
   generateImage?(agent: Context, input: import('./generation').HarnessImageGenerationInput, signal?: AbortSignal): Promise<import('./generation').HarnessImageGenerationResult>;
   generateText?(agent: Context, input: HarnessTextGenerationInput): Promise<HarnessTextGenerationResult>;
@@ -83,7 +79,7 @@ export type HarnessDriver<Context = HarnessSessionContext, Event = unknown, Hist
   resumeConversation?(agent: Context, target: ConversationResumeTarget): Promise<HarnessConversationResumeResult>;
   replaceConversationWithSummary?(agent: Context): Promise<HarnessConversationReplacementResult>;
   forkConversation?(agent: Context, targetAgent: Context, turnId?: string): Promise<HarnessConversationForkResult>;
-  readConversationMessages?(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]>;
+  readConversationMessages?(ref: BackendConversationRef, agentId: string): Promise<Message[]>;
   readConversationSummary?(agent: Context, ref: BackendConversationRef): Promise<ConversationSummary | null>;
   steerPrompt?(agent: Context, prompt: string, options?: SendPromptOptions): Promise<HarnessSendResult>;
   deleteTurn?(agent: Context, turnId: string): Promise<HarnessTurnActionResult>;

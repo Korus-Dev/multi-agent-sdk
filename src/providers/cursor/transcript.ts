@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { RendererMessage, RendererMessagePart, RendererToolPart } from '../../contracts/index';
+import type { Message, MessagePart, ToolPart } from '../../contracts/index';
 import type { CursorConversationEvent } from '../../contracts/cursor-conversation';
 import { createCursorConversationReplica, emptyCursorSnapshot } from '../../conversations/cursor-conversation-replica';
 import { cursorContent, cursorToolContent } from './content';
@@ -8,22 +8,22 @@ import { record } from '../../acp/acp-connection';
 
 type Change = CursorConversationEvent extends infer Event ? Event extends CursorConversationEvent ? Omit<Event, 'agentId' | 'sessionId' | 'turnId' | 'occurredAt'> : never : never;
 
-/** Native updates become app-owned messages here; no ACP shape reaches the renderer. */
+/** Native updates become canonical messages here; no ACP shape reaches consumers. */
 export class CursorTranscript {
   readonly replica;
-  private message?: RendererMessage;
+  private message?: Message;
   private readonly todoItems = new Map<string, Record<string, unknown>>();
   private replayUser: Record<string, unknown>[] = [];
   private readonly toolBodies = new Map<string,string>();
   private denied = new Set<string>();
-  constructor(private readonly agentId: string, private readonly sessionId: string, private readonly changed: (event: CursorConversationEvent) => void, private readonly display: (text: string) => { text: string; parts: RendererMessagePart[]; metadata?: RendererMessage['metadata'] } = text => ({ text, parts: [] }), private readonly cwd?: string) {
+  constructor(private readonly agentId: string, private readonly sessionId: string, private readonly changed: (event: CursorConversationEvent) => void, private readonly display: (text: string) => { text: string; parts: MessagePart[]; metadata?: Message['metadata'] } = text => ({ text, parts: [] }), private readonly cwd?: string) {
     this.replica = createCursorConversationReplica(emptyCursorSnapshot(agentId, sessionId));
   }
   private event(change: Change, turnId = this.replica.getSnapshot().activeTurnId!): void {
     const event = { ...change, agentId: this.agentId, sessionId: this.sessionId, turnId, occurredAt: new Date().toISOString() } as CursorConversationEvent;
     this.replica.apply(event); this.changed(event);
   }
-  start(text: string, metadata?: RendererMessage['metadata'], parts: RendererMessagePart[] = []): string {
+  start(text: string, metadata?: Message['metadata'], parts: MessagePart[] = []): string {
     const turnId = randomUUID(); this.message = undefined; this.denied.clear(); this.toolBodies.clear();
     this.event({ type: 'turn.started', payload: { turn: { id: turnId } } }, turnId);
     this.text('user', text, false, metadata);
@@ -77,7 +77,7 @@ export class CursorTranscript {
     if (active) this.finish(active, 'completed');
     const nativeText = blocks.filter(block => block.type === 'text' && typeof block.text === 'string').map(block => block.text).join('');
     const presentation = this.display(nativeText);
-    const parts = presentation.parts.length ? presentation.parts : blocks.flatMap((block): RendererMessagePart[] => {
+    const parts = presentation.parts.length ? presentation.parts : blocks.flatMap((block): MessagePart[] => {
       if (block.type === 'image' && typeof block.mimeType === 'string' && typeof block.data === 'string') return [{ type: 'attachment', attachment: { kind: 'image', name: 'Image', mimeType: block.mimeType, url: `data:${block.mimeType};base64,${block.data}` } }];
       if (block.type === 'resource' && record(block.resource) && typeof block.resource.uri === 'string') return [{ type: 'attachment', attachment: { kind: 'file', name: typeof block.resource.name === 'string' ? block.resource.name : block.resource.uri, url: block.resource.uri } }];
       return [];
@@ -95,7 +95,7 @@ export class CursorTranscript {
   }
   imageFile(toolCallId: string, image: {url:string;mimeType:string}): void {
     const message = this.current('assistant'), itemId = `cursor-file:${toolCallId}`;
-    const part: RendererMessagePart = {type:'media',itemId,media:{...image,alt:'Image file',title:'Image file'}};
+    const part: MessagePart = {type:'media',itemId,media:{...image,alt:'Image file',title:'Image file'}};
     const index = message.parts.findIndex(part=>part.type==='media' && part.itemId===itemId);
     if (index === -1) message.parts.push(part); else message.parts[index]=part;
     this.event({type:'message.upsert',payload:{message}});
@@ -134,7 +134,7 @@ export class CursorTranscript {
     this.denied.add(toolCall.toolCallId);
     this.tool({ ...toolCall, status: 'failed', rawOutput: { rejected: true }, content: [{ type: 'content', content: { type: 'text', text: 'Permission denied.' } }] });
   }
-  private text(role: 'user' | 'assistant', text: string, thought: boolean, metadata?: RendererMessage['metadata']): void {
+  private text(role: 'user' | 'assistant', text: string, thought: boolean, metadata?: Message['metadata']): void {
     const message = this.current(role); const last = message.parts.at(-1);
     if (metadata) message.metadata = metadata;
     if (thought) {
@@ -148,7 +148,7 @@ export class CursorTranscript {
     if (typeof update.toolCallId !== 'string') throw new Error('Invalid Cursor tool identity.');
     const existing = this.replica.getSnapshot().messages.find(message => message.turnId === this.replica.getSnapshot().activeTurnId && message.parts.some(part => part.type === 'tool' && part.id === update.toolCallId));
     const message = existing ? structuredClone(existing) : this.current('assistant');
-    const previous = message.parts.find((part): part is RendererToolPart => part.type === 'tool' && part.id === update.toolCallId);
+    const previous = message.parts.find((part): part is ToolPart => part.type === 'tool' && part.id === update.toolCallId);
     const part = previous ?? { type: 'tool' as const, id: update.toolCallId, kind: 'tool', title: 'Cursor tool', status: 'running' as const };
     if (typeof update.title === 'string') part.title = update.title;
     if (typeof update.kind === 'string') { part.kind = update.kind; part.metadata = {...part.metadata,cursorToolKind:update.kind}; }
@@ -196,7 +196,7 @@ export class CursorTranscript {
     if (message.id === this.message?.id) this.message = message;
     this.event({ type: 'message.upsert', payload: { message } });
   }
-  private current(role: 'user' | 'assistant'): RendererMessage {
+  private current(role: 'user' | 'assistant'): Message {
     if (this.message?.role !== role) this.message = { id: randomUUID(), agentId: this.agentId, turnId: this.replica.getSnapshot().activeTurnId!, role,
       parts: [], status: role === 'user' ? 'complete' : 'streaming', createdAt: new Date().toISOString() };
     return this.message;

@@ -1,8 +1,9 @@
+import { validateMcpPolicy } from '../../mcp-policy';
 import type { HarnessHistoryLoadResult, HarnessPromptScope } from '../../driver';
-import { promptContentDispatchText, type CodexPromptPart } from '../../core/surface';
+import { promptContentDispatchText, type PromptPart } from '../../core/surface';
 import type { ClaudeToolPartOptions } from './claude-tool-part-adapter';
 export type ClaudeHistoryLoadResult = HarnessHistoryLoadResult<Extract<HarnessEvent, { type: 'claude.conversationEventReceived' }> & { seq: number; occurredAt: string }>;
-export type ClaudePromptConfiguration = { cwd?: string; title?: string; appendSystemPrompt?: string; mcpServerUrl?: string | null; mcpServerName?: string; hostedMcpServerUrls?: Record<string, string>; allowedTools?: string[]; formatPrompt?: (prompt: string, content: readonly CodexPromptPart[] | undefined) => string };
+export type ClaudePromptConfiguration = { cwd?: string; title?: string; appendSystemPrompt?: string; mcpServerUrl?: string | null; mcpServerName?: string; hostedMcpServerUrls?: Record<string, string>; allowedTools?: string[]; enabledMcpTools?: Record<string, readonly string[]>; formatPrompt?: (prompt: string, content: readonly PromptPart[] | undefined) => string };
 export type ClaudeHostOptions<Context extends Agent = Agent> = {
   homeDir?: string;
   contextForConversation?: (ref: Extract<BackendConversationRef, { backend: 'claude' }>, agentId: string) => Context;
@@ -12,14 +13,16 @@ export type ClaudeHostOptions<Context extends Agent = Agent> = {
   mcpServerLabel?: (server: string | undefined) => string | undefined;
   statusText?: (status: 'notConfigured' | 'running') => import('../../contracts').AppText;
   toolOptions?: ClaudeToolPartOptions;
-  inferWorkPhases?: (messages: RendererMessage[]) => RendererMessage[];
+  inferWorkPhases?: (messages: Message[]) => Message[];
   log?: (level: 'warn', component: string, message: string, details?: Record<string, unknown>) => void;
 };
 function scopedConfiguration(scope: HarnessPromptScope): ClaudeScopedTurnConfiguration {
+  validateMcpPolicy(scope.mcpServers ?? [], 'claude');
   const [primary, ...hosted] = scope.mcpServers ?? [];
   return { mcpServerUrl: primary?.url ?? null, mcpServerName: primary?.name,
     hostedMcpServerUrls: Object.fromEntries(hosted.map(server => [server.name, server.url])),
-    allowedTools: scope.allowedTools ?? (scope.mcpServers ?? []).flatMap(server => (server.enabledTools ?? ['*']).map(tool => `mcp__${server.name}__${tool}`)),
+    enabledMcpTools: Object.fromEntries((scope.mcpServers ?? []).filter(server => server.enabledTools !== undefined).map(server => [server.name, server.enabledTools!])),
+    allowedTools: scope.allowedTools ?? (scope.mcpServers ?? []).filter(server => server.approval === 'auto').flatMap(server => (server.enabledTools ?? ['*']).map(tool => `mcp__${server.name}__${tool}`)),
     ...(scope.developerInstructions === undefined ? {} : { appendSystemPrompt: scope.developerInstructions }),
   };
 }
@@ -49,8 +52,8 @@ import type {
   ClaudeConversationTurn,
   ConversationResumeTarget,
   ConversationSummary,
-  RendererMessage,
-  RendererToolPart,
+  Message,
+  ToolPart,
   SendPromptOptions,
   ThreadGoal,
 } from '../../contracts/index';
@@ -124,7 +127,7 @@ type ActiveClaudeTurn = {
   interrupted: boolean;
   streamedText: string;
   streamedToolsByIndex: Map<number, StreamedClaudeTool>;
-  toolPartsById: Map<string, RendererToolPart>;
+  toolPartsById: Map<string, ToolPart>;
   fileActivitiesById: Map<string, ClaudeToolFileActivity>;
   completedPlanMarkdown: string | null;
   compactionStarted: boolean;
@@ -146,7 +149,7 @@ type UnsequencedClaudeConversationEvent<Event extends ClaudeConversationEvent = 
 export type ClaudeHistoryLoader<Context extends Agent = Agent> = (agent: Context, options?: import('./transcript-history-adapter').ClaudeTranscriptHistoryOptions) => Promise<ClaudeTranscriptHistory | null>;
 
 
-type ClaudeScopedTurnConfiguration = { mcpServerUrl?: string | null; mcpServerName?: string; hostedMcpServerUrls?: Record<string, string>; allowedTools: string[]; appendSystemPrompt?: string };
+type ClaudeScopedTurnConfiguration = { mcpServerUrl?: string | null; mcpServerName?: string; hostedMcpServerUrls?: Record<string, string>; allowedTools: string[]; enabledMcpTools?: Record<string, readonly string[]>; appendSystemPrompt?: string };
 
 export class ClaudeConversationHost<Context extends Agent = Agent> implements HarnessDriver<Context, HarnessEvent, Extract<HarnessEvent, { type: 'claude.conversationEventReceived' }>> {
   async authenticate(request: import('../../contracts/authentication').ProviderAuthenticationAction): Promise<import('../../contracts/authentication').ProviderAuthentication> {
@@ -223,7 +226,15 @@ export class ClaudeConversationHost<Context extends Agent = Agent> implements Ha
     return this.transport.generateText(nativeInput, { model: selected.model, ...(selected.reasoningEffort ? { effort: claudeEffort(selected.reasoningEffort) } : {}) });
   }
 
+  async cancelScopedPrompt(agent: Context): Promise<void> {
+    const turn = this.activeTurnsByAgentId.get(agent.id);
+    if (turn && !turn.startResolved) turn.rejectStart(new DOMException('Scoped execution was aborted.', 'AbortError'));
+    try { if (turn) await this.interrupt(agent, turn.turnId); }
+    finally { await this.releaseConversation(agent.id); }
+  }
+
   async executeScopedPrompt(agent: Context, input: HarnessScopedPromptInput): Promise<HarnessScopedPromptResult> {
+    input.signal?.throwIfAborted();
     if (input.session && input.session.kind !== 'claude') {
       throw new Error('Claude cannot continue a non-Claude scope conversation.');
     }
@@ -255,7 +266,8 @@ export class ClaudeConversationHost<Context extends Agent = Agent> implements Ha
       }
     });
     try {
-      const started = await this.sendPromptWithConfiguration(scopedContext, input.prompt, input.options ?? {}, scopedConfiguration(input.scope));
+      const started = await this.sendPromptWithConfiguration(scopedContext, input.prompt, input.options ?? {}, scopedConfiguration(input.scope), false, false, () => input.signal?.throwIfAborted());
+      input.signal?.throwIfAborted();
       targetTurnId = started.turnId ?? null;
       if (!targetTurnId) throw new Error('Claude did not start the scope turn.');
       if (completedBeforeTarget.has(targetTurnId)) {
@@ -264,6 +276,7 @@ export class ClaudeConversationHost<Context extends Agent = Agent> implements Ha
       } else {
         await completion;
       }
+      input.signal?.throwIfAborted();
       const sessionId = started.backendSession.kind === 'claude'
         ? started.backendSession.sessionId
         : null;
@@ -371,7 +384,9 @@ export class ClaudeConversationHost<Context extends Agent = Agent> implements Ha
     scope?: ClaudeScopedTurnConfiguration,
     waitForCompletion = false,
     waitForInputReplay = false,
+    admissionGuard?: () => void,
   ): Promise<HarnessSendResult> {
+    admissionGuard?.();
     if (this.forkingAgentIds.has(agent.id)) throw new Error('Claude conversation is being forked.');
     if (this.activeTurnsByAgentId.has(agent.id)) {
       throw new Error('Claude already has an active turn for this agent.');
@@ -386,6 +401,7 @@ export class ClaudeConversationHost<Context extends Agent = Agent> implements Ha
       }
       if (this.activeTurnsByAgentId.has(agent.id) || this.forkingAgentIds.has(agent.id)) throw new Error('Claude conversation is already in use.');
     }
+    admissionGuard?.();
     if (history) this.restoreHistoryState(agent, history);
     const folder = claudeWorkingDirectory(agent);
     const goalRefreshId = Symbol();
@@ -397,6 +413,7 @@ export class ClaudeConversationHost<Context extends Agent = Agent> implements Ha
       await this.transport.closeSession?.(liveSessionId);
       this.liveSessionIdsByAgentId.delete(agent.id);
     }
+    admissionGuard?.();
     let activeTurn: ActiveClaudeTurn | null = null;
     const messageId = options.content === undefined ? undefined : randomUUID();
     const started = new Promise<HarnessSendResult>((resolve, reject) => {
@@ -848,7 +865,7 @@ export class ClaudeConversationHost<Context extends Agent = Agent> implements Ha
     } finally { this.forkingAgentIds.delete(agent.id); }
   }
 
-  async readConversationMessages(ref: BackendConversationRef, agentId: string): Promise<RendererMessage[]> {
+  async readConversationMessages(ref: BackendConversationRef, agentId: string): Promise<Message[]> {
     if (ref.backend !== 'claude') {
       throw new Error('Claude cannot read non-Claude conversation history.');
     }
@@ -885,7 +902,7 @@ export class ClaudeConversationHost<Context extends Agent = Agent> implements Ha
       const source = history.source;
       if (source) {
         const home = this.promptContentHome(); const sessionId = history.backendSession.sessionId;
-        const restore = async (messages: RendererMessage[]) => { await restorePromptContent(home, sessionId, messages); return messages; };
+        const restore = async (messages: Message[]) => { await restorePromptContent(home, sessionId, messages); return messages; };
         const restoredSource = (original: import('./history-source').ClaudeHistorySource): import('./history-source').ClaudeHistorySource => ({
           ...original, readTurn: async id => restore(await original.readTurn(id)), readAll: async () => restore(await original.readAll()),
           ...(original.loadEarlier ? { loadEarlier: async () => {
@@ -1385,7 +1402,7 @@ export class ClaudeConversationHost<Context extends Agent = Agent> implements Ha
   private emitClaudeFileActivity(
     activeTurn: ActiveClaudeTurn,
     itemId: string,
-    status: RendererToolPart['status'],
+    status: ToolPart['status'],
   ): void {
     const toolPart = activeTurn.toolPartsById.get(itemId);
     if (!toolPart) {
@@ -1872,7 +1889,7 @@ export class ClaudeConversationHost<Context extends Agent = Agent> implements Ha
   private resetConversationReplica(
     agent: Context,
     sessionId: string | null,
-    messages: RendererMessage[],
+    messages: Message[],
     taskPlan = new ClaudeTaskPlan(),
     turns: ClaudeConversationTurn[] = [],
     source?: import('./history-source').ClaudeHistorySource,
@@ -1969,6 +1986,7 @@ function claudeTurnParams(
     mcpServerName: configuration.mcpServerName,
     hostedMcpServerUrls: configuration.hostedMcpServerUrls ?? {},
     allowedTools: configuration.allowedTools ?? [],
+    enabledMcpTools: configuration.enabledMcpTools,
     ...(options.attachments?.length ? { attachments: [...options.attachments] } : {}),
   };
 }

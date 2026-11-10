@@ -1,12 +1,15 @@
+import type { Turn } from './contracts/turn';
 import type { BackendCapabilities, ConversationListInput, ConversationSummary as NativeSummary, Message, SendPromptOptions } from './contracts';
 import type { AgentRequest, AgentRequestResponse } from './conversations/agent-request';
+export type { PromptPart, PromptMention } from './contracts/prompt';
 export type { Message, MessagePart, MessageAttachment, MessageMedia, ToolPart, ToolPartUpdate, ThreadGoal, ThreadPlan, AgentContextUsage } from './contracts/conversation';
 export type { AgentRequest, AgentRequestResponse, AgentRequestOutcome } from './conversations/agent-request';
 export type { ExecutionObservation, RequestObservation } from './contracts/usage';
 export type { HarnessMcpEndpoint, HarnessTextGenerationInput, HarnessTextGenerationResult } from './generation';
-export type ModelOption = import('./contracts').BackendModelOption;
+/** Provider-authored catalog metadata is optional; portable selection uses model/id. */
+export type ModelOption = Omit<import('./contracts').BackendModelOption, 'displayName'> & { displayName?: string };
 export type SkillSummary = import('./contracts').BackendSkillSummary;
-export type PluginSummary = import('./contracts').BackendPluginSummary;
+export type PluginSummary = Omit<import('./contracts').BackendPluginSummary, 'displayName'> & { displayName?: string };
 export type RuntimeStatus = Omit<import('./contracts').BackendRuntimeStatus, 'detail' | 'capabilities'> & { detail?: string };
 /** Provider-specific account/login detail is an explicit native escape hatch. */
 export type Authentication = { connected: boolean; native: import('./contracts/authentication').ProviderAuthentication };
@@ -25,25 +28,7 @@ export type HarnessCapabilities = Omit<BackendCapabilities, 'approvalPresets' | 
 export type PromptOptions = Omit<SendPromptOptions, 'backendOptions' | 'recordUserMessage'>;
 export type Admission = { session: Session; turnId?: string; messageId?: string };
 export type ConversationSummary = Omit<NativeSummary, 'ref'> & { ref: ConversationRef };
-/** Full native lifecycle evidence, shared structurally by all supported providers.
- * Native error detail and execution usage remain lossless compatibility DTOs.
- */
-export type TurnError = import('./core/surface').CodexSurfaceTurnError;
-export type TurnExecutionUsage = import('./core/surface').CodexSurfaceExecutionUsage;
-export type Turn = {
-  id: string;
-  status: 'inProgress' | 'completed' | 'interrupted' | 'failed';
-  error: TurnError | null;
-  /** Native evidence; never defaulted by the consumer projection. */
-  willRetry: boolean;
-  startedAt: string | null;
-  completedAt: string | null;
-  durationMs: number | null;
-  itemsView?: 'full' | 'summary';
-  detailsLoading?: boolean;
-  detailsError?: string | null;
-  executionUsage?: TurnExecutionUsage | null;
-};
+export type { Turn, TurnError, TurnExecutionUsage, TurnStatus, TokenUsage, RequestUsage, RequestUsageField, SafetyFindings, JsonValue } from './contracts/turn';
 export type HistoryState = {
   hasOlder: boolean;
   loadingOlder: boolean;
@@ -112,7 +97,7 @@ export type HarnessDriver = {
   loadOlderHistory(session: Session): Promise<{ hasOlder: boolean }>;
   listConversations(session: Session, input?: ConversationListInput): Promise<ConversationSummary[]>;
   resumeConversation(session: Session, target: { ref: ConversationRef; storageState: 'active' | 'archived' }): Promise<void>;
-  executeScopedPrompt(session: Session, input: { prompt: string; cwd: string; session?: Session; scope: import('./driver').HarnessPromptScope; options?: PromptOptions }): Promise<{ text: string; session: Session }>;
+  executeScopedPrompt(session: Session, input: { prompt: string; cwd: string; session?: Session; scope: import('./generation').HarnessPromptScope; options?: PromptOptions; signal?: AbortSignal }): Promise<{ text: string; session: Session }>;
   disposeScopedSession(session: Session): Promise<void>;
   release(session: Session): Promise<void>;
   onEvent(listener: (event: HarnessEvent) => void): () => void;

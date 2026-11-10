@@ -10,7 +10,7 @@ import { handleAcpFileRequest } from './filesystem';
 import { validateAcpSession } from './catalog';
 import { AcpPromptJournal } from './prompt-journal';
 import { acpConsumption, selectedModel } from './consumption';
-import type { RendererMessagePart } from '../../contracts/index';
+import type { MessagePart } from '../../contracts/index';
 import type { ExecutionObservation } from '../../contracts/usage';
 import { hasGitSafeguards, nativeTargetsInside, readOnlyGitCommand } from '../../tools/read-only-workspace';
 
@@ -89,7 +89,7 @@ export class AcpSession {
   get cwd(): string { return this.options.cwd; }
   get writtenPlan(): string | undefined { return this.planMarkdown; }
 
-  prompt(text: string, content: unknown[] = [{ type: 'text', text }], parts: RendererMessagePart[] = [], metadata?: import('../../contracts/index').RendererMessage['metadata']): { turnId: string; completion: Promise<void> } {
+  prompt(text: string, content: unknown[] = [{ type: 'text', text }], parts: MessagePart[] = [], metadata?: import('../../contracts/index').Message['metadata']): { turnId: string; completion: Promise<void> } {
     if (this.disposed) throw new Error('Antigravity session is closed.');
     if (this.active) throw new Error('Antigravity is still finishing the previous turn. Queue the next prompt.');
     this.interrupted = false;

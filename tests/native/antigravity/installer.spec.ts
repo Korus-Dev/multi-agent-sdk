@@ -137,8 +137,7 @@ describe('Antigravity ACP installation', () => {
     vi.mocked(filesystem.statfs).mockResolvedValueOnce({ bavail: 0n, bsize: 4096n } as unknown as Awaited<ReturnType<typeof filesystem.statfs>>);
     await expect(installAcpRuntime({ dataDirectory: root })).rejects.toThrow('free disk space');
     expect(fetch).not.toHaveBeenCalled();
-    vi.stubEnv('APP_ANTIGRAVITY_COMMAND', path.join(root, 'missing-custom-runtime'));
-    await expect(installAcpRuntime({ dataDirectory: root })).rejects.toThrow('custom Antigravity runtime paths');
+    await expect(installAcpRuntime({ dataDirectory: root, command: path.join(root, 'missing-custom-runtime') })).rejects.toThrow('custom Antigravity runtime paths');
     expect(fetch).not.toHaveBeenCalled();
   });
 });

@@ -13,15 +13,18 @@ export function managedRuntimeDirectory(dataDirectory = defaultRuntimeDirectory(
 function runtimeDirectory(dataDirectory: string): string { return path.join(dataDirectory, 'antigravity', acpVersion); }
 export function antigravityHome(dataDirectory = defaultRuntimeDirectory()): string { return process.env.GEMINI_HOME || path.join(dataDirectory, 'antigravity-home'); }
 
-export function resolveAcpRuntime(dataDirectory = defaultRuntimeDirectory()): { command: string; harness: string; args: string[] } | null {
+/** Explicit host paths override managed/PATH discovery. A missing explicit path never falls back. */
+export type AcpRuntimeConfiguration = { command?: string; harnessPath?: string };
+
+export function resolveAcpRuntime(dataDirectory = defaultRuntimeDirectory(), configuration: AcpRuntimeConfiguration = {}): { command: string; harness: string; args: string[] } | null {
   const executable = process.platform === 'win32' ? 'agy_acp_server.exe' : 'agy_acp_server.par';
   const companion = process.platform === 'win32' ? 'localharness_external.exe' : 'localharness_external';
-  const command = process.env.APP_ANTIGRAVITY_COMMAND
-    ? resolveRuntimeExecutable(process.env.APP_ANTIGRAVITY_COMMAND)
+  const command = configuration.command?.trim()
+    ? resolveRuntimeExecutable(configuration.command.trim())
     : resolveRuntimeExecutable(path.join(managedRuntimeDirectory(dataDirectory) ?? runtimeDirectory(dataDirectory), executable))
       ?? resolveRuntimeExecutable(executable) ?? resolveRuntimeExecutable(path.join(runtimeDirectory(dataDirectory), executable));
   if (!command) return null;
-  const harness = resolveRuntimeExecutable(process.env.ANTIGRAVITY_HARNESS_PATH || path.join(path.dirname(command), companion));
+  const harness = resolveRuntimeExecutable(configuration.harnessPath?.trim() || process.env.ANTIGRAVITY_HARNESS_PATH || path.join(path.dirname(command), companion));
   return harness ? { command, harness, args: process.platform === 'linux' ? ['--uid='] : [] } : null;
 }
 

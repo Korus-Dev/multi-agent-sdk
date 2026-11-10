@@ -11,11 +11,11 @@ import type {
   CodexSurfaceAskUserAnswers,
   CodexSurfaceClientRequestResponse,
   CodexSurfaceJsonValue,
-  CodexRendererAttachment,
-  CodexRendererSendMessageOptions,
+  CodexClientAttachment,
+  CodexClientSendMessageOptions,
   CodexSurfaceAttachment,
-  CodexSurfaceRendererApi,
-  CreateCodexRendererConversationOptions,
+  CodexSurfaceClientApi,
+  CreateCodexClientConversationOptions,
   ListCodexConversationsOptions,
   ListCodexModelsOptions,
   ListCodexSkillsOptions,
@@ -27,13 +27,13 @@ import type {
   UpdateCodexConversationSettings,
 } from './surface';
 
-type RequiredRendererApi = Required<CodexSurfaceRendererApi>;
+type RequiredClientApi = Required<CodexSurfaceClientApi>;
 export type CodexSurfaceBridgeOperation = Exclude<
-  keyof RequiredRendererApi,
+  keyof RequiredClientApi,
   'onEvent' | 'onStateChange' | 'onStatePatch' | 'getVersionedSnapshot'
 >;
 type OperationFunction<Name extends CodexSurfaceBridgeOperation> = Extract<
-  RequiredRendererApi[Name],
+  RequiredClientApi[Name],
   (...args: never[]) => unknown
 >;
 export type CodexSurfaceBridgeOperationArguments<Name extends CodexSurfaceBridgeOperation> =
@@ -55,7 +55,7 @@ export type CodexSurfaceBridgeTarget = Omit<BridgeOperationMethods, OptionalAcco
   & Pick<CodexSurfaceApi, 'onEvent' | 'onStateChange'>;
 
 export type CodexSurfaceBridgeAttachmentResolver = (
-  attachment: CodexRendererAttachment,
+  attachment: CodexClientAttachment,
 ) => Awaitable<CodexSurfaceAttachment>;
 
 export type CodexSurfaceBridgeInvokeOptions = {
@@ -69,7 +69,7 @@ type CodexConversationBridgeOperationFunctions = {
   continueInterruptedTurn(): Awaitable<CodexConversationSnapshot>;
   deleteTurn(turnId: string): Awaitable<CodexConversationSnapshot>;
   deleteQueuedPrompt(promptId: string): Awaitable<CodexConversationSnapshot>;
-  editTurn(turnId: string, content: string, options?: CodexRendererSendMessageOptions): Awaitable<CodexConversationSnapshot>;
+  editTurn(turnId: string, content: string, options?: CodexClientSendMessageOptions): Awaitable<CodexConversationSnapshot>;
   forkTurn(turnId: string): Awaitable<CodexConversationSnapshot>;
   getSnapshot(): Awaitable<CodexConversationSnapshot>;
   interrupt(): Awaitable<CodexConversationSnapshot>;
@@ -85,10 +85,10 @@ type CodexConversationBridgeOperationFunctions = {
     scope?: CodexSurfaceApprovalScope,
   ): Awaitable<CodexConversationSnapshot>;
   retryTurn(turnId: string): Awaitable<CodexConversationSnapshot>;
-  sendMessage(prompt: string, options?: CodexRendererSendMessageOptions): Awaitable<CodexConversationSnapshot>;
+  sendMessage(prompt: string, options?: CodexClientSendMessageOptions): Awaitable<CodexConversationSnapshot>;
   setGoal(objective: string, tokenBudget?: number | null): Awaitable<CodexConversationSnapshot>;
   startReview(options?: StartCodexReviewOptions): Awaitable<CodexConversationSnapshot>;
-  steerMessage(prompt: string, options?: CodexRendererSendMessageOptions): Awaitable<CodexConversationSnapshot>;
+  steerMessage(prompt: string, options?: CodexClientSendMessageOptions): Awaitable<CodexConversationSnapshot>;
   steerQueuedPrompt(promptId: string, prompt?: string, options?: SendCodexMessageOptions): Awaitable<CodexConversationSnapshot>;
   updateConversationSettings(settings: UpdateCodexConversationSettings): Awaitable<CodexConversationSnapshot>;
   updateQueuedPrompt(promptId: string, prompt: string, options?: SendCodexMessageOptions): Awaitable<CodexConversationSnapshot>;
@@ -460,7 +460,7 @@ function liveChatOptions(value: unknown): StartCodexLiveChatOptions {
   return result;
 }
 
-function conversationOptions(value: unknown): CreateCodexRendererConversationOptions | undefined {
+function conversationOptions(value: unknown): CreateCodexClientConversationOptions | undefined {
   if (value === undefined) return undefined;
   const record = plainObject(value, 'Conversation options');
   onlyKeys(record, ['model', 'reasoningEffort', 'serviceTier', 'approvalPreset'], 'Conversation options');
@@ -634,7 +634,7 @@ async function attachmentInputs(
     if (image && attachment.detail !== undefined && !['auto', 'low', 'high', 'original'].includes(String(attachment.detail))) {
       throw new TypeError('Message image detail is invalid');
     }
-    const rendererAttachment: CodexRendererAttachment = image ? {
+    const clientAttachment: CodexClientAttachment = image ? {
       type: 'image' as const,
       reference: nonEmptyString(attachment.reference, 'Message attachment reference'),
       ...(attachment.detail === undefined ? {} : { detail: attachment.detail as 'auto' | 'low' | 'high' | 'original' }),
@@ -642,14 +642,14 @@ async function attachmentInputs(
       type: 'file' as const,
       reference: nonEmptyString(attachment.reference, 'Message attachment reference'),
     };
-    const resolved = await resolveAttachment!(rendererAttachment);
-    return resolvedAttachment(resolved, rendererAttachment);
+    const resolved = await resolveAttachment!(clientAttachment);
+    return resolvedAttachment(resolved, clientAttachment);
   }));
 }
 
 function resolvedAttachment(
   value: CodexSurfaceAttachment,
-  source: CodexRendererAttachment,
+  source: CodexClientAttachment,
 ): CodexSurfaceAttachment {
   const attachment = plainObject(value, 'Resolved message attachment');
   if (attachment.type !== source.type) throw new TypeError('Resolved message attachment type does not match');

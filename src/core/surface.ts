@@ -1,92 +1,75 @@
+import type {
+  ClientAttachment as CodexClientAttachment,
+  ClientSendMessageOptions as CodexClientSendMessageOptions,
+  Approval as CodexSurfaceApproval,
+  ApprovalDecision as CodexSurfaceApprovalDecision,
+  ApprovalScope as CodexSurfaceApprovalScope,
+  ClientRequest as CodexSurfaceClientRequest,
+  ClientRequestResponse as CodexSurfaceClientRequestResponse,
+  Plugin as CodexSurfacePlugin,
+  ServiceTier as CodexSurfaceServiceTier,
+  Skill as CodexSurfaceSkill,
+  SendMessageOptions as SendCodexMessageOptions,
+  UpdateConversationSettings as UpdateCodexConversationSettings,
+  SurfaceMessage,
+  SurfaceMessageTextPart,
+  SurfaceMessageToolPart,
+  ApprovalPreset as CodexSurfaceApprovalPreset,
+} from '../contracts/ui';
+export type {
+  ClientAttachment as CodexClientAttachment,
+  ClientSendMessageOptions as CodexClientSendMessageOptions,
+  ConversationRenderStrategy as CodexConversationRenderStrategy,
+  Approval as CodexSurfaceApproval,
+  ApprovalDecision as CodexSurfaceApprovalDecision,
+  ApprovalScope as CodexSurfaceApprovalScope,
+  RequestedPermission as CodexSurfaceRequestedPermission,
+  Attachment as CodexSurfaceAttachment,
+  ClientRequest as CodexSurfaceClientRequest,
+  ClientRequestResponse as CodexSurfaceClientRequestResponse,
+  Plugin as CodexSurfacePlugin,
+  ServiceTier as CodexSurfaceServiceTier,
+  Skill as CodexSurfaceSkill,
+  SendMessageOptions as SendCodexMessageOptions,
+  UpdateConversationSettings as UpdateCodexConversationSettings,
+  SurfaceMessage,
+  SurfaceMessageAttachment,
+  SurfaceMessageAttachmentPart,
+  SurfaceMessageMedia,
+  SurfaceMessageMediaPart,
+  SurfaceMessagePart,
+  SurfaceMessageQuestionPart,
+  SurfaceMessageStatusPart,
+  SurfaceMessageTextPart,
+  SurfaceMessageToolPart,
+  AskUserQuestion as CodexSurfaceAskUserQuestion,
+  AskUserAnswers as CodexSurfaceAskUserAnswers,
+  ToolConfirmationDecision as CodexSurfaceToolConfirmationDecision,
+  SkillInput as CodexSurfaceSkillInput,
+  ApprovalPreset as CodexSurfaceApprovalPreset,
+  SurfaceMessageReasoningPart,
+} from '../contracts/ui';
+import type {
+  JsonValue as CodexSurfaceJsonValue,
+  TurnStatus as CodexSurfaceTurnStatus,
+  TurnExecutionUsage as CodexSurfaceExecutionUsage,
+  SafetyFindings as CodexSurfaceMisalignmentErrorDetails,
+  TurnError as CodexSurfaceTurnError,
+  Turn as CodexSurfaceTurn,
+} from '../contracts/turn';
+export type {
+  JsonValue as CodexSurfaceJsonValue,
+  TurnStatus as CodexSurfaceTurnStatus,
+  TokenUsage as CodexSurfaceTokenUsage,
+  RequestUsageField as CodexSurfaceRequestUsageField,
+  RequestUsage as CodexSurfaceRequestUsage,
+  TurnExecutionUsage as CodexSurfaceExecutionUsage,
+  SafetyFindings as CodexSurfaceMisalignmentErrorDetails,
+  TurnError as CodexSurfaceTurnError,
+  Turn as CodexSurfaceTurn,
+} from '../contracts/turn';
 export { normalizePromptContent, promptContentText, promptContentDispatchText, trimPromptContent, slicePromptContent, replacePromptContentRange } from './prompt-content';
-export type { CodexPromptMention, CodexPromptPart } from './prompt-content';
-import type { CodexPromptPart } from './prompt-content';
-
-export type SurfaceMessageTextPart = {
-  type: 'text';
-  text: string;
-  itemId?: string;
-  phase?: 'commentary' | 'partial_answer' | 'final_answer';
-};
-
-export type SurfaceMessageReasoningPart = {
-  type: 'reasoning';
-  summary: string;
-  itemId: string;
-  summaryIndex: number;
-};
-
-export type SurfaceMessageStatusPart = {
-  type: 'status';
-  text: string;
-};
-
-export type CodexSurfaceAskUserQuestion = {
-  id: string;
-  header: string;
-  question: string;
-  isOther: boolean;
-  isSecret: boolean;
-  options: readonly {
-    label: string;
-    description: string;
-  }[] | null;
-};
-
-export type SurfaceMessageQuestionPart = {
-  type: 'question';
-  /** Replayed transcript content, not a live request to answer. */
-  historical?: boolean;
-  request: Extract<CodexSurfaceClientRequest, { kind: 'ask_user' }>;
-};
-
-export type SurfaceMessageAttachment = {
-  /** Intrinsic display dimensions, available before lazy image bytes load. */
-  width?: number;
-  height?: number;
-  kind: 'file' | 'image';
-  name: string;
-  path?: string;
-  url?: string;
-  mimeType?: string;
-};
-
-export type SurfaceMessageAttachmentPart = {
-  type: 'attachment';
-  attachment: SurfaceMessageAttachment;
-};
-
-export type SurfaceMessageMedia = {
-  /** Intrinsic display dimensions, available before lazy image bytes load. */
-  width?: number;
-  height?: number;
-  url: string;
-  alt?: string;
-  mimeType?: string;
-  prompt?: string;
-  title?: string;
-};
-
-export type SurfaceMessageMediaPart = {
-  type: 'media';
-  /** Tool observations belong to Working; final-answer media stays visible. */
-  phase?: SurfaceMessageTextPart['phase'];
-  media: SurfaceMessageMedia;
-  itemId?: string;
-};
-
-export type SurfaceMessageToolPart = {
-  type: 'tool';
-  id: string;
-  title: string;
-  kind?: string;
-  status: 'running' | 'completed' | 'failed';
-  statusText?: string;
-  body?: string;
-  input?: unknown;
-  output?: unknown;
-  metadata?: Record<string, unknown>;
-};
+export type { CodexPromptMention, CodexPromptPart, PromptMention, PromptPart } from './prompt-content';
 
 export type SurfaceMessageToolPartUpdate = {
   itemId: string;
@@ -100,26 +83,6 @@ export type SurfaceMessageToolPartUpdate = {
   output?: unknown;
   metadata?: Record<string, unknown>;
   fallbackToolPart?: SurfaceMessageToolPart;
-};
-
-export type SurfaceMessagePart =
-  | SurfaceMessageAttachmentPart
-  | SurfaceMessageMediaPart
-  | SurfaceMessageQuestionPart
-  | SurfaceMessageReasoningPart
-  | SurfaceMessageTextPart
-  | SurfaceMessageStatusPart
-  | SurfaceMessageToolPart;
-
-export type SurfaceMessage = {
-  id: string;
-  kind?: 'compaction' | 'steer';
-  role: 'user' | 'assistant' | 'system';
-  status: 'complete' | 'streaming' | 'error';
-  parts: readonly SurfaceMessagePart[];
-  createdAt?: string;
-  turnId?: string;
-  metadata?: Record<string, unknown>;
 };
 
 export type CodexConversationSummary = {
@@ -142,87 +105,6 @@ export type CodexConversationSummary = {
   updatedAt: string;
 };
 
-export type CodexSurfaceApproval = {
-  id: string;
-  kind: 'command' | 'file-change' | 'permissions';
-  conversationId: string;
-  turnId?: string;
-  itemId: string;
-  title: string;
-  description?: string;
-  command?: string;
-  cwd?: string;
-  requestedPermissions?: readonly CodexSurfaceRequestedPermission[];
-  allowedScopes?: readonly CodexSurfaceApprovalScope[];
-  canDeny?: boolean;
-  /** Requires a fresh human decision; never satisfy this through automatic or remembered approval. */
-  requiresHumanApproval?: boolean;
-};
-
-export type CodexSurfaceRequestedPermission =
-  | {
-    kind: 'filesystem';
-    access: 'read' | 'write' | 'deny';
-    path: string;
-  }
-  | {
-    kind: 'network';
-    enabled: boolean;
-    host?: string;
-    protocol?: string;
-  };
-
-export type CodexSurfaceApprovalDecision = 'approve' | 'deny';
-export type CodexSurfaceApprovalScope = 'once' | 'session';
-export type CodexSurfaceApprovalPreset = 'ask-for-approval' | 'approve-for-me' | 'full-access';
-
-export type CodexSurfaceAskUserAnswers = Record<string, { answers: string[] }>;
-export type CodexSurfaceToolConfirmationDecision = 'allow' | 'allow_conversation' | 'always_allow' | 'deny';
-export type CodexSurfaceClientRequestResponse = {
-  id: string;
-  payload?: {
-    answers?: CodexSurfaceAskUserAnswers;
-    cancelled?: boolean;
-    decision?: CodexSurfaceToolConfirmationDecision | null;
-  };
-};
-
-export type CodexSurfaceClientRequest =
-  | {
-    id: string;
-    kind: 'confirm_tool';
-    conversationId: string;
-    turnId: string | null;
-    itemId: string;
-    payload: {
-      confirmation: {
-        argumentsPreview: string;
-        integrationId: string;
-        integrationName: string;
-        summary: string;
-        toolName: string;
-        allowConversation?: boolean;
-        allowAlways?: boolean;
-      };
-    };
-  }
-  | {
-    id: string;
-    kind: 'ask_user';
-    conversationId: string;
-    turnId: string;
-    itemId: string;
-    payload: {
-      request: {
-        itemId: string;
-        delivery: 'tool' | 'async';
-        blocking: boolean;
-        questions: readonly CodexSurfaceAskUserQuestion[];
-        autoResolutionMs?: number;
-      };
-    };
-  };
-
 export type CodexSurfaceQueuedPrompt = {
   id: string;
   text: string;
@@ -233,12 +115,6 @@ export type CodexSurfaceCatalogStatus = 'notLoaded' | 'loading' | 'loaded' | 'er
 
 export type CodexSurfaceReasoningEffortOption = {
   reasoningEffort: string;
-  description: string;
-};
-
-export type CodexSurfaceServiceTier = {
-  id: string;
-  name: string;
   description: string;
 };
 
@@ -264,37 +140,6 @@ export type CodexSurfaceRemoteControlStatus = {
   environmentId: string | null;
 };
 
-export type CodexSurfaceSkill = {
-  name: string;
-  description?: string;
-  shortDescription?: string;
-  displayName?: string;
-  /** Bounded image data URL; no local paths exposed. */
-  iconSmall?: string;
-  /** Bounded image data URL; no local paths exposed. */
-  iconLarge?: string;
-  brandColor?: string;
-  defaultPrompt?: string;
-  path: string;
-  scope?: string;
-  enabled: boolean;
-};
-
-export type CodexSurfacePlugin = {
-  /** Canonical app-server plugin id, suitable for matching `plugin://` mentions exactly. */
-  id: string;
-  name: string;
-  displayName: string;
-  shortDescription?: string;
-  longDescription?: string;
-  brandColor?: string;
-  /** Remote URL or bounded image data URL; no local paths exposed. */
-  iconUrl?: string;
-  /** Dark-mode icon with the same guarantees as `iconUrl`. */
-  iconUrlDark?: string;
-  enabled: boolean;
-};
-
 export type CodexSurfacePermissionProfile = {
   id: string;
   description: string | null;
@@ -310,49 +155,6 @@ export type CodexSurfaceContextUsage = {
   lastTotalTokens: number;
   modelContextWindow: number | null;
   usedPercent: number | null;
-};
-
-/** Provider counts: cached input is part of input, and reasoning is part of output. */
-export type CodexSurfaceTokenUsage = {
-  totalTokens: number;
-  inputTokens: number;
-  cachedInputTokens: number;
-  /** Null when absent. Its relationship to input is not guaranteed by app-server. */
-  cacheWriteInputTokens: number | null;
-  outputTokens: number;
-  reasoningOutputTokens: number;
-};
-
-/** Fields lacking public, request-attributable evidence in the supported app-server protocol. */
-export type CodexSurfaceRequestUsageField =
-  | 'requestIdentity' | 'timestamp' | 'actualModel' | 'actualProvider' | 'requestTokenUsage'
-  | 'cacheWriteLifetimes' | 'cacheWriteInputInclusion' | 'pricingContext'
-  | 'requestedModel' | 'requestedServiceTier' | 'reportedServiceTier' | 'finality';
-
-/**
- * Public app-server counters cannot establish independently billable requests.
- * Null requests means unknown coverage, never an empty list or zero consumption.
- */
-export type CodexSurfaceRequestUsage = {
-  status: 'unavailable';
-  reason: 'public-runtime-request-evidence-unavailable';
-  unavailableFields: readonly CodexSurfaceRequestUsageField[];
-  requests: null;
-};
-
-export type CodexSurfaceExecutionUsage = {
-  /** This surface instance observed the turn start, rather than only its replayed counters. */
-  observedStart: boolean;
-  /** Latest provider counters; no stable request identity or finality is supplied. */
-  last: CodexSurfaceTokenUsage;
-  /** Provider thread counters; may be replayed or reset. */
-  total: CodexSurfaceTokenUsage;
-  /** Cumulative replacement since an observed start with a known baseline. */
-  execution: CodexSurfaceTokenUsage | null;
-  /** Unknown unless the provider supplies authoritative whole-execution evidence. */
-  model: string | null;
-  /** Request-pricing capability. Absent on older SDK projections means unknown support. */
-  requestUsage?: CodexSurfaceRequestUsage;
 };
 
 export type CodexSurfaceGoal = {
@@ -453,9 +255,6 @@ export type CodexSurfaceStatus = 'idle' | 'connecting' | 'ready' | 'error';
 
 /** Controls whether a conversation loads its complete history up front. */
 export type CodexConversationLoadingStrategy = 'eager' | 'lazy';
-
-/** Controls whether the conversation view mounts all supplied messages. */
-export type CodexConversationRenderStrategy = 'eager' | 'lazy';
 
 export type CodexConversationHistoryState = {
   /** Missing means full detail; individual turns may already have richer cached content. */
@@ -597,7 +396,6 @@ export type CodexConversationPromptHistory = {
 
 export type CodexSurfaceEventOrigin = 'action' | 'notification' | 'lifecycle';
 export type CodexSurfaceHistoryReason = 'fork' | 'load' | 'resume' | 'rollback' | 'resync' | 'details' | 'images';
-export type CodexSurfaceTurnStatus = 'completed' | 'interrupted' | 'failed' | 'inProgress';
 export type CodexSurfaceFileActivityAction = 'read' | 'edit' | 'create';
 export type CodexSurfaceFileActivityStatus = 'running' | 'completed' | 'failed';
 export type CodexSurfacePlanStepStatus = 'pending' | 'inProgress' | 'completed';
@@ -653,42 +451,10 @@ export type CodexSurfaceSubagentActivity = {
   agentConversationId: string;
   agentPath: string;
 };
-/** Provider-authored findings; continuation requires an explanation, instruction and user confirmation. */
-export type CodexSurfaceMisalignmentErrorDetails = {
-  errorType: string | null;
-  detailedExplanation: string | null;
-  steer: { message: string } | null;
-  /** Opaque provider target; its presence alone does not permit continuation. */
-  reviewTarget?: string | null;
-};
-
 /** Explicit user review of the exact findings supplied by the provider. */
 export type ContinueCodexSafetyReviewOptions = {
   turnId: string;
   findings: CodexSurfaceMisalignmentErrorDetails;
-};
-
-export type CodexSurfaceTurnError = {
-  /** Absent when no provider findings were supplied. */
-  misalignment?: CodexSurfaceMisalignmentErrorDetails;
-  message: string;
-  additionalDetails: string | null;
-  codexErrorInfo: CodexSurfaceJsonValue | null;
-};
-export type CodexSurfaceTurn = {
-  id: string;
-  /** Missing on older/full snapshots. Summary turns can fetch details on expansion. */
-  itemsView?: 'full' | 'summary';
-  detailsLoading?: boolean;
-  detailsError?: string | null;
-  status: CodexSurfaceTurnStatus;
-  error: CodexSurfaceTurnError | null;
-  willRetry: boolean;
-  /** Provider start time, or the observed live start when the provider omits it. */
-  startedAt: string | null;
-  completedAt: string | null;
-  durationMs: number | null;
-  executionUsage?: CodexSurfaceExecutionUsage | null;
 };
 
 /**
@@ -1042,59 +808,6 @@ export type CreateCodexClientConversationOptions = Pick<
   'approvalPreset' | 'model' | 'reasoningEffort' | 'serviceTier'
 >;
 
-export type SendCodexMessageOptions = {
-  content?: readonly CodexPromptPart[];
-  attachments?: readonly CodexSurfaceAttachment[];
-  inputMethod?: 'typed' | 'dictated';
-  model?: string;
-  reasoningEffort?: string;
-  serviceTier?: string | null;
-  planMode?: boolean;
-  skills?: readonly CodexSurfaceSkillInput[];
-  outputSchema?: CodexSurfaceJsonValue;
-};
-
-export type CodexClientAttachment =
-  | {
-    type: 'image';
-    reference: string;
-    detail?: 'auto' | 'low' | 'high' | 'original';
-  }
-  | {
-    type: 'file';
-    reference: string;
-  };
-
-export type CodexClientSendMessageOptions = Omit<SendCodexMessageOptions, 'attachments'> & {
-  attachments?: readonly CodexClientAttachment[];
-};
-
-export type CodexSurfaceAttachment =
-  | {
-    type: 'image';
-    path: string;
-    detail?: 'auto' | 'low' | 'high' | 'original';
-    name?: string;
-    mimeType?: string;
-    previewUrl?: string;
-  }
-  | {
-    type: 'file';
-    path: string;
-    name?: string;
-    mimeType?: string;
-  };
-
-export type CodexSurfaceJsonValue =
-  | null
-  | boolean
-  | number
-  | string
-  | CodexSurfaceJsonValue[]
-  | { [key: string]: CodexSurfaceJsonValue };
-
-export type CodexSurfaceSkillInput = Pick<CodexSurfaceSkill, 'name' | 'path'>;
-
 export type CodexSurfaceReviewTarget =
   | { type: 'uncommittedChanges' }
   | { type: 'baseBranch'; branch: string }
@@ -1103,14 +816,6 @@ export type CodexSurfaceReviewTarget =
 
 export type StartCodexReviewOptions = {
   target?: CodexSurfaceReviewTarget;
-};
-
-export type UpdateCodexConversationSettings = {
-  approvalPreset?: CodexSurfaceApprovalPreset;
-  modelId?: string;
-  reasoningEffort?: string;
-  serviceTier?: string | null;
-  planMode?: boolean;
 };
 
 export type CodexSurfaceApi = {

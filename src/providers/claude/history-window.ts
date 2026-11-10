@@ -1,7 +1,7 @@
 import type { ClaudeHistorySource, ClaudeHistoryState } from './history-source';
 import { withInferredTurnWorkPhases } from '../../conversations/work-phases';
 import { createHash } from 'node:crypto';
-import type { ClaudeConversationTurn, RendererMessage, RendererMessagePart } from '../../contracts/index';
+import type { ClaudeConversationTurn, Message, MessagePart } from '../../contracts/index';
 import type { ConversationContentChunk, ConversationContentInput } from '../../contracts/conversation';
 
 // Leave room for routing envelopes and snapshot state under the 4 MiB event limit.
@@ -22,16 +22,16 @@ export class ClaudeHistoryWindow {
   private readonly content = new Map<string, Buffer>();
   private readonly contentByMessage = new Map<string, string>();
 
-  private readonly messages: RendererMessage[];
+  private readonly messages: Message[];
   private readonly initialIds: Set<string>;
   private visibleIds = new Set<string>();
   private readonly loadedTurns = new Set<string>();
-  private readonly historyMessages: Map<string, RendererMessage>;
+  private readonly historyMessages: Map<string, Message>;
   private readonly archiveTurns = new Map<string, ClaudeConversationTurn>();
   private pendingArchive?: Promise<void>;
   private recoveredState?: ClaudeHistoryState;
 
-  constructor(public sessionId: string | null, messages: RendererMessage[] = [], private readonly summaryTurnIds = new Set<string>(), private source?: ClaudeHistorySource, private readonly inferWorkPhases: (messages: RendererMessage[]) => RendererMessage[] = withInferredTurnWorkPhases) {
+  constructor(public sessionId: string | null, messages: Message[] = [], private readonly summaryTurnIds = new Set<string>(), private source?: ClaudeHistorySource, private readonly inferWorkPhases: (messages: Message[]) => Message[] = withInferredTurnWorkPhases) {
     this.initialIds = new Set(messages.map(message => message.id));
     this.historyMessages = phasedHistory(messages, this.summaryTurnIds, this.inferWorkPhases);
     const workTurns = new Set([...this.historyMessages.values()].filter(message => message.kind === 'steer' || message.parts.some(isWork)).map(message => message.turnId));
@@ -45,7 +45,7 @@ export class ClaudeHistoryWindow {
 
   isSummaryTurn(turnId: string): boolean { return this.summaryTurnIds.has(turnId); }
 
-  async expandTurn(turnId: string): Promise<RendererMessage[]> {
+  async expandTurn(turnId: string): Promise<Message[]> {
     const messages = this.source && !this.loadedTurns.has(turnId) ? await this.source.readTurn(turnId) : this.messages.filter(message => message.turnId === turnId);
     if (!messages.length) throw new Error('Claude turn is no longer available. Reload the conversation.');
     if (this.source) {
@@ -62,7 +62,7 @@ export class ClaudeHistoryWindow {
 
   visibleMessageIds(): Set<string> { return new Set(this.visibleIds); }
   isHistoricalMessage(id: string): boolean { return this.initialIds.has(id); }
-  reveal(messages: RendererMessage[]): void { for (const message of messages) this.visibleIds.add(message.id); }
+  reveal(messages: Message[]): void { for (const message of messages) this.visibleIds.add(message.id); }
 
   nextVisibleMessage(messageId: string, visible: Set<string>): string | undefined {
     const index = this.messages.findIndex(message => message.id === messageId);
@@ -109,14 +109,14 @@ export class ClaudeHistoryWindow {
     finally { if (this.pendingArchive === pending) this.pendingArchive = undefined; }
   }
 
-  pageTurns(messages: RendererMessage[]): ClaudeConversationTurn[] {
+  pageTurns(messages: Message[]): ClaudeConversationTurn[] {
     return [...new Set(messages.map(message => message.turnId))].flatMap(id => {
       const turn = id ? this.archiveTurns.get(id) : undefined;
       return turn ? [{ ...turn, itemsView: this.isSummaryTurn(turn.id) ? 'summary' as const : 'full' as const }] : [];
     });
   }
 
-  older(known = this.visibleIds): { messages: RendererMessage[]; hasOlder: boolean } {
+  older(known = this.visibleIds): { messages: Message[]; hasOlder: boolean } {
     const page = this.recent(this.messages.slice(0, this.before).filter(message => !known.has(message.id)));
     this.before = page.length ? this.messages.findIndex(message => message.id === page[0]!.id) : 0;
     this.reveal(page);
@@ -124,7 +124,7 @@ export class ClaudeHistoryWindow {
   }
 
   /** Reopening a bounded window makes its preceding history reachable again. */
-  reopen(messages: RendererMessage[]): RendererMessage[] {
+  reopen(messages: Message[]): Message[] {
     this.capture(messages);
     let page = this.recent(messages);
     // A bounded reset must not advertise complete details for a turn cut by its boundary.
@@ -144,7 +144,7 @@ export class ClaudeHistoryWindow {
     return page;
   }
 
-  capture(messages: RendererMessage[]): void {
+  capture(messages: Message[]): void {
     const indexes = new Map(this.messages.map((message, index) => [message.id, index]));
     for (const message of messages) {
       const index = indexes.get(message.id);
@@ -155,7 +155,7 @@ export class ClaudeHistoryWindow {
     }
   }
 
-  async readMessages(current: RendererMessage[]): Promise<RendererMessage[]> {
+  async readMessages(current: Message[]): Promise<Message[]> {
     this.capture(current);
     if (!this.source) return structuredClone(this.messages);
     const original = await this.source.readAll();
@@ -163,8 +163,8 @@ export class ClaudeHistoryWindow {
     return [...original, ...structuredClone(this.messages.filter(message => !known.has(message.id)))];
   }
 
-  private recent(messages: RendererMessage[]): RendererMessage[] {
-    const page: RendererMessage[] = [];
+  private recent(messages: Message[]): Message[] {
+    const page: Message[] = [];
     let bytes = 2;
     const sources = new Map(this.messages.map(message => [message.id, message]));
     for (let i = messages.length - 1; i >= 0 && page.length < pageCount; i--) {
@@ -183,7 +183,7 @@ export class ClaudeHistoryWindow {
   }
 
   /** The row as it travels: unchanged unless a part of it is too big, in which case only those parts are cut and the full row stays readable by content ID. */
-  project(message: RendererMessage): RendererMessage {
+  project(message: Message): Message {
     let parts = message.parts;
     let cut = false;
     for (const limit of partTiers) {
@@ -222,7 +222,7 @@ export class ClaudeHistoryWindow {
 }
 
 /** One part cut to a preview when it is larger than `limit`; every smaller part is returned as it is. */
-function shrinkPart(part: RendererMessagePart, limit: number): RendererMessagePart {
+function shrinkPart(part: MessagePart, limit: number): MessagePart {
   if (size(part) <= limit) return part;
   const head = (text: string, keep: number) => `${text.slice(0, keep)}\n… ${(text.length - keep).toLocaleString('en-US')} more characters not shown`;
   if (part.type === 'tool') {
@@ -239,14 +239,14 @@ function shrinkPart(part: RendererMessagePart, limit: number): RendererMessagePa
 }
 
 /** Phase the whole native turn, including segments separated by compaction or interruption. */
-function phasedHistory(messages: RendererMessage[], turnIds: Set<string>, inferWorkPhases: (messages: RendererMessage[]) => RendererMessage[]): Map<string, RendererMessage> {
-  const turns = new Map<string, RendererMessage[]>();
+function phasedHistory(messages: Message[], turnIds: Set<string>, inferWorkPhases: (messages: Message[]) => Message[]): Map<string, Message> {
+  const turns = new Map<string, Message[]>();
   for (const message of messages) {
     if (!message.turnId || !turnIds.has(message.turnId)) continue;
     const turn = turns.get(message.turnId) ?? [];
     turn.push(message); turns.set(message.turnId, turn);
   }
-  const projected = new Map<string, RendererMessage>();
+  const projected = new Map<string, Message>();
   for (const turn of turns.values()) {
     for (const message of inferWorkPhases(turn)) {
       if (message.role === 'assistant' || message.kind === 'steer') projected.set(message.id, message);
@@ -255,10 +255,10 @@ function phasedHistory(messages: RendererMessage[], turnIds: Set<string>, inferW
   return projected;
 }
 
-function summarize(message: RendererMessage): RendererMessage {
+function summarize(message: Message): Message {
   return { ...message, parts: message.kind === 'steer' ? [] : message.parts.filter(part => !isWork(part)) };
 }
 
-function isWork(part: RendererMessagePart): boolean {
+function isWork(part: MessagePart): boolean {
   return part.type === 'tool' || part.type === 'reasoning' || part.type === 'text' && part.phase === 'commentary';
 }

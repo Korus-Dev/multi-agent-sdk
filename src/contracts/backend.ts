@@ -118,8 +118,9 @@ export type BackendCapabilities = {
 
 export type BackendPermissionModeOption = {
   id: string;
-  label: AppText;
-  description: AppText;
+  /** Optional provider-authored metadata; consumers own labels for SDK defaults. */
+  label?: AppText;
+  description?: AppText;
   dangerous?: boolean;
 };
 

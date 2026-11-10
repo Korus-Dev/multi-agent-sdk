@@ -1,17 +1,17 @@
 import { createHash } from 'node:crypto';
 import { open, stat } from 'node:fs/promises';
 import type { Stats } from 'node:fs';
-import type { ClaudeConversationTurn, RendererMessage, ThreadGoal } from '../../contracts/index';
+import type { ClaudeConversationTurn, Message, ThreadGoal } from '../../contracts/index';
 import type { HarnessEvent } from '../../driver';
 import type { ClaudeTaskPlan } from './claude-task-plan';
 
 export type ClaudeHistoryState = { taskPlan?: ClaudeTaskPlan; goal?: ThreadGoal | null; subagentEvents?: HarnessEvent[] };
 
 export type ClaudeHistorySource = {
-  readTurn(turnId: string): Promise<RendererMessage[]>;
-  readAll(): Promise<RendererMessage[]>;
+  readTurn(turnId: string): Promise<Message[]>;
+  readAll(): Promise<Message[]>;
   isCurrent(): Promise<boolean>;
-  loadEarlier?(): Promise<ClaudeHistoryState & { messages: RendererMessage[]; turns: ClaudeConversationTurn[]; source: ClaudeHistorySource }>;
+  loadEarlier?(): Promise<ClaudeHistoryState & { messages: Message[]; turns: ClaudeConversationTurn[]; source: ClaudeHistorySource }>;
 };
 
 export type ClaudeTurnRange = { start: number; end: number };
@@ -23,7 +23,7 @@ export async function createClaudeHistorySource(
   file: string,
   content: string,
   ranges: Map<string, ClaudeTurnRange>,
-  decode: (content: string) => RendererMessage[],
+  decode: (content: string) => Message[],
   snapshot?: { offset: number; version: Stats },
 ): Promise<ClaudeHistorySource> {
   const version = snapshot?.version ?? await stat(file);
@@ -33,7 +33,7 @@ export async function createClaudeHistorySource(
   const index = new Map<string, IndexedRange>();
   for (const [id, range] of ranges) index.set(id, { start: offset + range.start, end: offset + range.end, hash: hash(bytes.subarray(range.start, range.end)) });
 
-  const read = async (range: IndexedRange): Promise<RendererMessage[]> => {
+  const read = async (range: IndexedRange): Promise<Message[]> => {
     const handle = await open(file, 'r').catch(() => null);
     if (!handle) throw new Error('Claude history is unavailable. Restore it or reload the conversation.');
     try {

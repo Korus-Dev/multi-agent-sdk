@@ -5,9 +5,7 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable"
+      "ES2022"
     ],
     "strict": true,
     "noUncheckedIndexedAccess": true,
@@ -49,7 +47,6 @@
     }
   },
   "include": [
-    "src/**/*.ts",
-    "src/**/*.vue"
+    "src/**/*.ts"
   ]
 }

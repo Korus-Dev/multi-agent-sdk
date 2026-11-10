@@ -1,15 +1,15 @@
-import { normalizePromptContent, promptContentText, type CodexPromptPart } from '../core/surface';
+import { normalizePromptContent, promptContentText, type PromptPart } from '../core/surface';
 import type {
   ClaudeConversationSnapshot,
   PromptAttachment,
-  RendererMessage,
-  RendererMessagePart,
+  Message,
+  MessagePart,
 } from '../contracts';
 
 type ClaudeTranscriptState = Pick<ClaudeConversationSnapshot, 'messages'> & Partial<Pick<ClaudeConversationSnapshot, 'turns'>>;
 
-export function appendSystemMessage(snapshot: ClaudeTranscriptState, agentId: string, text: string, createdAt = new Date().toISOString()): RendererMessage {
-  const message: RendererMessage = {
+export function appendSystemMessage(snapshot: ClaudeTranscriptState, agentId: string, text: string, createdAt = new Date().toISOString()): Message {
+  const message: Message = {
     id: `system-${createdAt.replace(/\W/g, '').toLowerCase()}`,
     agentId,
     role: 'system',
@@ -31,7 +31,7 @@ export function appendAssistantDelta(
   delta: string,
   createdAt: string,
   itemId?: string,
-  phase?: Extract<RendererMessagePart, { type: 'text' }>['phase'],
+  phase?: Extract<MessagePart, { type: 'text' }>['phase'],
 ): void {
   const message = ensureAssistantMessage(snapshot, agentId, turnId, assistantMessageId(turnId), createdAt);
   if (message.status !== 'complete') {
@@ -53,7 +53,7 @@ export function appendAssistantDelta(
   pruneSupersededEmptyAssistantPlaceholders(snapshot, agentId);
 }
 
-export function appendCompactionMarker(snapshot: ClaudeTranscriptState, agentId: string, turnId: string, createdAt: string): RendererMessage {
+export function appendCompactionMarker(snapshot: ClaudeTranscriptState, agentId: string, turnId: string, createdAt: string): Message {
   const existing = snapshot.messages.find((message) => {
     return message.agentId === agentId && message.id === compactionMessageId(turnId);
   });
@@ -68,7 +68,7 @@ export function appendCompactionMarker(snapshot: ClaudeTranscriptState, agentId:
     activeAssistantMessage.status = 'complete';
   }
 
-  const message: RendererMessage = {
+  const message: Message = {
     id: compactionMessageId(turnId),
     agentId,
     kind: 'compaction',
@@ -90,7 +90,7 @@ export function ensureAssistantMessage(
   turnId: string,
   messageId: string,
   createdAt: string,
-): RendererMessage {
+): Message {
   let effectiveMessageId = messageId;
   let effectiveCreatedAt = createdAt;
   const boundaryMessage = messageId === assistantMessageId(turnId)
@@ -110,7 +110,7 @@ export function ensureAssistantMessage(
     effectiveCreatedAt = boundaryMessage.createdAt;
   }
 
-  const nextMessage: RendererMessage = {
+  const nextMessage: Message = {
     id: effectiveMessageId,
     agentId,
     role: 'assistant',
@@ -161,11 +161,11 @@ export function pruneSupersededEmptyAssistantPlaceholders(snapshot: ClaudeTransc
   }
 }
 
-function isPlainEmptyAssistantPlaceholder(message: RendererMessage): boolean {
+function isPlainEmptyAssistantPlaceholder(message: Message): boolean {
   return message.role === 'assistant' && message.kind === undefined && message.parts.length === 0;
 }
 
-function findAssistantMessageForAppend(snapshot: ClaudeTranscriptState, agentId: string, turnId: string): RendererMessage | undefined {
+function findAssistantMessageForAppend(snapshot: ClaudeTranscriptState, agentId: string, turnId: string): Message | undefined {
   const boundaryMessage = findAssistantSegmentBoundary(snapshot, agentId, turnId);
   if (!boundaryMessage) {
     return findAssistantMessage(snapshot, agentId, turnId);
@@ -178,20 +178,20 @@ function findAssistantMessageForAppend(snapshot: ClaudeTranscriptState, agentId:
     .at(-1);
 }
 
-function findAssistantSegmentBoundary(snapshot: ClaudeTranscriptState, agentId: string, turnId: string): RendererMessage | undefined {
+function findAssistantSegmentBoundary(snapshot: ClaudeTranscriptState, agentId: string, turnId: string): Message | undefined {
   return snapshot.messages.filter((message) => message.agentId === agentId && message.turnId === turnId
     && (message.kind === 'compaction' || message.kind === 'steer')).at(-1);
 }
 
-export function findAssistantMessage(snapshot: ClaudeTranscriptState, agentId: string, turnId: string): RendererMessage | undefined {
+export function findAssistantMessage(snapshot: ClaudeTranscriptState, agentId: string, turnId: string): Message | undefined {
   return findAssistantMessages(snapshot, agentId, turnId).at(-1);
 }
 
-export function findAssistantMessages(snapshot: ClaudeTranscriptState, agentId: string, turnId: string): RendererMessage[] {
+export function findAssistantMessages(snapshot: ClaudeTranscriptState, agentId: string, turnId: string): Message[] {
   return snapshot.messages.filter((message) => isAssistantTurnMessage(message, agentId, turnId));
 }
 
-function isAssistantTurnMessage(message: RendererMessage, agentId: string, turnId: string): boolean {
+function isAssistantTurnMessage(message: Message, agentId: string, turnId: string): boolean {
   const baseId = assistantMessageId(turnId);
   return (
     message.agentId === agentId &&
@@ -200,7 +200,7 @@ function isAssistantTurnMessage(message: RendererMessage, agentId: string, turnI
   );
 }
 
-export function findCompactionMessages(snapshot: ClaudeTranscriptState, agentId: string, turnId: string): RendererMessage[] {
+export function findCompactionMessages(snapshot: ClaudeTranscriptState, agentId: string, turnId: string): Message[] {
   return snapshot.messages.filter((message) => (
     message.agentId === agentId &&
     message.kind === 'compaction' &&
@@ -208,7 +208,7 @@ export function findCompactionMessages(snapshot: ClaudeTranscriptState, agentId:
   ));
 }
 
-export function findAssistantMessageWithToolPart(snapshot: ClaudeTranscriptState, agentId: string, turnId: string, itemId: string): RendererMessage | undefined {
+export function findAssistantMessageWithToolPart(snapshot: ClaudeTranscriptState, agentId: string, turnId: string, itemId: string): Message | undefined {
   return findAssistantMessages(snapshot, agentId, turnId).find((message) => (
     message.parts.some((part) => part.type === 'tool' && part.id === itemId)
   ));
@@ -233,8 +233,8 @@ export function createUserMessage(
   idPrefix = 'message',
   turnId?: string,
   attachments: readonly PromptAttachment[] = [],
-  content?: readonly CodexPromptPart[],
-): RendererMessage {
+  content?: readonly PromptPart[],
+): Message {
   const isSteer = idPrefix.startsWith('steer-');
   return {
     id: `${idPrefix}-${createdAt.replace(/\W/g, '').toLowerCase()}`,
@@ -252,7 +252,7 @@ export function createUserMessage(
   };
 }
 
-function promptAttachmentPart(attachment: PromptAttachment): RendererMessagePart {
+function promptAttachmentPart(attachment: PromptAttachment): MessagePart {
   const name = attachment.name?.trim() || attachmentFileName(attachment.path) || (
     attachment.type === 'image' ? 'Image' : 'File'
   );

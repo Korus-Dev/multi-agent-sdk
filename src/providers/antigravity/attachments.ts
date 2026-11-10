@@ -3,7 +3,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { PromptAttachment } from '../../contracts/index';
 
-/** Input is resolved by the desktop's trusted registry, never a renderer path. */
+/** Input is resolved by the host's trusted registry, never an untrusted client path. */
 export async function acpAttachments(attachments: readonly PromptAttachment[]): Promise<unknown[]> {
   if (attachments.length > 10) throw new Error('Antigravity supports up to 10 attachments per prompt.');
   let bytes = 0;
