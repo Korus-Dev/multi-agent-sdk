@@ -26,6 +26,8 @@ import { normalizePromptContent } from '@korus-dev/multi-agent-sdk/prompt.js';
 
 Providers are `codex`, `claude`, `cursor`, and `antigravity`. `options.client.name` is required. Optional fields include `home`, `stateDirectory`, context-dependent `instructions` and `mcpServers`, `formatPrompt`, and named provider options. Native provider configuration remains in those named options rather than becoming generic policy.
 
+For a custom Cursor executable, supply the same resolver through `cursor.resolveCommand` (authentication and runtime status) and `cursor.sessionOptions.resolveCommand` (session launch).
+
 ## Driver operations
 
 | Group | Methods |

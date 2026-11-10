@@ -7,6 +7,7 @@ import { createHarnessDriver } from '../../src';
 import type { HarnessDriver, HarnessEvent, Session } from '../../src';
 import { MockCodexAppServer, requestsFor, resumeResponse, thread, turn } from '../codex/helpers/codex-surface-fixture';
 import { createQueryHarness } from '../native/claude/sdk-query-fixture';
+import * as cursorRuntime from '../../src/providers/cursor/runtime';
 import { writeAntigravityRuntimeFixture } from '../native/antigravity/session-fixture';
 
 const text = (driver: HarnessDriver, session: Session) => driver.readSession(session).messages.flatMap(m => m.parts.flatMap(p => p.type === 'text' ? [p.text] : [])).join('\n');
@@ -79,6 +80,7 @@ it('Claude: admission precedes completion and neutral requests route to native a
 
 for (const provider of ['cursor', 'antigravity'] as const) it(`${provider}: fixture-backed neutral CPA history, cancellation and scoped execution`, async () => {
   const root = await mkdtemp(path.join(tmpdir(), `neutral-${provider}-`));
+  const discovery = provider === 'cursor' ? vi.spyOn(cursorRuntime, 'resolveCursorExecutable').mockReturnValue(null) : undefined;
   let driver: HarnessDriver | undefined;
   try {
     if (provider === 'cursor') {
@@ -142,5 +144,5 @@ for (const provider of ['cursor', 'antigravity'] as const) it(`${provider}: fixt
     await host.interrupt(recovered, running.turnId);
     await expect.poll(() => host.readSession(recovered).busy).toBe(false);
     expect(host.readSession(recovered).turns.at(-1)?.status).toBe('interrupted');
-  } finally { await driver?.close(); await rm(root, { recursive: true, force: true }); }
+  } finally { await driver?.close(); discovery?.mockRestore(); await rm(root, { recursive: true, force: true }); }
 });

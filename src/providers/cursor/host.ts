@@ -92,7 +92,8 @@ export class CursorHost<Context extends HarnessContext = HarnessContext> impleme
   }
   getRuntimeStatus() {
     const live = [...this.sessions.values()].some(session => !session.isClosed);
-    return { backend: this.backend, status: !resolveCursorExecutable() ? 'notConfigured' as const : live ? 'running' as const : this.sessions.size ? 'error' as const : 'starting' as const, capabilities: this.getCapabilities() };
+    const command = (this.options.resolveCommand ?? resolveCursorExecutable)();
+    return { backend: this.backend, status: !command ? 'notConfigured' as const : live ? 'running' as const : this.sessions.size ? 'error' as const : 'starting' as const, capabilities: this.getCapabilities() };
   }
   getCapabilities() { return { ...cursorBackendCapabilities, steerPrompt: this.options.steeringFallbackEnabled?.() === true }; }
   getAccountRateLimits() { return getCursorAccountUsage(this.runtime); }
