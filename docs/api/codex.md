@@ -14,7 +14,7 @@ A native host integration can set `CodexHostOptions.inheritNativeSettings = true
 
 `createCodexConversationReplica` and the surface mirror helpers maintain provider-owned snapshots and incremental state. Bridge operations validate payloads before invoking a trusted target. They do not provide website authentication or application authorization.
 
-Use [web integration](../guide/web.md) to project an authorized Codex surface over WebSockets. Electron/renderer native integrations, attachments, speech, and Vue controls belong to [Agent UI SDK](https://github.com/Korus-Dev/agent-ui-sdk).
+Electron/renderer native integrations, attachments, speech, and Vue controls belong to [Agent UI SDK](https://github.com/Korus-Dev/agent-ui-sdk).
 
 ## Protocol ownership
 

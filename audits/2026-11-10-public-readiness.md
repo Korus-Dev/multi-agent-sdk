@@ -29,7 +29,7 @@ support the conclusions; they are not proof of all native/live-provider behavior
 | Backend native Node code | 47 original files are represented here under `src/providers/codex`; 3 transport/executable files belong in Codex SDK and 3 speech files in Agent UI SDK. No missing in-scope file identified. |
 | Backend tests | 66 original files are represented here; 7 protocol/transport tests belong in Codex SDK and 3 speech tests in Agent UI SDK. |
 | Core tests | 7 original files here; native host capability tests in Agent UI SDK. |
-| Web code and tests | All 5 original source files and 6 original test/helper files represented here. This remains a native Codex surface transport, not a generic multi-provider network API. |
+| Original website transport and tests | Excluded following the explicit scope decision. The earlier inventory is historical provenance; it is not the current public API. |
 | Raw client, generated protocol/schema, wire and schema tooling | Codex SDK; intentionally not duplicated here. |
 | Vue, Electron, native attachments, speech helpers/assets | Agent UI SDK; intentionally not duplicated here. |
 | Original conversation sidebar and its test | Host-owned navigation/history UI; intentionally excluded. Original retained. |
@@ -51,7 +51,7 @@ does not invent Codex equivalents for their provider-owned behaviors.
 | Authentication | Here: setup and account/runtime guidance; provider-native details remain explicit. |
 | Conversations, history | Here: sessions/restoration/history/settings guide, including read-only Codex history and archive behavior. |
 | Events, messages/tools, approvals, MCP, extensions | Here: state/events and tools/permissions guides plus native surface extension guidance. |
-| Web | Here: native Codex WebSocket boundary, lease ownership, origin checks and resource limits. |
+| Original website integration guide | Excluded from this package following the scope decision. |
 | Security | Here: trusted host boundary, credentials, restoration data, attachments and single-home limitations. UI HTML/Electron policy belongs in Agent UI SDK. |
 | Development, testing | Here: contributor instructions, behavioral test policy adapted from the original, strict fixture typechecking, coverage, packaging and source-mode tooling. Original testing policy was copied and byte-compared before adapting its UI-only sections. |
 | Troubleshooting | Here: runtime, authentication, admission/completion, settings, handles, recovery, previews and development failures. |
@@ -146,8 +146,7 @@ Ordinary public types, including UI DTOs, `CodexConversationSnapshot`,
 `CodexSurface`, and distinct native harness aliases, are type-only root exports.
 `TypedEventBus` is also a root value export for Node hosts. Browser-only prompt
 and bridge values remain isolated behind their small static public entry files.
-The optional native/Codex and WebSocket modules have static entry files too;
-web support was preserved pending a separate product decision.
+The optional native/Codex modules have static entry files. The later explicit scope decision removes standalone website hosting support.
 
 Owning tests import local source, not their own package. Codex dependency imports
 now use that package's root and `v2` type namespace, pinned at `0.167.0`.
@@ -160,3 +159,18 @@ TypeScript checks passed in installed-dependency and local-source modes, VitePre
 built, and the actual package qualified 552 packed files / nine root-and-optional
 entry points with ESNext/Bundler compilation and plain Node imports. Dependency
 advisories and publication prerequisites remain separate release blockers.
+
+## Standalone website support removed
+
+Following the explicit scope decision, this package no longer contains the
+WebSocket website transport, its public forwarding files, tests, guide, navigation,
+or package/build/typecheck entries. The historical file inventory marks the
+original website package as outside the current scope. Generic renderer bridges
+used by Electron and native provider/realtime transports remain intact.
+
+Validation after removal: 1,676 tests passed, one skipped, 86.67% statement coverage;
+source/test typechecks passed in installed-dependency and local-source modes;
+VitePress built; and the installed tarball passed plain Node imports and
+ESNext/Bundler compilation for 529 packed files and five entry points. Package
+validation was first demonstrated failing against the prior artifact and now
+rejects any residual website transport files in new tarballs.

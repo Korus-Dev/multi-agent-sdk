@@ -12,8 +12,9 @@ try {
   const [archive] = JSON.parse(npm(['pack', '--json', '--ignore-scripts', '--pack-destination', temporary], root));
   const files = new Set(archive.files.map(file => file.path));
   for (const file of files) {
+    assert(!/^(web(?:\.|\/)|dist\/web\/)/.test(file), `Removed web support is still packaged: ${file}`);
     assert(!file.endsWith('.tgz') && !file.includes('.env') && !file.includes('node_modules/'), `Private file: ${file}`);
-    assert(['README.md', 'LICENSE', 'package.json'].includes(file) || /^(dist|docs|examples|web|providers)\//.test(file) || /^[\w-]+\.(js|d\.ts)$/.test(file), `Unexpected file: ${file}`);
+    assert(['README.md', 'LICENSE', 'package.json'].includes(file) || /^(dist|docs|examples)\//.test(file) || /^[\w-]+\.(js|d\.ts)$/.test(file), `Unexpected file: ${file}`);
     assert(!file.startsWith('docs/.vitepress/'), `Generated docs/config in package: ${file}`);
   }
   for (const file of ['README.md', 'LICENSE', 'docs/consumer-contract.md', 'examples/chat.ts']) assert(files.has(file), `Missing ${file}`);
@@ -42,7 +43,6 @@ try {
   fs.writeFileSync(path.join(temporary, 'consumer.ts'), publicTypes + `
 import { createHarnessDriver, type HarnessDriver, type Session, type SessionState, type CodexConversationSnapshot, type CodexSurface, type NativeHarnessEvent, type NativeHarnessDriver, TypedEventBus } from '${manifest.name}';
 import { normalizePromptContent } from '${manifest.name}/prompt.js';
-import { createCodexWebSurfaceClient } from '${manifest.name}/web/client.js';
 import { createCodexSurface } from '${manifest.name}/codex.js';
 const driver: HarnessDriver = createHarnessDriver('codex', { client: { name: 'pack-check' } });
 const session: Session = driver.open({ id: 'test', folder: null });
@@ -51,7 +51,7 @@ const text: string[] = state.messages.flatMap(message => message.parts.flatMap(p
 const bus = new TypedEventBus<{ changed: string }>();
 bus.emit('changed', 'ready');
 const nativeTypes: [CodexConversationSnapshot?, CodexSurface?, NativeHarnessEvent?, NativeHarnessDriver?] = [];
-void [text, nativeTypes, normalizePromptContent, createCodexWebSurfaceClient, createCodexSurface];
+void [text, nativeTypes, normalizePromptContent, createCodexSurface];
 `);
   const tsc = path.join(root, 'node_modules/typescript/bin/tsc');
   // Resolve Node types from this repository, never from the consumer's ancestors.

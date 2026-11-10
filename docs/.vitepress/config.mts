@@ -14,7 +14,6 @@ export default defineConfig({
         { text: 'State and events', link: '/guide/events' },
         { text: 'Tools and permissions', link: '/guide/tools' },
         { text: 'Host security', link: '/guide/security' },
-        { text: 'Web integration', link: '/guide/web' },
         { text: 'Troubleshooting', link: '/guide/troubleshooting' },
       ] },
       { text: 'Reference', items: [

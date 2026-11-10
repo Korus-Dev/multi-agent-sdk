@@ -6,8 +6,6 @@ Keep native credentials, home paths, raw runtime configuration, and restoration 
 
 Attachment readers are session-scoped. Authorize uploads and resolve opaque references in trusted host code. Applications own durable attachment retention: a path left in provider history does not guarantee that a preview remains readable after restart.
 
-For browser access, authenticate and authorize the HTTP upgrade before granting a surface lease. Validate origins, account state, quotas, and session ownership. Never use a browser-supplied user ID as authority to select a provider surface. See [web integration](web.md).
-
 Claude's configuration-home helpers are process-wide. Use sequential close/recreate when switching profiles. The single-home driver interface is not a concurrent tenant-isolation mechanism.
 
 When reporting a vulnerability, avoid posting credentials or private conversation data in a public issue. Use the repository's private security reporting channel if enabled, or contact the maintainer privately.

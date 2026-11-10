@@ -49,7 +49,7 @@ node --experimental-strip-types examples/chat.ts codex 'Explain this project'
 | Restore chats and load history | [Sessions and history](docs/guide/sessions.md) |
 | Approvals, MCP, and scoped work | [Tools and permissions](docs/guide/tools.md) |
 | Streaming, requests, and accounting | [State and events](docs/guide/events.md) |
-| Native adapters and browser bridges | [API reference](docs/api/index.md) · [Codex surface](docs/api/codex.md) · [Web](docs/guide/web.md) |
+| Native adapters and renderer bridges | [API reference](docs/api/index.md) · [Codex surface](docs/api/codex.md) |
 | Build a conversation UI | [Agent UI SDK](https://github.com/Korus-Dev/agent-ui-sdk) |
 | Integrate the raw Codex protocol | [Codex SDK](https://github.com/Korus-Dev/codex-sdk) |
 

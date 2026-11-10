@@ -7,13 +7,13 @@
   },
   "note": "Working-tree inventory. Matching paths/hashes prove location/fidelity only; adapted declarations and behavior require source review and tests. Topic rows are deliberate disposition, not a claimed copy.",
   "counts": {
-    "adapted": 86,
+    "adapted": 81,
     "byte-identical": 1003,
-    "imports-only": 237,
-    "out-of-scope": 2,
+    "imports-only": 231,
+    "out-of-scope": 22,
     "replace-or-out-of-scope": 141,
     "superseded": 12,
-    "topic-ownership": 127
+    "topic-ownership": 118
   },
   "files": [
     {
@@ -11483,154 +11483,154 @@
     },
     {
       "source": "packages/web/LICENSE",
-      "owner": "repository-tooling",
-      "destination": "multi-agent-sdk repository tooling",
-      "comparison": "topic-ownership",
-      "note": "See audit report for quality, packaging, licensing, and release disposition."
+      "owner": "out-of-scope",
+      "destination": "",
+      "comparison": "out-of-scope",
+      "note": "Standalone website support intentionally excluded from package scope."
     },
     {
       "source": "packages/web/README.md",
-      "owner": "repository-tooling",
-      "destination": "multi-agent-sdk repository tooling",
-      "comparison": "topic-ownership",
-      "note": "See audit report for quality, packaging, licensing, and release disposition."
+      "owner": "out-of-scope",
+      "destination": "",
+      "comparison": "out-of-scope",
+      "note": "Standalone website support intentionally excluded from package scope."
     },
     {
       "source": "packages/web/package.json",
-      "owner": "repository-tooling",
-      "destination": "multi-agent-sdk repository tooling",
-      "comparison": "topic-ownership",
-      "note": "See audit report for quality, packaging, licensing, and release disposition."
+      "owner": "out-of-scope",
+      "destination": "",
+      "comparison": "out-of-scope",
+      "note": "Standalone website support intentionally excluded from package scope."
     },
     {
       "source": "packages/web/src/client.ts",
-      "owner": "multi-agent-sdk",
-      "destination": "multi-agent-sdk/src/web/client.ts",
-      "comparison": "adapted",
+      "owner": "out-of-scope",
+      "destination": "",
+      "comparison": "out-of-scope",
       "sourceSha256": "3dff807982f2434ecd12ee8d2837092567b4a77d552258aff9012851cea98975",
-      "destinationSha256": "18f25342b5968fe23edd9f8e0e8a83fed52ca8d5b6e70d73742e027376efef10"
+      "note": "Standalone website support intentionally excluded from package scope."
     },
     {
       "source": "packages/web/src/index.ts",
-      "owner": "multi-agent-sdk",
-      "destination": "multi-agent-sdk/src/web/index.ts",
-      "comparison": "adapted",
+      "owner": "out-of-scope",
+      "destination": "",
+      "comparison": "out-of-scope",
       "sourceSha256": "6487031967ffbcd9088dbd2ef3716d2c25dfb00afcd8653e3692e476c7acbefa",
-      "destinationSha256": "2446c215a0a8192f725342542846156b9780e7ab98d0cf7493ba250fef991131"
+      "note": "Standalone website support intentionally excluded from package scope."
     },
     {
       "source": "packages/web/src/protocol.ts",
-      "owner": "multi-agent-sdk",
-      "destination": "multi-agent-sdk/src/web/protocol.ts",
-      "comparison": "imports-only",
+      "owner": "out-of-scope",
+      "destination": "",
+      "comparison": "out-of-scope",
       "sourceSha256": "0a39108754451570bac74f0ea5c8a44e94d5e695d40c235b1225f4689beb141c",
-      "destinationSha256": "7c8ed1b539618bb519a2ef054c3bf4fc433337ebe3b4400949344ef8dfe57441"
+      "note": "Standalone website support intentionally excluded from package scope."
     },
     {
       "source": "packages/web/src/server.ts",
-      "owner": "multi-agent-sdk",
-      "destination": "multi-agent-sdk/src/web/server.ts",
-      "comparison": "adapted",
+      "owner": "out-of-scope",
+      "destination": "",
+      "comparison": "out-of-scope",
       "sourceSha256": "0ce76f8d2f25b6eff1b9750616a0160f96542606bf01d331aa034a7987946b09",
-      "destinationSha256": "1d67dd55426ef4cc6eb3ba95a9b51cc3cda600289616cc9c726742640ea06008"
+      "note": "Standalone website support intentionally excluded from package scope."
     },
     {
       "source": "packages/web/src/socket-port.ts",
-      "owner": "multi-agent-sdk",
-      "destination": "multi-agent-sdk/src/web/socket-port.ts",
-      "comparison": "adapted",
+      "owner": "out-of-scope",
+      "destination": "",
+      "comparison": "out-of-scope",
       "sourceSha256": "02d32f8026ef79ee25749160a69374bd12cb2f4f30de6627e4aa4dc308e47b16",
-      "destinationSha256": "b48f4b83bc9a1cd33a624ea8098d4e57fe8e31436b44b618046d1e7c33132fb6"
+      "note": "Standalone website support intentionally excluded from package scope."
     },
     {
       "source": "packages/web/stryker.config.mjs",
-      "owner": "repository-tooling",
-      "destination": "multi-agent-sdk repository tooling",
-      "comparison": "topic-ownership",
-      "note": "See audit report for quality, packaging, licensing, and release disposition."
+      "owner": "out-of-scope",
+      "destination": "",
+      "comparison": "out-of-scope",
+      "note": "Standalone website support intentionally excluded from package scope."
     },
     {
       "source": "packages/web/tests/client-errors.spec.ts",
-      "owner": "multi-agent-sdk",
-      "destination": "multi-agent-sdk/tests/web/client-errors.spec.ts",
-      "comparison": "imports-only",
+      "owner": "out-of-scope",
+      "destination": "",
+      "comparison": "out-of-scope",
       "sourceSha256": "acc59b13a2eabfb8fd79dede3038edbe99bf8a1df1182fe8a1cf280d89d4a6bc",
-      "destinationSha256": "7251cb3288b767021e86f7a6f9c1499d827f128890cc050535dfde61f3852fcd"
+      "note": "Standalone website support intentionally excluded from package scope."
     },
     {
       "source": "packages/web/tests/origin-policy.spec.ts",
-      "owner": "multi-agent-sdk",
-      "destination": "multi-agent-sdk/tests/web/origin-policy.spec.ts",
-      "comparison": "imports-only",
+      "owner": "out-of-scope",
+      "destination": "",
+      "comparison": "out-of-scope",
       "sourceSha256": "2a0023f87c890ff85d6c5e0c11e91aa55d972b7d638ad9f28b69aca1b347dc0e",
-      "destinationSha256": "ca2db6040c0eb7e5f06161d29ba230e3df2c8baa4c4b20085a3d7a234dcca348"
+      "note": "Standalone website support intentionally excluded from package scope."
     },
     {
       "source": "packages/web/tests/server-errors.spec.ts",
-      "owner": "multi-agent-sdk",
-      "destination": "multi-agent-sdk/tests/web/server-errors.spec.ts",
-      "comparison": "imports-only",
+      "owner": "out-of-scope",
+      "destination": "",
+      "comparison": "out-of-scope",
       "sourceSha256": "8c58110b39b359c8f413b4a72e177d220c82b3352f40f78ef9f9828505cc12c4",
-      "destinationSha256": "5bd850fd9f71ce9bd53efc797eee7b55d181b09b241a4ffbb0fb6447e8ffd419"
+      "note": "Standalone website support intentionally excluded from package scope."
     },
     {
       "source": "packages/web/tests/socket-adapters.spec.ts",
-      "owner": "multi-agent-sdk",
-      "destination": "multi-agent-sdk/tests/web/socket-adapters.spec.ts",
-      "comparison": "adapted",
+      "owner": "out-of-scope",
+      "destination": "",
+      "comparison": "out-of-scope",
       "sourceSha256": "8cb79ef21c5bd851630daaaecbcd6ad0d6f5bd579a6a9ff9295c77bae799fb8a",
-      "destinationSha256": "87e87e33fc7b8ba0545219c0e223d6cf8057fcfd9da31f72f3702cad70ee3188"
+      "note": "Standalone website support intentionally excluded from package scope."
     },
     {
       "source": "packages/web/tests/web-test-helpers.ts",
-      "owner": "multi-agent-sdk",
-      "destination": "multi-agent-sdk/tests/web/web-test-helpers.ts",
-      "comparison": "imports-only",
+      "owner": "out-of-scope",
+      "destination": "",
+      "comparison": "out-of-scope",
       "sourceSha256": "af20ed59175c15feb9e0e73d9c2916a386c02e7fd6fb896a6112a436b0b187b4",
-      "destinationSha256": "840426d1fdc05466bfac7c5765b14981be3c6ecc6c2f5b586384fc15b487ca67"
+      "note": "Standalone website support intentionally excluded from package scope."
     },
     {
       "source": "packages/web/tests/web-transport.spec.ts",
-      "owner": "multi-agent-sdk",
-      "destination": "multi-agent-sdk/tests/web/web-transport.spec.ts",
-      "comparison": "imports-only",
+      "owner": "out-of-scope",
+      "destination": "",
+      "comparison": "out-of-scope",
       "sourceSha256": "03929d43866fc3cf67470450a0f2e9bd46c2896cf59069208c261ba388d9f5a7",
-      "destinationSha256": "7b8a41c24c47aa279a5592fa7ceac27e6b63eefa84a0a7278ef19d3df20abbc8"
+      "note": "Standalone website support intentionally excluded from package scope."
     },
     {
       "source": "packages/web/tsconfig.build.json",
-      "owner": "repository-tooling",
-      "destination": "multi-agent-sdk repository tooling",
-      "comparison": "topic-ownership",
-      "note": "See audit report for quality, packaging, licensing, and release disposition."
+      "owner": "out-of-scope",
+      "destination": "",
+      "comparison": "out-of-scope",
+      "note": "Standalone website support intentionally excluded from package scope."
     },
     {
       "source": "packages/web/tsconfig.json",
-      "owner": "repository-tooling",
-      "destination": "multi-agent-sdk repository tooling",
-      "comparison": "topic-ownership",
-      "note": "See audit report for quality, packaging, licensing, and release disposition."
+      "owner": "out-of-scope",
+      "destination": "",
+      "comparison": "out-of-scope",
+      "note": "Standalone website support intentionally excluded from package scope."
     },
     {
       "source": "packages/web/tsconfig.test.json",
-      "owner": "repository-tooling",
-      "destination": "multi-agent-sdk repository tooling",
-      "comparison": "topic-ownership",
-      "note": "See audit report for quality, packaging, licensing, and release disposition."
+      "owner": "out-of-scope",
+      "destination": "",
+      "comparison": "out-of-scope",
+      "note": "Standalone website support intentionally excluded from package scope."
     },
     {
       "source": "packages/web/vite.config.ts",
-      "owner": "repository-tooling",
-      "destination": "multi-agent-sdk repository tooling",
-      "comparison": "topic-ownership",
-      "note": "See audit report for quality, packaging, licensing, and release disposition."
+      "owner": "out-of-scope",
+      "destination": "",
+      "comparison": "out-of-scope",
+      "note": "Standalone website support intentionally excluded from package scope."
     },
     {
       "source": "packages/web/vitest.config.ts",
-      "owner": "repository-tooling",
-      "destination": "multi-agent-sdk repository tooling",
-      "comparison": "topic-ownership",
-      "note": "See audit report for quality, packaging, licensing, and release disposition."
+      "owner": "out-of-scope",
+      "destination": "",
+      "comparison": "out-of-scope",
+      "note": "Standalone website support intentionally excluded from package scope."
     },
     {
       "source": "plans/modular-packages.md",

@@ -9,7 +9,6 @@
 | `/surface-bridge.js` | Codex bridge operations and snapshot subscription helpers. |
 | `/native.js` | `createNativeHarnessDriver` and provider-native integration contracts. |
 | `/codex.js` | Native Codex surface/backend and runtime compatibility. |
-| `/web.js`, `/web/client.js`, `/web/server.js`, `/web/protocol.js` | Optional Codex WebSocket client, server binding and protocol. |
 
 Paths in this table are appended to `@korus-dev/multi-agent-sdk`. The package root resolves through `main` and `types`; optional modules have small static forwarding files. Application imports do not reference build directories. Use root `import type` declarations for public types. Import optional values from the named modules to preserve browser/Node separation.
 
