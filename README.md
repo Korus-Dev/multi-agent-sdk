@@ -2,7 +2,13 @@
 
 A unified TypeScript interface for building apps on **Codex, Claude, Cursor, and Antigravity**. Send prompts, stream conversation state, answer approvals, and restore native conversations through one Node.js API.
 
-[Documentation](https://korus-dev.github.io/multi-agent-sdk/) · [API reference](https://korus-dev.github.io/multi-agent-sdk/api/)
+[![npm version](https://img.shields.io/npm/v/%40korus-dev%2Fmulti-agent-sdk?color=0b7a65)](https://www.npmjs.com/package/@korus-dev/multi-agent-sdk)
+[![CI](https://github.com/Korus-Dev/multi-agent-sdk/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Korus-Dev/multi-agent-sdk/actions/workflows/ci.yml)
+[![Documentation](https://github.com/Korus-Dev/multi-agent-sdk/actions/workflows/docs.yml/badge.svg?branch=main)](https://korus-dev.github.io/multi-agent-sdk/)
+[![License](https://img.shields.io/badge/license-Apache--2.0-0b7a65.svg)](LICENSE)
+[![Node.js](https://img.shields.io/node/v/%40korus-dev%2Fmulti-agent-sdk?color=339933)](package.json)
+
+**[Documentation →](https://korus-dev.github.io/multi-agent-sdk/)** · [Getting started](https://korus-dev.github.io/multi-agent-sdk/guide/quick-start.html) · [API reference](https://korus-dev.github.io/multi-agent-sdk/api/) · [Contributing](CONTRIBUTING.md)
 
 Public types can be imported directly from `@korus-dev/multi-agent-sdk` with `import type`.
 
