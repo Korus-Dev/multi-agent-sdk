@@ -117,14 +117,12 @@ installable. No authenticated provider execution was performed during this audit
 ## Remaining launch blockers and decisions
 
 1. **Publish Codex SDK first.** This package now pins `0.167.0` and the local tarball is qualified separately from public registry installation. Publish that dependency through its owner, then regenerate/verify the registry lock entry. Clean registry installation and hosted CI require that dependency to exist.
-2. **Resolve production dependency advisories with approval.** `npm audit
-   --omit=dev` reports high findings for `@modelcontextprotocol/sdk` and `zod`,
-   and a moderate finding for `@hono/node-server` in the installed peer/transitive
-   graph. The new high-severity CI/release gate deliberately blocks on them. These
-   are advisory results, not an exploitability determination. Runtime dependency
-   upgrades were deferred to respect the instruction to confirm code-related gaps.
-   The full audit also reports dev-tool advisories, including Vite/VitePress/Vitest;
-   those need compatible toolchain remediation, not an unreviewed force upgrade.
+2. **Dependency advisories resolved.** Claude Agent SDK `0.3.322`, Anthropic API
+   SDK `1.8.0`, MCP SDK `1.32.2` and Zod `4.6.7` are pinned directly. The transitive
+   Hono adapter resolves to `2.1.6`. Vitest/coverage `4.1.12` and Vite `8.1.7`
+   address toolchain advisories; VitePress uses a scoped Vite `6.4.6` override.
+   The current full npm audit reports zero findings. Historical audit counts in
+   the original validation table describe the pre-remediation snapshot.
 3. **Configure release infrastructure.** The initial Multi version is `0.25.0`; configure npm's
    trusted publisher for the repository/workflow/environment, configure the `npm`
    GitHub environment, and select Actions as the GitHub Pages source if hosting the
@@ -174,3 +172,20 @@ VitePress built; and the installed tarball passed plain Node imports and
 ESNext/Bundler compilation for 529 packed files and five entry points. Package
 validation was first demonstrated failing against the prior artifact and now
 rejects any residual website transport files in new tarballs.
+
+## Dependency remediation validation
+
+The final dependency update reports zero npm audit findings for the full tree,
+including development dependencies, down from nine findings before remediation.
+A fresh consumer installed from the npm tarball also reports zero production
+findings. Claude Agent SDK, Anthropic API SDK and MCP SDK use the latest stable
+versions verified in the registry for this update; Zod is pinned at `4.6.7`.
+VitePress remains stable `1.6.4`, with its Vite dependency scoped to patched
+`6.4.6`; the normal SDK build uses Vite `8.1.7` and Vitest/coverage `4.1.12`.
+
+Full checks pass with the local Codex artifact: 1,676 tests passed, one skipped,
+86.67% statement coverage, source/test types, five installed-package entry points,
+529 packed files and VitePress production build. Local-source typechecks pass.
+A local VitePress development server also served its HTML shell, transformed
+client module and compiled Markdown successfully; the test server was stopped.
+No runtime source or test implementation changes were needed.

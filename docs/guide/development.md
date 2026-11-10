@@ -14,6 +14,13 @@ npm run build:docs
 
 Vite builds ESM JavaScript and TypeScript emits declarations unchanged. The package uses `main` and `types`, with ESNext modules and Bundler resolution. Static public forwarding files keep optional browser and native modules separate. Package validation creates and installs an actual npm tarball into a temporary consumer, imports public runtime entries in plain Node, and typechecks consumer code. It does not start a provider or execute a model turn.
 
+## Dependency maintenance
+
+Direct SDK dependencies are pinned, including the Claude Agent SDK's Anthropic,
+MCP and Zod peers, so package consumers receive the validated versions.
+VitePress uses a scoped Vite 6.4.6 override. Validate both documentation builds and
+the development server when changing this override.
+
 ## Dependency source mode
 
 Published npm dependencies are the default. Set `SDK_LOCAL_SOURCE=1` in `.env` to use sibling SDK source in Vite/tests. `SDK_SOURCE_ROOT` selects another common parent containing `codex-sdk`, `multi-agent-sdk`, and `agent-ui-sdk`. Build dependencies in that order. Typechecking uses the local dependency declarations; runtime tests use source. `SDK_LOCAL_SOURCE=0` explicitly disables source mode.
