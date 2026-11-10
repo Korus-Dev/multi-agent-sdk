@@ -26,6 +26,9 @@
       "@korus-dev/multi-agent-sdk/prompt.js": [
         "./src/prompt.ts"
       ],
+      "@korus-dev/multi-agent-sdk/renderer.js": [
+        "./src/renderer.ts"
+      ],
       "@korus-dev/multi-agent-sdk/native.js": [
         "./src/native.ts"
       ],

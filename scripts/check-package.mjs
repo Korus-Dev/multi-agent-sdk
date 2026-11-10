@@ -29,6 +29,8 @@ try {
 import { createHarnessDriver, TypedEventBus, type HarnessDriver, type Session, type SessionState, type CodexConversationSnapshot, type CodexSurface, type NativeHarnessEvent, type NativeHarnessDriver } from '${manifest.name}';
 import { normalizePromptContent } from '${manifest.name}/prompt.js';
 import { createCodexSurface } from '${manifest.name}/codex.js';
+import { codexBackendCapabilities, claudeBackendCapabilities, cursorBackendCapabilities, antigravityBackendCapabilities, withInferredWorkPhases, withInferredTurnWorkPhases, createCodexConversationReplica, projectSessionSelection, projectCodexConversation, projectClaudeConversation, projectCursorConversation, projectAntigravityConversation } from '${manifest.name}/renderer.js';
+import { AcpRuntime, AcpSession, installAcpRuntime, AntigravityHost, ClaudeConversationHost, ClaudeAgentSdkTransport, listClaudeSkills, claudeToolPart, loadClaudeTranscriptHistory, claudeTranscriptToRendererMessages, resolveClaudeLaunch, getLocalClaudeAuthentication, logoutLocalClaude, CursorHost, sessionMcpServer } from '${manifest.name}/native.js';
 const driver: HarnessDriver = createHarnessDriver('codex', { client: { name: 'pack-check' } });
 const session: Session = driver.open({ id: 'test', folder: null });
 const state: SessionState = driver.readSession(session);
@@ -37,6 +39,8 @@ const bus = new TypedEventBus<{ changed: string }>();
 bus.emit('changed', 'ready');
 const nativeTypes: [CodexConversationSnapshot?, CodexSurface?, NativeHarnessEvent?, NativeHarnessDriver?] = [];
 void [text, nativeTypes, normalizePromptContent, createCodexSurface];
+void [codexBackendCapabilities, claudeBackendCapabilities, cursorBackendCapabilities, antigravityBackendCapabilities, withInferredWorkPhases, withInferredTurnWorkPhases, createCodexConversationReplica, projectSessionSelection, projectCodexConversation, projectClaudeConversation, projectCursorConversation, projectAntigravityConversation];
+void [AcpRuntime, AcpSession, installAcpRuntime, AntigravityHost, ClaudeConversationHost, ClaudeAgentSdkTransport, listClaudeSkills, claudeToolPart, loadClaudeTranscriptHistory, claudeTranscriptToRendererMessages, resolveClaudeLaunch, getLocalClaudeAuthentication, logoutLocalClaude, CursorHost, sessionMcpServer];
 `);
   fs.writeFileSync(path.join(temporary, 'tsconfig.json'), JSON.stringify({ compilerOptions: {
     strict: true, noEmit: true, target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler',

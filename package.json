@@ -1,6 +1,6 @@
 {
   "name": "@korus-dev/multi-agent-sdk",
-  "version": "0.25.0",
+  "version": "0.25.1",
   "description": "Unified native coding-agent harness interface and adapters.",
   "license": "Apache-2.0",
   "author": "Nicolas Bonamy",
@@ -35,6 +35,8 @@
     "CHANGELOG.md",
     "prompt.js",
     "prompt.d.ts",
+    "renderer.js",
+    "renderer.d.ts",
     "surface-bridge.js",
     "surface-bridge.d.ts",
     "native.js",

@@ -55,8 +55,9 @@ Each provider's existing replica owns transcript changes. The facade only dispat
 | --- | --- |
 | `@korus-dev/multi-agent-sdk` | Neutral factory, `TypedEventBus`, and public neutral/UI/native type declarations |
 | `@korus-dev/multi-agent-sdk/prompt.js` | Pure prompt authoring helpers |
+| `@korus-dev/multi-agent-sdk/renderer.js` | Pure capabilities, work phases, Codex replica and provider presentation projections |
 | `@korus-dev/multi-agent-sdk/surface-bridge.js` | Native bridge operations and state subscriptions |
-| `@korus-dev/multi-agent-sdk/native.js` | `createNativeHarnessDriver` and native contracts |
+| `@korus-dev/multi-agent-sdk/native.js` | Native driver, Claude/Cursor/Antigravity hosts and helpers, MCP session bridge and native contracts |
 | `@korus-dev/multi-agent-sdk/codex.js` | Codex surface/runtime adapter |
 
 Native wire consumers can import `NativeHarnessDriver`, `NativeHarnessContext`, and `NativeHarnessEvent` type-only from the root. Ordinary neutral `HarnessDriver` and `HarnessEvent` remain different contracts. Optional native values use `/native.js` and surface construction uses `/codex.js`. Native events retain provider prefixes and reducers retain their original wire contracts. The native factory is named `createNativeHarnessDriver` to distinguish it from the neutral root factory. Application imports never need build-directory paths.
