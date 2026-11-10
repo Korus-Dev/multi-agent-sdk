@@ -1,0 +1,55 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "skipLibCheck": true,
+    "verbatimModuleSyntax": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "types": [
+      "node",
+      "vitest/globals"
+    ],
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "sourceMap": true,
+    "paths": {
+      "multi-agents-sdk/core": [
+        "./src/core/index.ts"
+      ],
+      "multi-agents-sdk/surface": [
+        "./src/core/surface.ts"
+      ],
+      "multi-agents-sdk/surface-bridge": [
+        "./src/core/surface-bridge.ts"
+      ],
+      "multi-agents-sdk/events": [
+        "./src/core/typed-event-bus.ts"
+      ],
+      "multi-agents-sdk/contracts/*": [
+        "./src/contracts/*"
+      ],
+      "multi-agents-sdk/conversations/*": [
+        "./src/conversations/*"
+      ]
+    }
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.vue"
+  ]
+}

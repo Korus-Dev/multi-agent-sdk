@@ -1,0 +1,510 @@
+import { promptContentDispatchText } from '../../../src/core/surface';
+import { appendFile, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { DatabaseSync } from 'node:sqlite';
+import path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AcpSession } from '../../../src/providers/antigravity/session';
+import { AntigravityHost } from '../../../src/providers/antigravity/host';
+
+import type { Agent } from 'multi-agents-sdk/contracts';
+import type { HarnessEvent } from 'multi-agents-sdk/driver';
+
+
+
+
+
+
+import { sessionMcpServer as nativeSessionMcpServer } from '../../../src/acp/mcp-bridge';
+const product = { name: 'CPA workbench', mcpServerName: 'accounting' };
+const sessionMcpServer = (url: string) => nativeSessionMcpServer(url, product.mcpServerName);
+import type { ExecutionObservation, UsageCost } from 'multi-agents-sdk/contracts/usage';
+
+
+import usageFixture from './fixtures/usage-capability.json';
+import authorshipFixture from './fixtures/authorship-capability.json';
+
+
+
+
+let root: string;
+const sessions: AcpSession[] = [];
+vi.mock('multi-agents-sdk/runtime', async importOriginal => ({
+  ...await importOriginal<typeof import('multi-agents-sdk/runtime')>(),
+  withDiscoveredRuntimePath: () => ({ ...process.env }),
+}));
+beforeEach(async () => {
+  root = await mkdtemp(path.join(tmpdir(), 'korus-acp-session-'));
+  vi.stubEnv('APP_ANTIGRAVITY_COMMAND', path.join(root, 'runtime'));
+  vi.stubEnv('ANTIGRAVITY_HARNESS_PATH', path.join(root, 'harness'));
+  vi.stubEnv('GEMINI_HOME', path.join(root, 'home'));
+  vi.stubEnv('APP_HOME', path.join(root, 'app'));
+  await writeFile(path.join(root, 'harness'), '', { mode: 0o700 });
+  await writeFile(path.join(root, 'runtime'), `#!/usr/bin/env node
+const rl=require('node:readline').createInterface({input:process.stdin});
+const send=v=>process.stdout.write(JSON.stringify({jsonrpc:'2.0',...v})+'\\n');
+const fs=require('node:fs'), catalogFile=require('node:path').join(process.env.GEMINI_HOME,'catalog.json');
+fs.mkdirSync(process.env.GEMINI_HOME,{recursive:true});
+const usageFile=require('node:path').join(process.cwd(),'usage-fixture.json');
+const usageFixture=()=>fs.existsSync(usageFile)?JSON.parse(fs.readFileSync(usageFile,'utf8')):undefined;
+const authorshipFixture=${JSON.stringify(authorshipFixture)};
+const catalog=()=>fs.existsSync(catalogFile)?fs.readFileSync(catalogFile,'utf8').trim().split('\\n').map(JSON.parse):[];
+let sessionId=require('node:crypto').randomUUID(), promptId, mcpServers=[], planPhase, utility, permissionFixture, cancelPermissionFixture;
+const update=update=>send({method:'session/update',params:{sessionId,update}});
+async function review(text,reply) {
+ const server=mcpServers.find(server=>server.name==='korus');
+ if(!server) throw new Error('Missing korus server');
+ const child=require('node:child_process').spawn(server.command,server.args,{env:{...process.env,...Object.fromEntries(server.env.map(item=>[item.name,item.value]))},stdio:['pipe','pipe','ignore']});
+ const pending=new Map();let id=0;
+ require('node:readline').createInterface({input:child.stdout}).on('line',line=>{const value=JSON.parse(line);const done=pending.get(value.id);if(done)done(value);});
+ const rpc=(method,params)=>new Promise((resolve,reject)=>{const key=++id;pending.set(key,value=>value.error?reject(new Error(value.error.message)):resolve(value.result));child.stdin.write(JSON.stringify({jsonrpc:'2.0',id:key,method,params})+'\\n');});
+ const call=async(name,args)=>{const result=await rpc('tools/call',{name,arguments:args});if(result.isError)throw new Error(JSON.stringify(result));return result.structuredContent;};
+ try {
+  const tools=await rpc('tools/list',{});
+  if(!tools.tools.some(tool=>tool.name==='report_finding')||tools.tools.some(tool=>tool.name==='create-agent')) throw new Error('Wrong review scope');
+  const ledgerFile=require('node:path').join(process.cwd(),'fixture-ledger.json');
+  if(text.split('</context>').at(-1).trim().startsWith('Fix the ')) {
+   const finding=JSON.parse(fs.readFileSync(ledgerFile,'utf8'));
+   fs.writeFileSync(require('node:path').join(process.cwd(),'fixture-code.txt'),'fixed');
+   await call('update_finding',{findingId:finding.id,status:'fixed',evidence:'Fixture external tool wrote and verified fixed content.'});
+  } else if(!fs.existsSync(require('node:path').join(process.cwd(),'fixture-code.txt'))) {
+   const finding=await call('report_finding',{priority:'p2',title:'Fixture defect',body:'The fixture code needs a correction.'});
+   fs.writeFileSync(ledgerFile,JSON.stringify(finding.finding??finding));
+   await call('finish_review_round',{findingCount:1});
+  } else await call('finish_review_round',{findingCount:0});
+  update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Review turn complete.'}});reply({stopReason:'end_turn'});
+ } finally {child.stdin.end();}
+}
+rl.on('line',line=>{
+ const v=JSON.parse(line), reply=result=>send({id:v.id,result});
+ if(v.method==='initialize') {fs.writeFileSync(require('node:path').join(process.cwd(),'fixture-initialize.json'),JSON.stringify(v.params));reply({protocolVersion:2,agentInfo:{name:'antigravity-acp',version:'1.4.5'}});}
+ else if(v.method==='authenticate') reply({});
+ else if(v.method==='session/new') {mcpServers=v.params.mcpServers;fs.writeFileSync(require('node:path').join(process.cwd(),'fixture-session.json'),JSON.stringify(v.params));fs.appendFileSync(catalogFile,JSON.stringify({sessionId,cwd:v.params.cwd,title:'Saved conversation'})+'\\n');reply({sessionId,...(usageFixture()?.configuration??{}),models:usageFixture()?.configuration.models??{currentModelId:'gemini-low',availableModels:[{modelId:'gemini-low',name:'Gemini Low'},{modelId:'opaque-oss-id',name:'GPT-OSS 120B (Medium)'}]}});}
+ else if(v.method==='session/set_config_option') {fs.writeFileSync(require('node:path').join(process.cwd(),'fixture-model.json'),JSON.stringify(v.params));reply({});}
+ else if(v.method==='session/list') reply({sessions:[...catalog(),{sessionId:'stored-session',cwd:process.cwd(),title:'Create a file'},{sessionId:'other-folder',cwd:'/another-workspace',title:'Private'}]});
+ else if(v.method==='session/load') {
+   sessionId=v.params.sessionId;
+   mcpServers=v.params.mcpServers;
+   for(const item of usageFixture()?.updates??[]) update(item);
+   const saved=require('node:path').join(process.env.GEMINI_HOME,sessionId+'.jsonl');
+   if(fs.existsSync(saved)) {
+     for(const line of fs.readFileSync(saved,'utf8').trim().split('\\n')) {const prompt=JSON.parse(line);update({...authorshipFixture.historyUpdate,content:{...authorshipFixture.historyUpdate.content,text:prompt.replace(/^\\/plan\\s*/,'')}});update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Recovered.'}});}
+     reply({});return;
+   }
+   update({sessionUpdate:'user_message_chunk',content:{type:'text',text:'Create a file'}});
+   update({sessionUpdate:'tool_call',toolCallId:'replay-id',title:'Create file',kind:'edit',status:'completed'});
+   update({sessionUpdate:'tool_call_update',toolCallId:'replay-id',status:'failed',rawOutput:'Rejected by user'});
+   update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Denied.'}});
+   reply({models:{currentModelId:'gemini-low',availableModels:[{modelId:'gemini-low',name:'Gemini Low'}]}});
+ } else if(v.method==='session/prompt') {
+   promptId=v.id;
+   const text=v.params.prompt[0].text;
+   fs.writeFileSync(require('node:path').join(process.cwd(),'fixture-prompt.json'),JSON.stringify(v.params.prompt));
+   if(text.startsWith('usage-fixture:')) {
+     const fixture=usageFixture();
+     for(const item of fixture.updates) update(item);
+     update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Public ACP response.'}});
+     if(text.startsWith('usage-fixture:crash')) process.exit(1);
+     if(text.startsWith('usage-fixture:wait')) return;
+     if(text.startsWith('usage-fixture:schema-only')) {update(fixture.schemaOnlyNegativeControl.update);reply(fixture.schemaOnlyNegativeControl.completion);}
+     else reply(fixture.completion);
+     setTimeout(()=>update(fixture.lateUpdate),10);return;
+   }
+   if(text.startsWith('permission-fixture:')||text.startsWith('cancel-permission-fixture:')) {
+     permissionFixture=JSON.parse(text.slice(text.indexOf(':')+1));
+     if(text.startsWith('cancel-permission-fixture:')) {cancelPermissionFixture=true;fs.writeFileSync(require('node:path').join(process.cwd(),'cancel-permission-ready'),'');return;}
+     update({sessionUpdate:'tool_call',...permissionFixture.toolCall,status:'pending'});
+     send({id:v.id,method:'session/request_permission',params:{sessionId,...permissionFixture}});return;
+   }
+   if(text==='/usage') {fs.appendFileSync(require('node:path').join(process.env.GEMINI_HOME,'quota-reads'),'x');update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:'### Quota Limits\\n- **Gemini Models**\\n  - **Weekly Limit Remaining:** 97% remaining (resets Nov 12, 2026, 19:59 UTC)'}});reply({stopReason:'end_turn'});return;}
+   if(text.endsWith('utility-fixture')) {utility=true;send({id:211,method:'fs/write_text_file',params:{sessionId,path:require('node:path').join(process.cwd(),'unwanted-write'),content:'bad'}});return;}
+   fs.appendFileSync(require('node:path').join(process.env.GEMINI_HOME,sessionId+'.jsonl'),JSON.stringify(text)+'\\n');
+   if(text.startsWith('/plan ')) {
+     planPhase='question';
+     send({id:v.id,method:'session/request_permission',params:{sessionId,toolCall:{toolCallId:'interaction_plan',title:'Use the minimal plan?'},options:[{optionId:'minimal-plan',name:'Minimal',kind:'allow_once'}]}});return;
+   }
+   if(mcpServers.some(server=>server.env.some(item=>item.name==='HARNESS_ACP_MCP_URL'&&item.value.includes('reviewContextId=')))) {void review(text,reply).catch(error=>{fs.writeFileSync(require('node:path').join(process.cwd(),'fixture-error.txt'),error.message);send({id:v.id,error:{code:-32603,message:error.message}});});return;}
+   if(text==='crash') process.exit(1);
+   if(text==='wait'||text.endsWith('utility-wait')) return;
+   if(text==='question'||text==='deny') {
+     update({sessionUpdate:'tool_call',toolCallId:'live-id',title:'Create file',kind:'edit',status:'pending'});
+     send({id:v.id,method:'session/request_permission',params:{sessionId,toolCall:{toolCallId:text==='question'?'interaction_1':'live-id',title:text==='question'?'Which option?':'Create file'},options:text==='question'?[{optionId:'native-choice-7',name:'Proceed',kind:'allow_once'}]:[{optionId:'native-deny-9',name:'Deny',kind:'reject_once'}]}});
+   } else {update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Recovered.'}});reply({stopReason:'end_turn'});}
+ } else if(v.method==='session/cancel') {
+   if(cancelPermissionFixture) send({id:901,method:'session/request_permission',params:{sessionId,...permissionFixture}});
+   else send({id:promptId,result:{stopReason:'cancelled'}});
+ }
+ else if(!v.method) {
+   if(permissionFixture) {
+     fs.writeFileSync(require('node:path').join(process.cwd(),'permission-response.json'),JSON.stringify(v));
+     const selected=permissionFixture.options.find(option=>option.optionId===v.result?.outcome?.optionId);
+     update({sessionUpdate:'tool_call_update',toolCallId:permissionFixture.toolCall.toolCallId,status:selected?.kind.startsWith('allow_')?'completed':'failed'});
+     permissionFixture=undefined;send({id:promptId,result:{stopReason:cancelPermissionFixture?'cancelled':'end_turn'}});cancelPermissionFixture=false;return;
+   }
+   if(utility) {utility=false;update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:v.error?'Tools denied; text result.':'Unexpected write'}});send({id:promptId,result:{stopReason:'end_turn'}});return;}
+   if(planPhase==='question') {planPhase='write';send({id:900,method:'fs/write_text_file',params:{sessionId,path:require('node:path').join(process.cwd(),'PLAN.md'),content:'# Native plan\\n\\n1. Make the scoped change.\\n2. Verify it.'}});return;}
+   if(planPhase==='write') {planPhase=undefined;update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:'The plan is ready.'}});send({id:promptId,result:{stopReason:'end_turn'}});return;}
+   update({sessionUpdate:'tool_call_update',toolCallId:'live-id',status:v.result.outcome.optionId==='native-deny-9'?'failed':'completed',rawOutput:v.result.outcome.optionId});
+   send({id:promptId,result:{stopReason:'end_turn'}});
+ } else reply({});
+});
+`, { mode: 0o700 });
+});
+afterEach(async () => {
+  await Promise.all(sessions.splice(0).map(session => session.close()));
+  vi.unstubAllEnvs(); await rm(root, { recursive: true, force: true });
+});
+async function open(sessionId?: string, options: Partial<Parameters<typeof AcpSession.open>[0]> = {}) {
+  const changed = vi.fn();
+  const session = await AcpSession.open({ agentId: 'agent', cwd: root, home: path.join(root, 'home'), mcpServers: [], sessionId, changed, client: { name: 'cpa-workbench', trustedMcpServerName: product.mcpServerName, metadataDirectory: 'korus-sessions' }, ...options });
+  sessions.push(session);
+  return { session, changed };
+}
+
+// Real ACP child processes, durable journals and multi-turn/restart workflows.
+describe('Antigravity native session', () => {
+  // ACP replay lacks stable identities, so this backend must remain unqualified.
+
+
+  it("observes only admitted live ACP executions, with the selected model and no consumption when the runtime reports none", async () => {
+    const usage = vi.fn();
+    const { session } = await open("stored-session", { usage });
+    expect(usage).not.toHaveBeenCalled();
+    await session.prompt("hello").completion;
+    expect(usage.mock.calls.map(([event]) => event.phase)).toEqual([
+      "started",
+      "completed",
+    ]);
+    expect(usage.mock.calls[1][0]).toMatchObject({
+      provider: "antigravity",
+      agentId: "agent",
+      tokens: null,
+      model: "gemini-low",
+      requestCoverage: "partial",
+      requestCoverageReason: "acp-request-evidence-unavailable",
+    });
+    const waiting = session.prompt("wait");
+    await vi.waitFor(() => expect(usage).toHaveBeenCalledTimes(3));
+    expect(() => session.prompt("duplicate")).toThrow("previous turn");
+    await session.interrupt(waiting.turnId);
+    await waiting.completion;
+    expect(usage.mock.calls.map(([event]) => event.phase)).toEqual([
+      "started",
+      "completed",
+      "started",
+      "interrupted",
+    ]);
+    await session.prompt("crash").completion;
+    expect(usage.mock.calls.slice(-2).map(([event]) => event.phase)).toEqual([
+      "started",
+      "failed",
+    ]);
+  });
+
+  it("reads account quota through an ephemeral /usage turn and reuses it briefly", async () => {
+    const host = new AntigravityHost({ home: () => path.join(root, 'home'), stateDirectory: () => path.join(root, 'app'), client: { name: 'cpa-workbench', metadataDirectory: 'korus-sessions', trustedMcpServerName: product.mcpServerName } });
+    const reads = async () => (await readFile(path.join(root, 'home', 'quota-reads'), 'utf8').catch(() => '')).length;
+    try {
+      const [first, second] = await Promise.all([host.getAccountRateLimits(), host.getAccountRateLimits()]);
+      expect(first).toMatchObject({ primary: { label: 'Gemini', usedPercent: 3, windowDurationMins: 10_080 }, secondary: null });
+      expect(second).toStrictEqual(first);
+      expect(await host.getAccountRateLimits()).toStrictEqual(first);
+      expect(await reads()).toBe(1);
+    } finally { await host.close(); }
+  });
+
+  it("disables run_workflow so the runtime never writes its skill file into the workspace", async () => {
+    await open();
+    expect(JSON.parse(await readFile(path.join(root, 'fixture-session.json'), 'utf8'))).toMatchObject({ _meta: { antigravity: { disabledTools: ['run_workflow'] } } });
+    await expect(readFile(path.join(root, 'skills/system/run-workflow/SKILL.md'), 'utf8')).rejects.toThrow();
+  });
+
+  it("reports per-turn token categories and the selected model from PromptResponse.usage", async () => {
+    const config = (currentValue: string) => [{ id: 'model', name: 'Model', type: 'select', category: 'model', currentValue, options: [{ value: currentValue, name: currentValue }] }];
+    const measured = (usage: unknown) => ({ configuration: { models: { currentModelId: 'gemini-3.8-flash', availableModels: [{ modelId: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' }] }, configOptions: config('gemini-3.8-flash') },
+      updates: [], completion: { stopReason: 'end_turn', usage }, lateUpdate: { sessionUpdate: 'usage_update', used: 1, size: 2 } });
+    const run = async (usage: unknown) => {
+      await writeFile(path.join(root, 'usage-fixture.json'), JSON.stringify(measured(usage)));
+      const observed = vi.fn();
+      const { session } = await open(undefined, { usage: observed });
+      await session.prompt('usage-fixture:tokens').completion;
+      return observed.mock.calls.map(([event]) => event).find(event => event.phase === 'completed');
+    };
+    // Wire input already includes cached reads; thoughts are separate from output and join it in Korus's model.
+    expect(await run({ inputTokens: 1000, outputTokens: 50, cachedReadTokens: 400, cachedWriteTokens: 0, thoughtTokens: 30, totalTokens: 1480 })).toMatchObject({
+      model: 'gemini-3.8-flash',
+      tokens: { input: 1000, cacheRead: 400, cacheWrite: 0, output: 80, reasoning: 30, total: 1080 },
+    });
+    // Anything the pricing model cannot represent stays unmeasured rather than guessed.
+    for (const usage of [undefined, { inputTokens: -1, outputTokens: 1 }, { inputTokens: 'many' }, { inputTokens: 10, outputTokens: 1, cachedWriteTokens: 5 }, { inputTokens: 10, outputTokens: 1, cachedReadTokens: 11 }]) {
+      expect(await run(usage)).toMatchObject({ model: 'gemini-3.8-flash', tokens: null });
+    }
+  });
+
+  // Boundary failures: context occupancy or selected models fabricated as consumption;
+  // duplicate/late/replayed updates inventing requests; terminal/failed activity omitted;
+  // coverage reason or turn timing lost through persistence and usage/get.
+
+
+  const mcpPermission = (tool: string) => ({
+    toolCall: { toolCallId: 'native-mcp-call', title: `${product.mcpServerName}_${tool}`, kind: 'other', rawInput: { arguments: {} },
+      _meta: { is_mcp_tool_call: true, mcp: { server: product.mcpServerName, tool } } },
+    options: [
+      { optionId: 'native-always-17', name: 'Allow Always', kind: 'allow_always' },
+      { optionId: 'native-once-42', name: 'Allow', kind: 'allow_once' },
+      { optionId: 'native-deny-9', name: 'Deny', kind: 'reject_once' },
+    ],
+  });
+
+  it.each([
+    { sessionId: undefined, mode: 'auto_edit', tool: 'set_status' },
+    { sessionId: 'stored-session', mode: 'default', tool: 'finish_turn' },
+    { sessionId: undefined, mode: 'default', tool: 'report_finding' },
+  ])('pre-authorizes the supplied Korus server in $mode for $tool (session $sessionId)', async ({ sessionId, mode, tool }) => {
+    const { session, changed } = await open(sessionId, { mcpServers: [sessionMcpServer('http://127.0.0.1:1/mcp?agentId=agent')] });
+    await session.setMode(mode);
+    await session.prompt(`permission-fixture:${JSON.stringify(mcpPermission(tool))}`).completion;
+    const response = JSON.parse(await readFile(path.join(root, 'permission-response.json'), 'utf8'));
+    expect(response.result).toStrictEqual({ outcome: { outcome: 'selected', optionId: 'native-once-42' } });
+    expect(session.snapshot.clientRequests).toEqual([]);
+    expect(changed.mock.calls.map(([event]) => event.type)).not.toContain('request.created');
+    expect(session.snapshot.turns.at(-1)?.status).toBe('completed');
+    expect(session.snapshot.messages.at(-1)?.parts).toContainEqual(expect.objectContaining({ type: 'tool', id: 'native-mcp-call', status: 'completed' }));
+  });
+
+  it.each([
+    { boundary: 'Korus not supplied to the session', registered: false },
+    { boundary: 'other MCP server', meta: { is_mcp_tool_call: true, mcp: { server: 'github', tool: 'set_status' } } },
+    { boundary: 'title or arguments impersonating Korus', meta: undefined },
+    { boundary: 'missing native MCP marker', meta: { mcp: { server: product.mcpServerName, tool: 'set_status' } } },
+    { boundary: 'missing tool identity', meta: { is_mcp_tool_call: true, mcp: { server: product.mcpServerName } } },
+    { boundary: 'command approval', kind: 'execute' },
+    { boundary: 'file approval', kind: 'edit' },
+    { boundary: 'native question', toolCallId: 'interaction_choice' },
+    { boundary: 'no native allow-once choice', alwaysOnly: true },
+  ])('keeps $boundary interactive', async scenario => {
+    const { session, changed } = await open(undefined, { mcpServers: scenario.registered === false ? [] : [sessionMcpServer('http://127.0.0.1:1/mcp')] });
+    const permission = mcpPermission('set_status');
+    const toolCall = { ...permission.toolCall, ...('meta' in scenario ? { _meta: scenario.meta } : {}),
+      ...(scenario.kind ? { kind: scenario.kind } : {}), ...(scenario.toolCallId ? { toolCallId: scenario.toolCallId } : {}) };
+    const turn = session.prompt(`permission-fixture:${JSON.stringify({ ...permission, toolCall,
+      ...(scenario.alwaysOnly ? { options: [permission.options[0]] } : {}) })}`);
+    await vi.waitFor(() => expect(session.snapshot.clientRequests).toHaveLength(1));
+    const request = session.snapshot.clientRequests[0]!;
+    expect(request.kind).toBe(scenario.toolCallId ? 'ask_user' : 'confirm_tool');
+    expect(changed).toHaveBeenCalledWith(expect.objectContaining({ type: 'request.created' }));
+    session.respond({ id: request.id, outcome: scenario.alwaysOnly || scenario.toolCallId ? { kind: 'cancelled' } : { kind: 'decision', decision: 'deny' } });
+    await turn.completion;
+    const response = JSON.parse(await readFile(path.join(root, 'permission-response.json'), 'utf8'));
+    expect(response.result).toStrictEqual({ outcome: scenario.alwaysOnly || scenario.toolCallId ? { outcome: 'cancelled' } : { outcome: 'selected', optionId: 'native-deny-9' } });
+  });
+
+  it('rejects cross-session MCP approval requests and keeps tool-free generation disabled', async () => {
+    const mcpServers = [sessionMcpServer('http://127.0.0.1:1/mcp')];
+    const { session, changed } = await open(undefined, { mcpServers });
+    await session.prompt(`permission-fixture:${JSON.stringify({ ...mcpPermission('finish_turn'), sessionId: 'other-session' })}`).completion;
+    expect(JSON.parse(await readFile(path.join(root, 'permission-response.json'), 'utf8')).error).toStrictEqual({ code: -32603, message: 'Client request failed.' });
+    expect(changed.mock.calls.map(([event]) => event.type)).not.toContain('request.created');
+    const { session: utility } = await open(undefined, { mcpServers, tools: false });
+    await utility.prompt(`permission-fixture:${JSON.stringify(mcpPermission('finish_turn'))}`).completion;
+    expect(JSON.parse(await readFile(path.join(root, 'permission-response.json'), 'utf8')).result).toStrictEqual({ outcome: { outcome: 'cancelled' } });
+  });
+
+  it('automatically admits hardened read-only Git inspection and denies mutation in a utility session', async () => {
+    const { session, changed } = await open(undefined, { tools: 'read-only' });
+    const safe = 'git --no-pager --no-optional-locks -c core.fsmonitor=false';
+    for (const [command, allowed] of [
+      [`${safe} status --short`, true],
+      [`${safe} diff --no-ext-diff --no-textconv --stat HEAD`, true],
+      ['git status --short', false],
+      ['git --no-optional-locks status --short', false],
+      [`${safe} reset --hard`, false],
+      [`${safe} diff --no-ext-diff --no-textconv --output=source.ts`, false],
+      [`${safe} status; touch source.ts`, false],
+    ] as const) {
+      const fixture = mcpPermission('inspect');
+      await session.prompt(`permission-fixture:${JSON.stringify({ ...fixture, toolCall: { toolCallId: 'git-inspect', kind: 'execute', rawInput: { CommandLine: command, Cwd: root } } })}`).completion;
+      expect(JSON.parse(await readFile(path.join(root, 'permission-response.json'), 'utf8')).result).toStrictEqual({ outcome: allowed ? { outcome: 'selected', optionId: 'native-once-42' } : { outcome: 'cancelled' } });
+    }
+    expect(changed.mock.calls.map(([event]) => event.type)).not.toContain('request.created');
+  });
+
+  it('admits native reads and searches only for targets established inside the working folder', async () => {
+    await writeFile(path.join(root, 'inside.ts'), 'export {};');
+    const outside = path.join(path.dirname(root), `${path.basename(root)}-outside.ts`);
+    await writeFile(outside, 'secret');
+    const { session } = await open(undefined, { tools: 'read-only' });
+    for (const [toolCall, allowed] of [
+      [{ kind: 'read', rawInput: { AbsolutePath: path.join(root, 'inside.ts') } }, true],
+      [{ kind: 'read', locations: [{ path: 'inside.ts' }] }, true],
+      [{ kind: 'search', rawInput: { SearchPath: root } }, true],
+      [{ kind: 'read', rawInput: { AbsolutePath: outside } }, false],
+      [{ kind: 'read', rawInput: { path: `../${path.basename(outside)}` } }, false],
+      [{ kind: 'read', locations: [{ path: 'inside.ts' }, { path: path.dirname(root) }] }, false],
+      [{ kind: 'search', rawInput: { Query: 'secret' } }, false],
+      [{ kind: 'read' }, false],
+    ] as const) {
+      const fixture = mcpPermission('inspect');
+      await session.prompt(`permission-fixture:${JSON.stringify({ ...fixture, toolCall: { toolCallId: 'native-read', ...toolCall } })}`).completion;
+      expect(JSON.parse(await readFile(path.join(root, 'permission-response.json'), 'utf8')).result).toStrictEqual({ outcome: allowed ? { outcome: 'selected', optionId: 'native-once-42' } : { outcome: 'cancelled' } });
+    }
+    await rm(outside, { force: true });
+  });
+
+  it('does not authorize a Korus MCP request arriving after cancellation', async () => {
+    const { session, changed } = await open(undefined, { mcpServers: [sessionMcpServer('http://127.0.0.1:1/mcp')] });
+    const turn = session.prompt(`cancel-permission-fixture:${JSON.stringify(mcpPermission('finish_turn'))}`);
+    await vi.waitFor(async () => expect(await readFile(path.join(root, 'cancel-permission-ready'), 'utf8')).toBe(''));
+    await session.interrupt(turn.turnId);
+    expect(JSON.parse(await readFile(path.join(root, 'permission-response.json'), 'utf8')).result).toStrictEqual({ outcome: { outcome: 'cancelled' } });
+    expect(changed.mock.calls.map(([event]) => event.type)).not.toContain('request.created');
+    expect(session.snapshot.turns.at(-1)?.status).toBe('interrupted');
+  });
+
+
+
+
+
+
+
+
+
+
+  it('serializes prompts, cancels natively, and accepts a fresh turn in the same process', async () => {
+    const { session } = await open();
+    const first = session.prompt('wait');
+    expect(() => session.prompt('overlap')).toThrow('previous turn');
+    await expect(session.interrupt('stale-turn')).rejects.toThrow('changed');
+    await session.interrupt(first.turnId);
+    expect(session.snapshot.turns[0]?.status).toBe('interrupted');
+    await session.prompt('next').completion;
+    expect(session.snapshot.turns.map(turn => turn.status)).toEqual(['interrupted', 'completed']);
+    expect(session.snapshot.messages.at(-1)?.parts).toEqual([{ type: 'text', text: 'Recovered.' }]);
+  });
+
+  it('preserves user text and attachment chips across cold replay without exposing injected instructions', async () => {
+    const file = path.join(root, 'notes.txt');
+    await writeFile(file, 'Synthetic context');
+    const host = new AntigravityHost({ formatPrompt: (prompt, content) => promptContentDispatchText(content ?? [], prompt) + '\n\n<context>Caller-owned instructions</context>', home: () => path.join(root, 'home'), stateDirectory: () => path.join(root, 'app'), client: { name: 'cpa-workbench', metadataDirectory: 'korus-sessions', trustedMcpServerName: product.mcpServerName } });
+    const agent: Agent = { id: 'attachments', name: 'Attachments', folder: root, backend: 'antigravity', createdAt: '', updatedAt: '', status: { type: 'idle' } };
+    const events: HarnessEvent[] = [];
+    const content = [{ type: 'mention' as const, kind: 'file' as const, id: file, value: file, label: 'Read my notes' }];
+    host.onEvent(event => events.push(event));
+    try {
+      const result = await host.sendPrompt(agent, 'Read my notes', { content, attachments: [{ type: 'file', path: file, name: 'notes.txt', mimeType: 'text/plain' }] });
+      agent.backendSession = result.backendSession;
+      await vi.waitFor(() => expect(events.some(event => event.type === 'antigravity.conversationEventReceived' && event.payload.event.type === 'turn.completed')).toBe(true));
+      const ref = { backend: 'antigravity' as const, sessionId: result.backendSession.kind === 'antigravity' ? result.backendSession.sessionId : '', folder: root };
+      const admitted = JSON.parse((await readFile(path.join(root, 'home', 'korus-sessions', encodeURIComponent(ref.sessionId), 'prompts.jsonl'), 'utf8')).trim());
+      expect(admitted.wireText.startsWith(`@${file}\n\n<context>`)).toBe(true);
+      const live = await host.readConversationMessages(ref, agent.id);
+      await host.releaseConversation(agent.id);
+      const replay = await host.readConversationMessages(ref, agent.id);
+      expect(replay.map(message => message.parts)).toEqual(live.map(message => message.parts));
+      expect(live[0]?.metadata?.promptContent).toStrictEqual(content);
+      expect(replay[0]?.metadata?.promptContent).toStrictEqual(content);
+      expect(replay[0]?.parts).toEqual([{ type: 'text', text: 'Read my notes' }, { type: 'attachment', attachment: { kind: 'file', name: 'notes.txt', path: file, mimeType: 'text/plain' } }]);
+    } finally { await host.close(); }
+  });
+
+  it('opens a conversation whose prompt journal ends in a torn line, keeping the intact entries', async () => {
+    const host = new AntigravityHost({ home: () => path.join(root, 'home'), stateDirectory: () => path.join(root, 'app'), client: { name: 'cpa-workbench', metadataDirectory: 'korus-sessions', trustedMcpServerName: product.mcpServerName } });
+    const agent: Agent = { id: 'torn', name: 'Torn', folder: root, backend: 'antigravity', createdAt: '', updatedAt: '', status: { type: 'idle' } };
+    const events: HarnessEvent[] = [];
+    host.onEvent(event => events.push(event));
+    try {
+      const result = await host.sendPrompt(agent, 'Keep this prompt');
+      agent.backendSession = result.backendSession;
+      await vi.waitFor(() => expect(events.some(event => event.type === 'antigravity.conversationEventReceived' && event.payload.event.type === 'turn.completed')).toBe(true));
+      const sessionId = result.backendSession.kind === 'antigravity' ? result.backendSession.sessionId : '';
+      await host.releaseConversation(agent.id);
+      await appendFile(path.join(root, 'home', 'korus-sessions', encodeURIComponent(sessionId), 'prompts.jsonl'), '{"wireText":"half');
+      const replay = await host.readConversationMessages({ backend: 'antigravity', sessionId, folder: root }, agent.id);
+      expect(replay[0]?.parts).toEqual([{ type: 'text', text: 'Keep this prompt' }]);
+    } finally { await host.close(); }
+  });
+
+  it.each(['deny', 'question'] as const)('maps %s to the exact native option and resolves its app request', async kind => {
+    const { session, changed } = await open();
+    const turn = session.prompt(kind);
+    await vi.waitFor(() => expect(session.snapshot.clientRequests).toHaveLength(1));
+    const request = session.snapshot.clientRequests[0]!;
+    expect(request.kind).toBe(kind === 'question' ? 'ask_user' : 'confirm_tool');
+    expect(() => session.respond({ id: request.id, agentId: 'other', outcome: { kind: 'cancelled' } })).toThrow('another agent');
+    expect(() => session.respond({ id: request.id, outcome: { kind: 'decision', decision: 'always_allow' } })).toThrow('options supplied');
+    session.respond({ id: request.id, outcome: kind === 'question' ? { kind: 'answered', answers: { interaction_1: { answers: ['Proceed'] } } } : { kind: 'decision', decision: 'deny' } });
+    await turn.completion;
+    expect(session.snapshot.clientRequests).toEqual([]);
+    expect(session.snapshot.answeredClientRequestIds).toContain(request.id);
+    expect(changed).toHaveBeenCalledWith(expect.objectContaining({ type: 'request.resolved', payload: {
+      id: request.id, outcome: kind === 'question' ? { kind: 'answered', answers: { interaction_1: { answers: ['Proceed'] } } } : { kind: 'decision', decision: 'deny' },
+    } }));
+    expect(session.snapshot.messages.at(-1)?.parts).toContainEqual(expect.objectContaining({ type: 'tool', status: kind === 'question' ? 'completed' : 'failed', output: kind === 'question' ? 'native-choice-7' : 'native-deny-9' }));
+  });
+
+  it('rebuilds loaded history from changed replay IDs in order without publishing partial history', async () => {
+    const { session, changed } = await open('stored-session');
+    expect(session.sessionId).toBe('stored-session');
+    expect(changed).not.toHaveBeenCalled();
+    expect(session.snapshot.messages).toHaveLength(2);
+    expect(session.snapshot.messages.map(message => message.createdAt)).toEqual(['', '']);
+    expect(session.snapshot.turns[0]).toMatchObject({ startedAt: '', completedAt: '', durationMs: null });
+    expect(session.snapshot.messages[1]?.parts).toEqual([
+      expect.objectContaining({ type: 'tool', id: 'replay-id', status: 'failed', output: 'Rejected by user' }),
+      { type: 'text', text: 'Denied.' },
+    ]);
+    expect(session.snapshot).toMatchObject({ busy: false, activeTurnId: null, clientRequests: [] });
+  });
+
+  it('continues interrupted work in the saved Antigravity session', async () => {
+    const host = new AntigravityHost({ home: () => path.join(root, 'home'), stateDirectory: () => path.join(root, 'app'), client: { name: 'cpa-workbench', metadataDirectory: 'korus-sessions', trustedMcpServerName: product.mcpServerName } });
+    const events: HarnessEvent[] = [];
+    host.onEvent(event => events.push(event));
+    const agent: Agent = { id: 'resume', name: 'Resume', folder: root, backend: 'antigravity', createdAt: '', updatedAt: '', status: { type: 'idle' } };
+    try {
+      const first = await host.sendPrompt(agent, 'hello');
+      agent.backendSession = first.backendSession;
+      await vi.waitFor(() => expect(events.some(event => event.type === 'antigravity.conversationEventReceived' && event.payload.event.type === 'turn.completed')).toBe(true));
+      await host.releaseConversation(agent.id);
+      const resumed = await host.continueInterruptedTurn(agent);
+      expect(resumed.backendSession).toStrictEqual(first.backendSession);
+      expect(resumed.activeTurnId).toBeTypeOf('string');
+      await vi.waitFor(() => expect(events.filter(event => event.type === 'antigravity.conversationEventReceived' && event.payload.event.type === 'turn.completed')).toHaveLength(2));
+      const submitted = events.filter(event => event.type === 'antigravity.conversationEventReceived' && event.payload.event.type === 'message.upsert' && event.payload.event.payload.message.role === 'user');
+      expect(submitted.at(-1)).toMatchObject({ payload: { event: { payload: { message: { parts: [{ type: 'text', text: 'continue' }] } } } } });
+    } finally { await host.close(); }
+  });
+
+  it('validates folder-scoped history and coordinates model reads with completed or cancelled resume', async () => {
+    const host = new AntigravityHost({ home: () => path.join(root, 'home'), stateDirectory: () => path.join(root, 'app'), client: { name: 'cpa-workbench', metadataDirectory: 'korus-sessions', trustedMcpServerName: product.mcpServerName } });
+    const agent: Agent = { id: 'history', name: 'History', folder: root, backend: 'antigravity', createdAt: '', updatedAt: '', status: { type: 'idle' } };
+    try {
+      const rows = await host.listConversations(agent, { searchTerm: 'file' });
+      expect(rows).toEqual([expect.objectContaining({ id: 'stored-session', title: 'Create a file', updatedAt: '', ref: { backend: 'antigravity', sessionId: 'stored-session', folder: root } })]);
+      await expect(host.resumeConversation(agent, { storageState: 'active', ref: { backend: 'antigravity', folder: root, sessionId: 'other-folder' } })).rejects.toThrow('another workspace');
+      const messages = await host.readConversationMessages(rows[0]!.ref, agent.id);
+      expect(messages).toHaveLength(2);
+      expect(messages[1]?.parts[0]).toMatchObject({ type: 'tool', status: 'failed' });
+      expect(await host.readConversationSummary(agent, rows[0]!.ref)).toEqual(rows[0]);
+      const loading = host.resumeConversation(agent, { storageState: 'active', ref: rows[0]!.ref });
+      const catalog = expect(host.listModels(agent)).resolves.toEqual([
+        { id: 'gemini-low', model: 'gemini-low', displayName: 'Gemini Low', isDefault: true },
+      ]);
+      await expect(host.sendPrompt(agent, 'too early')).rejects.toThrow('history is still loading');
+      await loading;
+      await catalog;
+      await expect(host.readConversationMessages({ backend: 'antigravity', sessionId: rows[0]!.sessionId!, folder: path.join(root, 'home') }, agent.id)).rejects.toThrow('another workspace');
+      const cancelledLoad = expect(host.resumeConversation(agent, { storageState: 'active', ref: rows[0]!.ref })).rejects.toThrow('released during history loading');
+      const cancelledCatalog = expect(host.listModels(agent)).rejects.toThrow('released during model loading');
+      await host.releaseConversation(agent.id);
+      await Promise.all([cancelledLoad, cancelledCatalog]);
+    } finally { await host.close(); }
+  });
+
+  it('marks runtime exit as a failed turn and rejects future work on the dead session', async () => {
+    const { session } = await open();
+    await session.prompt('crash').completion;
+    expect(session.snapshot).toMatchObject({ busy: false, turns: [expect.objectContaining({ status: 'failed' })], error: expect.stringContaining('Antigravity') });
+    expect(() => session.prompt('next')).toThrow('closed');
+  });
+});

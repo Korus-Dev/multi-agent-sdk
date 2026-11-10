@@ -1,0 +1,3 @@
+import { defineConfig } from 'vitest/config';
+import { sourceAliases } from '../source-aliases.ts';
+export default defineConfig({ root: import.meta.dirname, resolve: { alias: sourceAliases, dedupe: ['vue'] },  test: { testTimeout: 2_500, hookTimeout: 2_500, environment: 'node', include: ['tests/**/*.spec.ts'], setupFiles: ['tests/codex/setup/state-patch-invariant.ts'], coverage: { provider: 'v8', reporter: ['text-summary', 'json', 'html'], include: ['src/**/*.ts', 'src/**/*.vue'], exclude: ['src/protocol/generated/**', 'src/protocol/method-map.ts', 'src/protocol/schema-version.ts'], thresholds: { statements: 85 } } } });

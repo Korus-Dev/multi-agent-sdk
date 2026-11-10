@@ -1,0 +1,113 @@
+{
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "vite build && tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "name": "multi-agents-sdk",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./codex": {
+      "types": "./dist/providers/codex/index.d.ts",
+      "import": "./dist/providers/codex/index.js"
+    },
+    "./core": {
+      "types": "./dist/core/index.d.ts",
+      "import": "./dist/core/index.js"
+    },
+    "./surface": {
+      "types": "./dist/core/surface.d.ts",
+      "import": "./dist/core/surface.js"
+    },
+    "./events": {
+      "types": "./dist/core/typed-event-bus.d.ts",
+      "import": "./dist/core/typed-event-bus.js"
+    },
+    "./surface-bridge": {
+      "types": "./dist/core/surface-bridge.d.ts",
+      "import": "./dist/core/surface-bridge.js"
+    },
+    "./conversation-replica": {
+      "types": "./dist/core/conversation-replica.d.ts",
+      "import": "./dist/core/conversation-replica.js"
+    },
+    "./web": {
+      "types": "./dist/web/index.d.ts",
+      "import": "./dist/web/index.js"
+    },
+    "./web/client": {
+      "types": "./dist/web/client.d.ts",
+      "import": "./dist/web/client.js"
+    },
+    "./web/server": {
+      "types": "./dist/web/server.d.ts",
+      "import": "./dist/web/server.js"
+    },
+    "./web/protocol": {
+      "types": "./dist/web/protocol.d.ts",
+      "import": "./dist/web/protocol.js"
+    },
+    "./contracts": {
+      "types": "./dist/contracts/index.d.ts",
+      "import": "./dist/contracts/index.js"
+    },
+    "./contracts/*": {
+      "types": "./dist/contracts/*.d.ts",
+      "import": "./dist/contracts/*.js"
+    },
+    "./conversations/*": {
+      "types": "./dist/conversations/*.d.ts",
+      "import": "./dist/conversations/*.js"
+    },
+    "./acp/*": {
+      "types": "./dist/acp/*.d.ts",
+      "import": "./dist/acp/*.js"
+    },
+    "./providers/*": {
+      "types": "./dist/providers/*.d.ts",
+      "import": "./dist/providers/*.js"
+    },
+    "./tools/*": {
+      "types": "./dist/tools/*.d.ts",
+      "import": "./dist/tools/*.js"
+    },
+    "./generation": {
+      "types": "./dist/generation.d.ts",
+      "import": "./dist/generation.js"
+    },
+    "./computer-use": {
+      "types": "./dist/computer-use/index.d.ts",
+      "import": "./dist/computer-use/index.js"
+    },
+    "./runtime": {
+      "types": "./dist/runtime/discovery.d.ts",
+      "import": "./dist/runtime/discovery.js"
+    },
+    "./backend": {
+      "types": "./dist/backend.d.ts",
+      "import": "./dist/backend.js"
+    }
+  },
+  "dependencies": {
+    "codex-sdk": "file:../codex-sdk",
+    "image-size": "2.0.4",
+    "ws": "8.22.2",
+    "@anthropic-ai/claude-agent-sdk": "0.3.319",
+    "@anthropic-ai/sdk": "0.116.0",
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "zod": "4.4.3",
+    "yauzl": "3.4.0"
+  }
+}

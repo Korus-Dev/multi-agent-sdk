@@ -1,0 +1,83 @@
+import type { AgentBackend } from './contracts';
+import type { HarnessContext, HarnessDriver, HarnessEvent, HarnessPromptScope } from './driver';
+import type { HarnessMcpEndpoint } from './generation';
+import type { CodexPromptPart } from './core/surface';
+import { createCodexSurface, type CodexSurfaceOptions } from './providers/codex';
+import { mcpServerConfig } from './providers/codex/codex-surface-mcp';
+import { CodexSurfaceAgentAdapter, type CodexHostOptions } from './providers/codex/host';
+import { CodexBackendDriver } from './providers/codex/driver';
+import { ClaudeConversationHost, type ClaudeHostOptions } from './providers/claude/host';
+import { ClaudeAgentSdkTransport, type ClaudeAgentSdkTransportOptions } from './providers/claude/agent-sdk-transport';
+import type { ClaudeTurnTransport } from './providers/claude/transport';
+import { CursorHost, type CursorHostOptions } from './providers/cursor/host';
+import { AntigravityHost, type AntigravityHostOptions } from './providers/antigravity/host';
+import { sessionMcpServer } from './acp/mcp-bridge';
+
+/** Shared app ports; provider-specific transport configuration stays in the named adapter options. */
+export type HarnessOptions<Context extends HarnessContext = HarnessContext> = {
+  client: { name: string; title?: string; version?: string; metadataDirectory?: string };
+  stateDirectory?: () => string;
+  instructions?: (context: Context) => string | undefined;
+  mcpServers?: (context: Context) => readonly HarnessMcpEndpoint[];
+  formatPrompt?: (prompt: string, content: readonly CodexPromptPart[] | undefined) => string;
+  codex?: { surface?: CodexSurfaceOptions; host?: CodexHostOptions<Context> };
+  claude?: { transport?: ClaudeTurnTransport; transportOptions?: ClaudeAgentSdkTransportOptions; host?: ClaudeHostOptions<Context> };
+  cursor?: CursorHostOptions<Context>;
+  antigravity?: AntigravityHostOptions<Context>;
+};
+type CodexContext<Context> = { context: Context; scope?: HarnessPromptScope };
+
+/** Creates a native adapter without connecting, authenticating or executing a model turn. */
+export function createHarnessDriver<Context extends HarnessContext = HarnessContext>(backend: AgentBackend, options: HarnessOptions<Context>): HarnessDriver<Context, HarnessEvent> {
+  const endpoints = (context: Context) => options.mcpServers?.(context) ?? [];
+  const bridges = (context: Context) => endpoints(context).map(server => sessionMcpServer(server.url, server.name, server.enabledTools ? [...server.enabledTools] : undefined));
+  if (backend === 'cursor') return new CursorHost({ ...options.cursor,
+    stateDirectory: options.stateDirectory ?? options.cursor?.stateDirectory,
+    instructions: options.instructions ?? options.cursor?.instructions,
+    formatPrompt: options.formatPrompt ?? options.cursor?.formatPrompt,
+    ...(options.mcpServers ? { mcpServers: bridges } : {}),
+    sessionOptions: { ...options.cursor?.sessionOptions, client: options.client },
+  });
+  if (backend === 'antigravity') return new AntigravityHost({ ...options.antigravity,
+    stateDirectory: options.stateDirectory ?? options.antigravity?.stateDirectory,
+    instructions: options.instructions ?? options.antigravity?.instructions,
+    formatPrompt: options.formatPrompt ?? options.antigravity?.formatPrompt,
+    ...(options.mcpServers ? { mcpServers: bridges } : {}),
+    client: { ...options.antigravity?.client, ...options.client },
+  });
+  if (backend === 'claude') return new ClaudeConversationHost(options.claude?.transport ?? new ClaudeAgentSdkTransport({ ...options.claude?.transportOptions, client: { ...options.claude?.transportOptions?.client, ...options.client } }), undefined, {
+    ...options.claude?.host,
+    configurePrompt: context => {
+      const defaults = options.claude?.host?.configurePrompt?.(context) ?? {};
+      const [primary, ...hosted] = endpoints(context);
+      return { ...defaults,
+        ...(options.instructions ? { appendSystemPrompt: options.instructions(context) } : {}),
+        ...(options.formatPrompt ? { formatPrompt: options.formatPrompt } : {}),
+        ...(options.mcpServers ? { mcpServerUrl: primary?.url ?? null, mcpServerName: primary?.name,
+          hostedMcpServerUrls: Object.fromEntries(hosted.map(server => [server.name, server.url])),
+          allowedTools: endpoints(context).flatMap(server => (server.enabledTools ?? ['*']).map(tool => `mcp__${server.name}__${tool}`)),
+        } : {}),
+      };
+    },
+  });
+  if (backend !== 'codex') throw new Error(`Unsupported harness: ${backend}`);
+  const surfaceOptions = options.codex?.surface ?? {};
+  const surface = createCodexSurface({ ...surfaceOptions, autoSelectFirstConversation: false,
+    clientInfo: surfaceOptions.clientInfo ?? { name: options.client.name, title: options.client.title ?? options.client.name, version: options.client.version ?? '1' },
+    extensions: [...surfaceOptions.extensions ?? [], { configureConversation: ({ extensionContext }) => {
+      const binding = extensionContext as CodexContext<Context> | undefined;
+      if (!binding?.context) return {};
+      const instructions = binding.scope?.developerInstructions ?? options.instructions?.(binding.context);
+      return {
+        ...(!binding.scope && options.mcpServers ? { config: mcpServerConfig(endpoints(binding.context).map(server => ({ name: server.name, transport: { type: 'http', url: server.url }, ...(server.enabledTools ? { enabledTools: [...server.enabledTools] } : {}), toolApprovalMode: 'auto', required: true }))) } : {}),
+        ...(instructions === undefined ? {} : { developerInstructions: instructions }),
+      };
+    } }],
+  });
+  const adapter = new CodexSurfaceAgentAdapter<Context>(surface, () => surface.close(), {
+    ...options.codex?.host,
+    extensionContext: (context, scope) => ({ context, scope } satisfies CodexContext<Context>),
+    formatPrompt: options.formatPrompt ?? options.codex?.host?.formatPrompt,
+  });
+  return new CodexBackendDriver(adapter);
+}
