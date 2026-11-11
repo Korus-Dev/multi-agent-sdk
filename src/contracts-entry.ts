@@ -5,7 +5,6 @@ export * from './contracts/conversation';
 export * from './contracts/safety-review';
 export * from './conversations/agent-request';
 export * from './conversations/tool-output';
-export * from './conversations/work-phases';
 /**
  * Transitional: native conversation replicas and reducers, for apps that still replay raw provider events
  * instead of consuming neutral session state. They leave this entry once that pipeline is gone.

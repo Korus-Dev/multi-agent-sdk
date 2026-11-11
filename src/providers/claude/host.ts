@@ -14,7 +14,6 @@ export type ClaudeHostOptions<Context extends Agent = Agent> = {
   mcpServerLabel?: (server: string | undefined) => string | undefined;
   statusText?: (status: 'notConfigured' | 'running') => import('../../contracts').AppText;
   toolOptions?: ClaudeToolPartOptions;
-  inferWorkPhases?: (messages: Message[]) => Message[];
   log?: (level: 'warn', component: string, message: string, details?: Record<string, unknown>) => void;
 };
 function scopedConfiguration(scope: HarnessPromptScope): ClaudeScopedTurnConfiguration {
@@ -1898,7 +1897,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
     source?: import('./history-source').ClaudeHistorySource,
   ): void {
     this.taskPlansByAgentId.set(agent.id, taskPlan);
-    const window = new ClaudeHistoryWindow(sessionId, messages, new Set(turns.filter(turn => turn.status !== 'inProgress').map(turn => turn.id)), source, this.driverOptions.inferWorkPhases);
+    const window = new ClaudeHistoryWindow(sessionId, messages, new Set(turns.filter(turn => turn.status !== 'inProgress').map(turn => turn.id)), source);
     this.historyWindows.set(agent.id, window);
     const page = window.older();
     this.publishConversationSnapshot({
@@ -1923,7 +1922,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
     if (!current || current.sessionId === sessionId) return;
     const window = this.historyWindows.get(agentId);
     if (window?.sessionId === null) window.sessionId = sessionId;
-    else if (window?.sessionId !== sessionId) this.historyWindows.set(agentId, new ClaudeHistoryWindow(sessionId, undefined, undefined, undefined, this.driverOptions.inferWorkPhases));
+    else if (window?.sessionId !== sessionId) this.historyWindows.set(agentId, new ClaudeHistoryWindow(sessionId));
     this.publishConversationSnapshot({ ...current, sessionId });
   }
 

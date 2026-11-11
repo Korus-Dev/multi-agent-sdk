@@ -4,6 +4,7 @@ import type {
   ClaudeConversationTurn,
 } from '../contracts';
 import { applyClaudeConversationEvent } from './claude-conversation-reducer';
+import { workPhaseView } from './work-phases';
 
 export type ClaudeConversationReplica = {
   apply(event: ClaudeConversationEvent): ClaudeConversationSnapshot;
@@ -14,6 +15,8 @@ export function createClaudeConversationReplica(
   initialSnapshot: ClaudeConversationSnapshot,
 ): ClaudeConversationReplica {
   let snapshot = structuredClone(initialSnapshot);
+  // Reads carry work phases Claude does not tag itself.
+  const view = workPhaseView<ClaudeConversationSnapshot>();
 
   return {
     apply(event) {
@@ -26,15 +29,15 @@ export function createClaudeConversationReplica(
           next.answeredClientRequestIds.push(event.payload.id);
         }
         snapshot = next;
-        return snapshot;
+        return view(snapshot);
       }
 
       applyClaudeConversationEvent(next, structuredClone(event));
       snapshot = applyTurnLifecycle(next, event);
-      return snapshot;
+      return view(snapshot);
     },
     getSnapshot() {
-      return snapshot;
+      return view(snapshot);
     },
   };
 }

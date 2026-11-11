@@ -1,9 +1,11 @@
 import type { AntigravityConversationEvent, AntigravityConversationSnapshot } from '../contracts/antigravity-conversation';
+import { workPhaseView } from './work-phases';
 
 /** Antigravity owns this replica; the app coordination reducer never contains its transcript. */
 export function createAntigravityConversationReplica(initial: AntigravityConversationSnapshot) {
   let snapshot = structuredClone(initial);
-  return {
+  const view = workPhaseView<AntigravityConversationSnapshot>();
+  const replica = {
     getSnapshot: () => snapshot,
     apply(event: AntigravityConversationEvent): AntigravityConversationSnapshot {
       if (event.agentId !== snapshot.agentId || event.sessionId !== snapshot.sessionId) throw new Error('Antigravity conversation identity mismatch.');
@@ -46,6 +48,8 @@ export function createAntigravityConversationReplica(initial: AntigravityConvers
       return snapshot;
     },
   };
+  // Reads carry work phases this harness does not tag itself.
+  return { ...replica, getSnapshot: () => view(snapshot), apply: (event: AntigravityConversationEvent) => view(replica.apply(event)) };
 }
 
 export function emptyAntigravitySnapshot(agentId: string, sessionId: string): AntigravityConversationSnapshot {

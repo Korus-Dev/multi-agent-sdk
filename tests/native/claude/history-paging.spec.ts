@@ -307,7 +307,7 @@ describe('Claude history paging', () => {
       emit({ type: 'assistant', session_id: session.sessionId, message: { content: 'Final answer' } });
       emit({ type: 'result', subtype: 'success', session_id: session.sessionId, is_error: false });
       const live = (await driver.readConversationMessages({ provider: 'claude', folder: agent.folder, sessionId: session.sessionId }, agent.id)).find((row) => row.role === 'assistant' && row.turnId === turn.turnId)!;
-      expect(live.parts).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'live-tool', body: output }), { type: 'text', text: 'Final answer' }]));
+      expect(live.parts).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'live-tool', body: output }), { type: 'text', text: 'Final answer', phase: 'final_answer' }]));
       expect(replica.getSnapshot().messages.filter((row) => row.role === 'assistant' && row.turnId === turn.turnId)).toHaveLength(1);
       const reference = replica.getSnapshot().messages.find((row) => row.id === live.id)!.deferredContent!;
       const chunks: Buffer[] = []; let offset = 0;

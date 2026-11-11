@@ -1,5 +1,5 @@
 
-type Message = { role?: string; kind?: string; parts?: readonly WorkPhasePart[] };
+type Message = { role?: string; kind?: string; turnId?: string; parts?: readonly WorkPhasePart[] };
 export type WorkPhasePart = { type: string; phase?: string; text?: string; content?: string; metadata?: Record<string, unknown> };
 
 /**
@@ -15,7 +15,7 @@ export function withInferredWorkPhases<T extends Message>(message: T, isBookkeep
 }
 
 /** Classify unphased historical text using only the last work tool in the whole turn. */
-export function withInferredTurnWorkPhases<T extends Message>(messages: T[], isBookkeepingTool: (part: WorkPhasePart) => boolean = part => part.metadata?.workPhase === 'bookkeeping'): T[] {
+export function withInferredTurnWorkPhases<T extends Message>(messages: T[], isBookkeepingTool: (part: WorkPhasePart) => boolean = part => part.metadata?.workPhase === 'bookkeeping', recompute = false): T[] {
   let position = 0; let lastWork = -1;
   for (const message of messages) {
     for (const part of message.parts ?? []) {
@@ -28,7 +28,7 @@ export function withInferredTurnWorkPhases<T extends Message>(messages: T[], isB
   return messages.map(message => {
     const parts = message.parts?.map(part => {
       const index = position++;
-      if (message.role !== 'assistant' || part.type !== 'text' || part.phase !== undefined) return part;
+      if (message.role !== 'assistant' || part.type !== 'text' || (part.phase !== undefined && !recompute)) return part;
       const hasText = (part.text ?? part.content ?? '').trim().length > 0;
       return { ...part, phase: index < lastWork || !hasText ? 'commentary' : 'final_answer' };
     });
@@ -37,3 +37,29 @@ export function withInferredTurnWorkPhases<T extends Message>(messages: T[], isB
 }
 
 function isWorkTool(part: WorkPhasePart, isBookkeepingTool: (part: WorkPhasePart) => boolean): boolean { return part.type === 'tool' && !isBookkeepingTool(part); }
+
+/**
+ * Tags assistant text with its work phase, turn by turn, for harnesses that do not tag it natively.
+ * Phases are recomputed, so text a later tool call turns into commentary never keeps a stale final-answer tag.
+ */
+export function tagWorkPhases<T extends Message>(messages: readonly T[]): T[] {
+  const tagged: T[] = [];
+  for (let start = 0; start < messages.length;) {
+    const turnId = messages[start]!.turnId;
+    let end = start + 1;
+    if (turnId !== undefined) while (end < messages.length && messages[end]!.turnId === turnId) end++;
+    tagged.push(...withInferredTurnWorkPhases(messages.slice(start, end), undefined, true));
+    start = end;
+  }
+  return tagged;
+}
+
+/** A snapshot view whose messages carry work phases, computed once per snapshot. */
+export function workPhaseView<S extends { messages: readonly Message[] }>(): (snapshot: S) => S {
+  let source: S | undefined;
+  let view: S | undefined;
+  return snapshot => {
+    if (snapshot !== source) { source = snapshot; view = { ...snapshot, messages: tagWorkPhases(snapshot.messages) }; }
+    return view!;
+  };
+}
