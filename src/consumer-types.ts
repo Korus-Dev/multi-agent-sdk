@@ -14,7 +14,7 @@ export type RuntimeStatus = Omit<import('./contracts/index').ProviderRuntimeStat
 /** Provider-specific account/login detail is an explicit native escape hatch. */
 export type Authentication = { connected: boolean; /** Present after `authenticate({ action: 'login' })` starts a managed login. */ login?: AuthenticationLogin; native: import('./contracts/authentication').ProviderAuthentication };
 export type { AuthenticationLogin, AuthenticationLoginMethod } from './contracts/authentication';
-export type SessionStatus = { type: 'idle' | 'working' | 'awaitingInput' | 'error'; detail?: string; message?: string; native?: import('./contracts/status').AgentStatus };
+export type SessionStatus = { type: 'idle' | 'working' | 'awaitingInput' | 'error'; reason?: 'approval' | 'input'; detail?: string; message?: string; native?: import('./contracts/status').AgentStatus };
 export type AuthenticationAction = import('./contracts/authentication').ProviderAuthenticationAction;
 type AuthenticationLogin = import('./contracts/authentication').AuthenticationLogin;
 export type TurnActionResult = { session: Session; activeTurnId: string | null };
@@ -83,7 +83,8 @@ export type HarnessEvent =
   | { type: 'provider.event'; session?: Session; event: import('./contracts/events').ProviderEvent }
   | { type: 'usage.observed'; observation: import('./contracts/usage').ExecutionObservation }
   | { type: 'requestUsage.observed'; observation: import('./contracts/usage').RequestObservation };
-export type Harness = {
+/** A provider harness. `P` narrows provider-specific inputs such as permission ids when the provider is known. */
+export type Harness<P extends HarnessProvider = HarnessProvider> = {
   getRuntimeStatus(): RuntimeStatus;
   authenticate(action: AuthenticationAction): Promise<Authentication>;
   getBankedResets(): Promise<import('./contracts/banked-resets').BankedResets>;
@@ -147,7 +148,7 @@ export type Harness = {
   sendPrompt(session: Session, prompt: string, options?: PromptOptions): Promise<Admission>;
   interrupt(session: Session, expectedTurnId?: string): Promise<Admission>;
   respondToRequest(session: Session, response: Omit<AgentRequestResponse, 'agentId'>): Promise<void>;
-  setPermission(session: Session, id: string): Promise<void>;
+  setPermission(session: Session, id: import('./contracts/permissions').PermissionFor<P>): Promise<void>;
   /** Changes the model, reasoning effort, speed or permission used by the session's next calls. */
   updateDefaults(session: Session, defaults: Partial<HarnessDefaults>): void;
   /**

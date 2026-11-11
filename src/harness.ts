@@ -198,6 +198,7 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
     else if (event.type === 'agent.statusChanged') {
       const payload = event.payload;
       this.emit({ type: 'status.changed', session, status: { type: payload.type,
+        ...('reason' in payload && payload.reason ? { reason: payload.reason } : {}),
         ...('detail' in payload && typeof payload.detail === 'string' ? { detail: payload.detail } : {}),
         ...('message' in payload && typeof payload.message === 'string' ? { message: payload.message } : {}),
         native: payload } });

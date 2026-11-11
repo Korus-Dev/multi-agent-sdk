@@ -309,7 +309,8 @@ export type MessageMedia = {
 
 export type MessagePart =
   | { type: 'attachment'; attachment: MessageAttachment }
-  | { type: 'media'; media: MessageMedia; itemId?: string }
+  /** Media from a tool observation belongs to the work; final-answer media stays visible. */
+  | { type: 'media'; media: MessageMedia; itemId?: string; phase?: 'commentary' | 'partial_answer' | 'final_answer' }
   | ConversationMessageQuestionPart
   | { type: 'reasoning'; summary: string; itemId: string; summaryIndex: number }
   | { type: 'text'; text: string; itemId?: string; phase?: 'commentary' | 'partial_answer' | 'final_answer' }
@@ -344,7 +345,11 @@ export type ToolPartUpdate = {
 };
 
 export type Message = {
-  metadata?: { promptContent?: readonly PromptPart[] };
+  metadata?: {
+    promptContent?: readonly PromptPart[];
+    /** Answers the person gave to non-blocking questions, keyed by question id, shown with their message. */
+    asyncQuestionAnswers?: Record<string, { answers: string[] }>;
+  };
   id: string;
   agentId: string;
   kind?: 'compaction' | 'steer';

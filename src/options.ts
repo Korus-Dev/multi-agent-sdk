@@ -1,4 +1,4 @@
-import type { AppText, ProviderSessionData } from './contracts';
+import type { ProviderSessionData } from './contracts';
 import type { HarnessDiagnostic } from './diagnostics';
 import type { HarnessMcpEndpoint, HarnessMcpServer } from './generation';
 import type { HarnessContext } from './consumer-types';
@@ -32,12 +32,6 @@ export type HarnessOptions = {
   formatPrompt?: (prompt: string, content: readonly PromptPart[] | undefined) => string;
   /** The app's own MCP server. Its tools run without a permission prompt. */
   trustedMcpServerName?: string;
-  /** Display name for an MCP server in tool presentation. */
-  mcpServerLabel?: (server: string | undefined) => string | undefined;
-  /** Text for the runtime status line; the SDK supplies plain defaults. */
-  statusText?: (status: 'notConfigured' | 'connecting' | 'running') => AppText;
-  /** Text for conversations waiting on the person. */
-  waitingText?: { approval?: AppText; input?: AppText };
   log?: HarnessLog;
   onDiagnostic?: (record: HarnessDiagnostic) => void;
   /**
@@ -69,8 +63,6 @@ export type HarnessOptions = {
     disallowedTools?: readonly string[];
     /** Decides a tool call before the consumer is asked. Return nothing to let it through to a permission request. */
     decideTool?: (tool: string, input: Record<string, unknown>) => { behavior: 'deny'; message: string } | undefined;
-    /** Rewrites an MCP tool's input for display. */
-    presentMcpInput?: (tool: { server: string; tool: string }, input: Record<string, unknown>) => Record<string, unknown>;
   };
   cursor?: {
     command?: () => string | null;

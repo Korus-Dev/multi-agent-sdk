@@ -3,7 +3,11 @@ type Message = { role?: string; kind?: string; turnId?: string; parts?: readonly
 export type WorkPhasePart = { type: string; phase?: string; text?: string; content?: string; metadata?: Record<string, unknown> };
 /** App rules for phase tagging: a bookkeeping tool call, such as the app's own status report, is not work. */
 export type WorkPhaseRules = { isBookkeepingTool?: (tool: import('../contracts').ToolPart) => boolean };
-const bookkeeping = (rules: WorkPhaseRules = {}) => (part: WorkPhasePart) => part.metadata?.workPhase === 'bookkeeping' || (rules.isBookkeepingTool?.(part as never) ?? false);
+const bookkeeping = (rules: WorkPhaseRules = {}) => (part: WorkPhasePart) => part.metadata?.workPhase === 'bookkeeping' || appRule(rules, part);
+/** The app's rule runs inside every replica; if it throws, the tool counts as work rather than breaking the projection. */
+function appRule(rules: WorkPhaseRules, part: WorkPhasePart): boolean {
+  try { return rules.isBookkeepingTool?.(part as never) ?? false; } catch { return false; }
+}
 
 /**
  * Gives backends that do not tag work phases (Claude) the Working / Done grouping Codex has:

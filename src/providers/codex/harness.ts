@@ -14,7 +14,6 @@ import { createCodexHost, type CodexHost, type CodexHostOptions } from './index'
 import { mcpServerConfig } from './host-mcp';
 import { CodexHostAdapter, conversationMessages, type CodexHostAdapterOptions } from './host-adapter';
 import { CodexHostController } from './host-controller';
-import { statusFromSnapshot } from './status';
 
 export type CodexProviderOptions<Context extends ProviderContext = ProviderContext> = SharedProviderOptions<Context> & {
   codex?: {
@@ -61,8 +60,6 @@ export class CodexHarness extends ProviderHarness<'codex'> {
           displayName: native => native.name ?? native.id,
           ...(options.codex?.syncTitle ? { shouldSyncTitle: native => options.codex!.syncTitle!(context(native)) } : {}),
           ...(options.codex?.retainedSessions ? { retainedSessions: native => options.codex!.retainedSessions!(context(native)) } : {}),
-          ...(options.statusText ? { runtimeStatusDetail: options.statusText } : {}),
-          ...(options.waitingText ? { statusFromSnapshot: snapshot => statusFromSnapshot(snapshot, { awaitingApproval: options.waitingText!.approval ?? 'Waiting for approval', awaitingUserInput: options.waitingText!.input ?? 'Waiting for your answer' }) } : {}),
           ...(options.codex?.imageModel || options.log ? { images: {
             ...(options.codex?.imageModel ? { selectModel: models => options.codex!.imageModel!(models as never) } : {}),
             ...(options.log ? { log: (message, details) => options.log!('warn', 'image-generation', message, details) } : {}),

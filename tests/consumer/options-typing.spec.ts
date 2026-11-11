@@ -8,6 +8,16 @@ const typed = () => {
   createHarness('codex', { client: { name: 'x' }, claude: {} });
   const provider = 'claude' as 'codex' | 'claude';
   createHarness(provider, { client: { name: 'x' }, codex: { readOnly: true }, claude: {} });
+  const codex = createHarness('codex', { client: { name: 'x' } });
+  const session = codex.open({ id: 'a', folder: null });
+  void codex.setPermission(session, 'full-access');
+  // @ts-expect-error Claude permission modes are not Codex approval presets.
+  void codex.setPermission(session, 'acceptEdits');
+  const claude: import('../../src/claude').ClaudePermission = 'bypassPermissions';
+  void claude;
+  // A harness whose provider is only known at runtime takes any id and checks it against its capabilities.
+  const any = createHarness('cursor' as import('../../src').HarnessProvider, { client: { name: 'x' } });
+  void any.setPermission(session, 'whatever' as string);
 };
 
 it('types options per provider', () => { expect(typed).toBeTypeOf('function'); });

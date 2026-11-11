@@ -21,8 +21,6 @@ export type CodexHostAdapterOptions<Context extends Agent = Agent> = {
   retainedSessions?: (context: Context) => readonly ProviderSessionData[];
   approvalPresetFromDefaults?: (defaults: import('../../contracts').ProviderDefaults | undefined) => ApprovalPreset;
   formatPrompt?: typeof defaultFormatPrompt;
-  statusFromSnapshot?: typeof statusFromSnapshot;
-  runtimeStatusDetail?: (status: 'connecting' | 'running' | 'notConfigured') => import('../../contracts').AppText;
   images?: import('./image-generation').CodexImageGenerationOptions;
 };
 function defaultFormatPrompt(prompt: string, content?: SendPromptOptions['content'], _native?: boolean): string { return content === undefined ? prompt : promptContentDispatchText(content, prompt); }
@@ -350,7 +348,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
   }
 
   getRuntimeStatus(): ProviderRuntimeStatus {
-    return runtimeStatus(this.host.getSnapshot(), this.options.runtimeStatusDetail);
+    return runtimeStatus(this.host.getSnapshot());
   }
 
   getCapabilities(agent?: Context) {
@@ -656,7 +654,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
       if (!session.handle.continueAfterSafetyReview) throw new Error('This SDK does not support provider safety review continuation.');
       const after = await session.handle.continueAfterSafetyReview({ turnId: review.turnId, findings: current.turns.find(turn => turn.id === review.turnId)!.error!.misalignment! });
       if (this.sessionsByAgentId.get(agent.id) !== session || codexThreadId(agent) !== safetyReview.conversationId) throw new Error('Conversation changed during safety review.');
-      this.emitStatus(session, (this.options.statusFromSnapshot ?? statusFromSnapshot)(after));
+      this.emitStatus(session, statusFromSnapshot(after));
       if (after.error || after.turns.at(-1)?.status === 'failed') throw new Error(after.error ?? after.turns.at(-1)?.error?.message ?? 'Continuation failed. Review the latest provider error.');
       return { threadId: session.handle.id, activeTurnId: after.activeTurnId };
     });
@@ -1235,7 +1233,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
       this.emitThread(session, { type: 'conversation.contextUsageUpdated', payload: { contextUsage: snapshot.contextUsage } });
     }
     if (snapshot.turnGitDiff) this.emitDiff(session, snapshot.turnGitDiff);
-    if (options.publishStatus !== false) this.emitStatus(session, (this.options.statusFromSnapshot ?? statusFromSnapshot)(snapshot));
+    if (options.publishStatus !== false) this.emitStatus(session, statusFromSnapshot(snapshot));
     if (options.publishProviderSnapshot !== false) this.publishConversationSnapshot(session, snapshot);
     else this.reconcilePending(session, snapshot);
   }
@@ -1365,7 +1363,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
       return;
     }
     if (event.type === 'host.statusChanged') {
-      this.emit({ provider: 'codex', type: 'provider.statusChanged', payload: runtimeStatus(this.host.getSnapshot(), this.options.runtimeStatusDetail), occurredAt: event.occurredAt });
+      this.emit({ provider: 'codex', type: 'provider.statusChanged', payload: runtimeStatus(this.host.getSnapshot()), occurredAt: event.occurredAt });
       return;
     }
     if (event.type === 'rateLimits.changed' && event.payload.rateLimits) {
@@ -1475,7 +1473,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
       case 'conversation.summaryRemoved':
         return;
       case 'conversation.activityChanged':
-        this.emitStatus(session, (this.options.statusFromSnapshot ?? statusFromSnapshot)(session.handle.getSnapshot()), event.occurredAt);
+        this.emitStatus(session, statusFromSnapshot(session.handle.getSnapshot()), event.occurredAt);
         return;
       case 'conversation.settingsChanged':
         this.emitSettings(
@@ -1525,10 +1523,10 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
         return;
       }
       case 'turn.error':
-        if (providerSafetyBlockMessage(event.payload.error)) this.emitStatus(session, (this.options.statusFromSnapshot ?? statusFromSnapshot)(session.handle.getSnapshot()), event.occurredAt);
+        if (providerSafetyBlockMessage(event.payload.error)) this.emitStatus(session, statusFromSnapshot(session.handle.getSnapshot()), event.occurredAt);
         return;
       case 'turn.completed':
-        if (providerSafetyBlockMessage(event.payload.error)) this.emitStatus(session, (this.options.statusFromSnapshot ?? statusFromSnapshot)(session.handle.getSnapshot()), event.occurredAt);
+        if (providerSafetyBlockMessage(event.payload.error)) this.emitStatus(session, statusFromSnapshot(session.handle.getSnapshot()), event.occurredAt);
         void this.refreshQuickChatConversationTitle(session);
         return;
       case 'file.activity':
@@ -1548,7 +1546,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
           id: event.payload.approval.id,
           outcome: approvalOutcome(event.payload.decision, event.payload.scope, event.payload.reason),
         }, ...metadata });
-        this.emitStatus(session, (this.options.statusFromSnapshot ?? statusFromSnapshot)(session.handle.getSnapshot()), event.occurredAt);
+        this.emitStatus(session, statusFromSnapshot(session.handle.getSnapshot()), event.occurredAt);
         return;
       case 'clientRequest.requested':
         this.clientRequestOwners.set(JSON.stringify([session.agent.id, event.payload.request.id]), session);
@@ -1560,7 +1558,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
           id: event.payload.request.id,
           outcome: event.payload.response ? agentResponseFromClientResponse(event.payload.response).outcome : approvalOutcome(null, null, event.payload.reason),
         }, ...metadata });
-        this.emitStatus(session, (this.options.statusFromSnapshot ?? statusFromSnapshot)(session.handle.getSnapshot()), event.occurredAt);
+        this.emitStatus(session, statusFromSnapshot(session.handle.getSnapshot()), event.occurredAt);
         return;
       default:
         return;
@@ -1938,6 +1936,11 @@ function scopedPromptOptions(agent: Agent): SendMessageOptions | undefined {
   };
 }
 
+/** Codex sometimes records a message's turn only in its metadata; the neutral model carries it on the message. */
+function turnIdOf(message: ConversationMessage): string | undefined {
+  return message.turnId ?? (typeof message.metadata?.turnId === 'string' ? message.metadata.turnId : undefined);
+}
+
 export function conversationMessages(
   messages: readonly ConversationMessage[],
   agentId: string,
@@ -1950,8 +1953,11 @@ export function conversationMessages(
     ...(message.kind ? { kind: message.kind } : {}),
     role: message.role,
     status: completeStreaming && message.status === 'streaming' ? 'complete' : message.status,
-    ...(message.turnId ? { turnId: message.turnId } : {}),
-    ...(message.metadata?.promptContent === undefined ? {} : { metadata: { promptContent: normalizePromptContent(message.metadata.promptContent) } }),
+    ...(turnIdOf(message) ? { turnId: turnIdOf(message) } : {}),
+    ...(message.metadata?.promptContent === undefined && message.metadata?.asyncQuestionAnswers === undefined ? {} : { metadata: {
+      ...(message.metadata.promptContent === undefined ? {} : { promptContent: normalizePromptContent(message.metadata.promptContent as never) }),
+      ...(message.metadata.asyncQuestionAnswers === undefined ? {} : { asyncQuestionAnswers: structuredClone(message.metadata.asyncQuestionAnswers as Record<string, { answers: string[] }>) }),
+    } }),
     parts: messageParts(message.parts, omitToolPayloads),
     createdAt: message.createdAt ?? new Date(0).toISOString(),
   }));
@@ -2134,17 +2140,11 @@ function boundedToolMetadata(metadata: Record<string, unknown> | undefined): Rec
   return Object.keys(bounded).length > 0 ? bounded : undefined;
 }
 
-function runtimeStatus(snapshot: CodexSnapshot, detail?: (status: 'connecting' | 'running' | 'notConfigured') => import('../../contracts').AppText): ProviderRuntimeStatus {
-  if (snapshot.status === 'connecting') {
-    return { provider: 'codex', status: 'starting', detail: detail?.('connecting') ?? 'Codex connecting' };
-  }
-  if (snapshot.status === 'ready') {
-    return { provider: 'codex', status: 'running', detail: detail?.('running') ?? 'Codex connected' };
-  }
-  if (snapshot.status === 'error') {
-    return { provider: 'codex', status: 'error', detail: snapshot.error ?? 'Codex app-server failed.' };
-  }
-  return { provider: 'codex', status: 'notConfigured', detail: detail?.('notConfigured') ?? 'Codex not connected' };
+function runtimeStatus(snapshot: CodexSnapshot): ProviderRuntimeStatus {
+  if (snapshot.status === 'connecting') return { provider: 'codex', status: 'starting' };
+  if (snapshot.status === 'ready') return { provider: 'codex', status: 'running' };
+  if (snapshot.status === 'error') return { provider: 'codex', status: 'error', ...(snapshot.error ? { detail: snapshot.error } : {}) };
+  return { provider: 'codex', status: 'notConfigured' };
 }
 
 function effectiveApprovalPreset(

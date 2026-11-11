@@ -43,9 +43,6 @@ export class ClaudeHarness extends SessionHarness<'claude'> {
         },
         host: {
           ...(options.isBookkeepingTool ? { isBookkeepingTool: options.isBookkeepingTool } : {}),
-          ...(options.trustedMcpServerName === undefined && !options.mcpServerLabel ? {} : { mcpServerLabel: options.mcpServerLabel ?? (() => undefined) }),
-          ...(options.statusText ? { statusText: status => options.statusText!(status) } : {}),
-          ...(options.claude?.presentMcpInput ? { toolOptions: { presentMcpInput: options.claude.presentMcpInput } } : {}),
           ...(log ? { log: (level, component, message, details) => log(level, component, message, details) } : {}),
         },
       },

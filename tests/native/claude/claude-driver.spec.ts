@@ -51,6 +51,20 @@ describe('ClaudeBackendDriver', () => {
       expect(forkWorktreeSession).not.toHaveBeenCalled();
     } finally { await driver.close(); }
   });
+  it('reports nothing to fork for the active turn while it runs, so the fork never ends on an unfinished tool call', async () => {
+    const transport = createConcurrentFakeTransport();
+    const forkWorktreeSession = vi.fn();
+    const driver = new ClaudeBackendDriver({ ...transport, forkWorktreeSession });
+    try {
+      const parent = { ...agent, providerSession: { kind: 'claude' as const, sessionId: 'source', transport: 'stdio' as const } };
+      const running = driver.sendPrompt(parent, 'First task');
+      transport.emit(parent.id, { type: 'system', subtype: 'init', session_id: 'source' });
+      const { turnId } = await running;
+      await expect(driver.forkConversation(parent, { ...agent, id: 'worker', folder: '/tmp/worker' }, turnId)).resolves.toBeNull();
+      await expect(driver.forkConversation(parent, { ...agent, id: 'worker' }, turnId)).resolves.toBeNull();
+      expect(forkWorktreeSession).not.toHaveBeenCalled();
+    } finally { await driver.close(); }
+  });
   it.each([false, true])('waits for native goal clear and reports failure honestly (error: %s)', async (isError) => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);

@@ -12,3 +12,4 @@ export type {
   CodexSubagentStatus, CodexSubagentTool, CodexSubagentToolCall, CodexSubagentToolCallStatus, CodexThreadStatus,
   CodexTurnEventEnvelope
 } from './core/codex-conversation-types';
+export type { CodexPermission } from './contracts/permissions';

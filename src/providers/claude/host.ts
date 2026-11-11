@@ -12,8 +12,6 @@ export type ClaudeHostOptions<Context extends Agent = Agent> = {
   configurePrompt?: (context: Context) => ClaudePromptConfiguration;
   authentication?: { check: typeof getLocalClaudeAuthentication; logout: typeof logoutLocalClaude };
   readAccountUsage?: typeof getClaudeAccountUsage;
-  mcpServerLabel?: (server: string | undefined) => string | undefined;
-  statusText?: (status: 'notConfigured' | 'running') => import('../../contracts').AppText;
   toolOptions?: ClaudeToolPartOptions;
   /** The app's bookkeeping tool calls, which do not count as work when tagging work phases. */
   isBookkeepingTool?: import('../../conversations/work-phases').WorkPhaseRules['isBookkeepingTool'];
@@ -200,7 +198,6 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
   ) {
     this.historyLoader = historyLoader ?? ((agent, options) => loadClaudeTranscriptHistory(agent, { projectsRoot: this.claudeProjectsRoot(), ...options, toolOptions: driverOptions.toolOptions }));
     this.catalog = new ClaudeProviderCatalog({
-      statusText: driverOptions.statusText,
       transport,
       homeDir: driverOptions.homeDir,
       emit: (event) => this.emit(event),
@@ -820,6 +817,8 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
     if (!sessionId) throw new Error('Claude needs an existing conversation to fork.');
     const snapshot = this.conversationReplicasByAgentId.get(agent.id)?.getSnapshot();
     const running = this.activeTurnsByAgentId.has(agent.id) || Boolean(snapshot?.busy);
+    // A turn still running has no stable end: its last message can be a tool call whose result has not arrived.
+    if (running && turnId !== undefined && (turnId === snapshot?.activeTurnId || snapshot?.turns.some(turn => turn.id === turnId && turn.status !== 'completed') || this.activeTurnsByAgentId.get(agent.id)?.turnId === turnId)) return null;
     if (agent.folder !== targetAgent.folder || running) {
       // Another folder, or a running source, needs the native fork that keeps the transcript resumable from elsewhere.
       return this.forkElsewhere(agent, sessionId, turnId, running && turnId === undefined ? snapshot?.turns ?? [] : undefined);
@@ -1511,7 +1510,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
         confirmation: {
           argumentsPreview: formatPermissionArguments(request),
           integrationId: mcp?.server ?? 'claude',
-          integrationName: this.driverOptions.mcpServerLabel?.(mcp?.server) ?? mcp?.server ?? 'Claude',
+          integrationName: mcp?.server ?? 'Claude',
           summary: permissionSummary(request),
           toolName: mcp?.tool ?? request.toolName,
           allowConversation: request.allowConversation,
@@ -1664,7 +1663,6 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
       payload: {
         provider: this.provider,
         status: 'running',
-        detail: this.driverOptions.statusText?.('running') ?? 'Claude connected',
         capabilities: this.getCapabilities(),
       },
     });

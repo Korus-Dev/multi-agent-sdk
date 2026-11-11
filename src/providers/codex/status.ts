@@ -8,7 +8,7 @@ import type { CodexConversationSnapshot } from '../../core/codex-conversation-ty
  * What a person should see for the conversation. An error with a turn still running is a retry in progress, not a failure:
  * the turn is working until it ends, and only then does its error become the agent's state.
  */
-export function statusFromSnapshot(snapshot: CodexConversationSnapshot, details: { awaitingApproval: import('../../contracts').AppText; awaitingUserInput: import('../../contracts').AppText } = { awaitingApproval: 'Awaiting approval', awaitingUserInput: 'Awaiting user input' }): AgentStatus {
+export function statusFromSnapshot(snapshot: CodexConversationSnapshot): AgentStatus {
   const latestTurnId = snapshot.turnIds.at(-1);
   const latestTurn = latestTurnId ? snapshot.turns.find(turn => turn.id === latestTurnId) : snapshot.turns.at(-1);
   const blocked = providerSafetyBlockMessage(snapshot.error) ?? providerSafetyBlockMessage(latestTurn?.error);
@@ -18,16 +18,16 @@ export function statusFromSnapshot(snapshot: CodexConversationSnapshot, details:
   }
   if (snapshot.threadStatus?.type === 'active') {
     if (snapshot.threadStatus.activeFlags.includes('waitingOnApproval')) {
-      return { type: 'awaitingInput', detail: details.awaitingApproval };
+      return { type: 'awaitingInput', reason: 'approval' };
     }
     if (snapshot.threadStatus.activeFlags.includes('waitingOnUserInput')) {
-      return { type: 'awaitingInput', detail: details.awaitingUserInput };
+      return { type: 'awaitingInput', reason: 'input' };
     }
   }
   if (snapshot.clientRequests.some((request) => (
     request.kind !== 'ask_user' || request.payload.request.blocking !== false
   )) || snapshot.approvals.length > 0) {
-    return { type: 'awaitingInput', detail: details.awaitingUserInput };
+    return { type: 'awaitingInput', reason: 'input' };
   }
   if (snapshot.busy) return { type: 'working' };
   if (snapshot.error) return { type: 'error', message: snapshot.error };

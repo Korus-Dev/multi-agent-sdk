@@ -16,7 +16,6 @@ export type ClaudeProviderCatalogOptions = {
   homeDir?: string;
   emit: (event: ProviderEvent) => void;
   transport: ClaudeTurnTransport;
-  statusText?: (status: 'notConfigured' | 'running') => import('../../contracts').AppText;
 };
 
 /** Owns Claude runtime capabilities, models, skills, and persisted defaults. */
@@ -30,7 +29,6 @@ export class ClaudeProviderCatalog {
     return {
       provider: 'claude',
       status: 'notConfigured',
-      detail: this.options.statusText?.('notConfigured') ?? 'Claude has not started',
     };
   }
 
@@ -101,7 +99,6 @@ export class ClaudeProviderCatalog {
       payload: {
         provider: 'claude',
         status: 'running',
-        detail: this.options.statusText?.('running') ?? 'Claude connected',
         capabilities: this.getCapabilities(),
       },
     });

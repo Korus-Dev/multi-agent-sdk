@@ -16,7 +16,6 @@ export type ClaudeToolFileActivity = {
 
 export type ClaudeToolPartOptions = {
   cwd?: string;
-  presentMcpInput?: (tool: { server: string; tool: string }, input: Record<string, unknown>) => Record<string, unknown>;
   /** Skill folders searched in order; defaults to the project's and the user's Claude skills. */
   skillRoots?: string[];
   status?: ClaudeToolStatus;
@@ -201,12 +200,11 @@ export function claudeToolPart(
 
   const mcp = claudeMcpToolName(block.name);
   if (mcp) {
-    const presentedInput = options.presentMcpInput?.(mcp, input) ?? input;
     return toolPart(block, {
       kind: 'mcp',
       title: `${mcp.server}.${mcp.tool}`,
       status,
-      input: presentedInput,
+      input,
       metadata: {
         ...metadata,
         server: mcp.server,

@@ -42,6 +42,12 @@ describe.each(Object.entries(replicas))('%s replica work phases', (_provider, cr
     expect(phases(create(turn).getSnapshot().messages)).toStrictEqual([['Reading.', 'commentary'], ['All done.', 'commentary']]);
   });
 
+  it('counts a tool as work when the app\'s rule throws, instead of breaking the session', () => {
+    const turn = [message('a1', 'turn-1', 'assistant', [text('Reading.'), tool('read'), text('All done.')])];
+    const rules = { isBookkeepingTool: () => { throw new Error('app bug'); } };
+    expect(phases(create(turn, rules).getSnapshot().messages)).toStrictEqual([['Reading.', 'commentary'], ['All done.', 'final_answer']]);
+  });
+
   it('gives a message without a turn its own group', () => {
     const loose = [{ ...message('a0', 'x', 'assistant', [text('Preamble.')]), turnId: undefined }, message('a1', 'turn-1', 'assistant', [tool('read'), text('Answer.')])];
     expect(phases(create(loose).getSnapshot().messages)).toStrictEqual([['Preamble.', undefined], ['Answer.', 'final_answer']]);

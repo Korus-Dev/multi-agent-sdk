@@ -69,3 +69,4 @@ export type {
   SharedHarnessOptions
 } from './options';
 export type { CodexRealtimeSession as RealtimeSession } from './providers/codex/realtime-types';
+export type { PermissionFor } from './contracts/permissions';
