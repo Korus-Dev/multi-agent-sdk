@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ConversationMessage, ConversationMessageToolPart } from '../../src/index';
+import type { ConversationMessage, ConversationMessageToolPart } from '../../src/core/codex-client-contracts';
 import {
   argumentsPreview,
   errorMessage,

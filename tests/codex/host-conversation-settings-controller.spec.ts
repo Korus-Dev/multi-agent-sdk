@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ModelDescriptor } from '../../src/index';
+import type { ModelDescriptor } from '../../src/core/codex-client-contracts';
 import type { CodexConversationSummary, CodexSnapshot } from '../../src/internal';
 import {
   CodexHostConversationSettingsController,

@@ -4,7 +4,7 @@ import type {
   ConversationMessage,
   ConversationMessageMediaPart,
   ConversationMessageToolPart,
-} from '../../src/index';
+} from '../../src/core/codex-client-contracts';
 import {
   activeTurnId,
   addUnique,

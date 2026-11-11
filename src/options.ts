@@ -1,8 +1,8 @@
 import type { ProviderSessionData } from './contracts';
 import type { HarnessDiagnostic } from './diagnostics';
 import type { HarnessMcpEndpoint, HarnessMcpServer } from './generation';
-import type { HarnessContext } from './consumer-types';
-import type { ModelDescriptor, PromptPart } from './ui-types';
+import type { HarnessContext, ModelOption } from './consumer-types';
+import type { PromptPart } from './contracts/prompt';
 
 /** Where and how to start a provider's command-line runtime. */
 export type HarnessLaunch = { command?: string; env?: Record<string, string | undefined> };
@@ -55,7 +55,7 @@ export type HarnessOptions = {
     syncTitle?: (context: HarnessContext) => boolean;
     /** Sessions to keep alive for a context, such as reviewers. */
     retainedSessions?: (context: HarnessContext) => readonly ProviderSessionData[];
-    imageModel?: (models: readonly ModelDescriptor[]) => { model: string; reasoningEffort?: string };
+    imageModel?: (models: readonly ModelOption[]) => { model: string; reasoningEffort?: string };
     onRequestSettled?: (record: HarnessRequestRecord) => void;
   };
   claude?: {

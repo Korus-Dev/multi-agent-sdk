@@ -1,7 +1,8 @@
-import type { ApprovalPreset } from './shared';
-export type { ApprovalPreset } from './shared';
-import type { PromptPart } from './prompt';
-import type { JsonValue } from './turn';
+/** Codex app-server client contracts: the shapes the Codex engine reads and writes. Codex-internal; the public API uses the neutral contracts. */
+import type { ApprovalPreset } from '../contracts/shared';
+export type { ApprovalPreset } from '../contracts/shared';
+import type { PromptPart } from '../contracts/prompt';
+import type { JsonValue } from '../contracts/turn';
 export type ConversationMessageTextPart = {
   type: 'text';
   text: string;
@@ -273,6 +274,12 @@ export type Attachment =
 
 export type SkillInput = Pick<Skill, 'name' | 'path'>;
 
+export type ConversationQueuedPrompt = {
+  id: string;
+  text: string;
+  options?: SendMessageOptions;
+};
+
 export type UpdateConversationSettings = {
   approvalPreset?: ApprovalPreset;
   modelId?: string;
@@ -280,8 +287,6 @@ export type UpdateConversationSettings = {
   serviceTier?: string | null;
   planMode?: boolean;
 };
-
-
 
 export type ConversationMessageToolPartUpdate = {
   itemId: string;
@@ -297,18 +302,12 @@ export type ConversationMessageToolPartUpdate = {
   fallbackToolPart?: ConversationMessageToolPart;
 };
 
-
-
 export type CatalogStatus = 'notLoaded' | 'loading' | 'loaded' | 'error';
-
-
 
 export type ReasoningEffortOption = {
   reasoningEffort: string;
   description: string;
 };
-
-
 
 export type ModelDescriptor = {
   id: string;
@@ -323,8 +322,6 @@ export type ModelDescriptor = {
   isDefault?: boolean;
   providerMetadata?: Record<string, unknown>;
 };
-
-
 
 export type PermissionProfile = {
   id: string;

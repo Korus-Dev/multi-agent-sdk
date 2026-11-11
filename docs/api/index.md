@@ -26,10 +26,11 @@ This entry loads no provider code or Node modules.
 ## Shared contracts
 
 The common application API is `Harness`, created by `createHarness`. Every provider (Codex, Claude, Cursor, Antigravity) is reached through it.
-Shared presentation contracts include `ConversationMessage`, `ConversationMessagePart`,
-`Approval`, `ClientAttachment`, `Turn`, `PromptPart` and `ModelDescriptor`.
-`Message` remains the agent-bound SDK message type; `ConversationMessage` describes
-the presentation transcript.
+Shared contracts are provider-neutral: `Message`, `MessagePart`, `AgentRequest`,
+`AgentRequestResponse`, `ProviderApprovalRequest`, `ProviderApprovalDecision`, `Turn`,
+`PromptPart`, `PromptReferenceAttachment` and `ModelOption`.
+Codex's own message and request shapes are available as `CodexConversationMessage` and
+`CodexClientRequest` from `/codex`, for apps that read Codex snapshots and events.
 
 `TtlCache` and its `TtlCacheOptions`, `TtlCacheRecord`, `TtlCacheScheduler`,
 `TtlCacheTimer` and `TtlCacheEvictionContext` types are available from the root.

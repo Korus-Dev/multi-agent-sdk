@@ -21,7 +21,7 @@ export type {
   AgentContextUsage, AgentFileActivity, AgentHistoryLoadResult, AgentQueuedPrompt, AgentSubagentTree, AskUserAnswers,
   AskUserQuestion, AskUserQuestionOption, AskUserRequest, ClientRequest as ProviderClientRequest,
   ClientRequestResponse as ProviderClientRequestResponse, ConfirmToolRequest, ConversationContentChunk, ConversationContentInput,
-  ConversationExecutionPlan, ConversationFileLink, ConversationHistoryReason, ConversationListInput, ConversationQueuedPrompt,
+  ConversationExecutionPlan, ConversationFileLink, ConversationHistoryReason, ConversationListInput,
   ConversationResumeTarget, ConversationReviewTarget, ConversationStorageState, ConversationSummary as ProviderConversationSummary,
   ConversationTurnGitDiff, FileActivityAction, FileActivityStatus, Message, MessageAttachment, MessageMedia, MessagePart,
   PromptAttachment, PromptContentOptions, PromptReferenceAttachment, PromptSkillInput, ProviderConversationRef,
@@ -47,13 +47,6 @@ export type { AppText, AppTextDescriptor, ApprovalPreset, HarnessProvider, Reaso
 export type { AgentStatus } from './contracts/status';
 export type { JsonValue, RequestUsage, RequestUsageField, SafetyFindings, TokenUsage, Turn, TurnError, TurnExecutionUsage, TurnStatus } from './contracts/turn';
 export type { TurnGitDiff } from './contracts/turn-diff';
-export type {
-  Approval, ApprovalDecision, ApprovalScope, Attachment, ClientAttachment, ClientRequest, ClientRequestResponse,
-  ClientSendMessageOptions, ConversationMessage, ConversationMessageAttachment, ConversationMessageAttachmentPart,
-  ConversationMessageMedia, ConversationMessageMediaPart, ConversationMessagePart, ConversationMessageQuestionPart,
-  ConversationMessageStatusPart, ConversationMessageTextPart, ConversationMessageToolPart, ConversationRenderStrategy,
-  ModelDescriptor, Plugin, RequestedPermission, SendMessageOptions, ServiceTier, Skill, UpdateConversationSettings
-} from './contracts/ui';
 export type { ApiPricingProvider, Consumption, ExecutionObservation, ExecutionTiming, RequestCoverageReason, RequestObservation } from './contracts/usage';
 export type { AgentRequest, AgentRequestOutcome, AgentRequestResponse } from './conversations/agent-request';
 export type {

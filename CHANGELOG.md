@@ -18,7 +18,9 @@
 - Persisted and wire names use `provider` instead of `backend`.
 - `/testing` provides `createScriptedHarness`, `createScriptedCodexHarness` and `createScriptedClaudeHarness`: Harnesses whose provider is scripted by the test.
 - `/runtime` finds provider executables and builds their search path.
-- `npm run check:package` fails when the public types reach a provider engine or use display wording, so neither can leak back in.
+- The root exports only provider-neutral message, request and approval contracts. Use `Message` and `MessagePart` for `ConversationMessage*`; `AgentRequest` and `AgentRequestResponse` for `ClientRequest` and `ClientRequestResponse`; `ProviderApprovalRequest`, `ProviderApprovalDecision`, `ProviderApprovalScope` and `ProviderRequestedPermission` for `Approval`, `ApprovalDecision`, `ApprovalScope` and `RequestedPermission`; `SendPromptOptions`, `ReferenceSendPromptOptions`, `PromptAttachment` and `PromptReferenceAttachment` for `SendMessageOptions`, `ClientSendMessageOptions`, `Attachment` and `ClientAttachment`; `ModelOption`, `SkillSummary`, `PluginSummary` and `ProviderServiceTier` for `ModelDescriptor`, `Skill`, `Plugin` and `ServiceTier`; and `ConversationSettings` for `UpdateConversationSettings`. `ConversationRenderStrategy` and `ConversationQueuedPrompt` are removed, and `codex.imageModel` receives `ModelOption`s.
+- `/codex` exports `CodexConversationMessage` and `CodexClientRequest`, the message and request shapes in Codex snapshots and events.
+- `npm run check:package` fails when the public types reach a provider engine, use display wording or export Codex's client contracts, so none of them can leak back in.
 
 ## 0.26.0 (2026-11-10)
 

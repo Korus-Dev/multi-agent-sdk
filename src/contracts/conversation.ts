@@ -1,4 +1,3 @@
-import type { SendMessageOptions } from './ui';
 import type { ExecutionSelectionOverrides } from './execution';
 import type { PromptPart } from './prompt';
 
@@ -480,11 +479,6 @@ export type ClientRequestResponse = {
 
 
 
-export type ConversationQueuedPrompt = {
-  id: string;
-  text: string;
-  options?: SendMessageOptions;
-};
 
 
 

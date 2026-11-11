@@ -1,6 +1,6 @@
 const product = { name: 'CPA workbench' };
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ConversationMessage } from '../../../src/index';
+import type { ConversationMessage } from '../../../src/core/codex-client-contracts';
 import type { CodexConversationEvent } from '../../../src/internal';
 import { codexSdkFixture, sdkAgent, sdkSummary } from './sdk-host-fixture';
 

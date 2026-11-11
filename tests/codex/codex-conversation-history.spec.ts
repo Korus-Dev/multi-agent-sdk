@@ -9,7 +9,7 @@ import {
   preserveHistoricalAttachmentPreviews,
 } from '../../src/providers/codex/codex-conversation-history';
 import type { v2 } from '@korus-dev/codex-sdk';
-import type { ConversationMessage } from '../../src/index';
+import type { ConversationMessage } from '../../src/core/codex-client-contracts';
 
 const pngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 

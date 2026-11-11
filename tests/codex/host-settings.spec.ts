@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { v2 } from '@korus-dev/codex-sdk';
-import type { ModelDescriptor } from '../../src/index';
+import type { ModelDescriptor } from '../../src/core/codex-client-contracts';
 import type { CodexSnapshot } from '../../src/internal';
 import {
   approvalPresetFromSettings,

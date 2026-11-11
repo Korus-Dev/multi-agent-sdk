@@ -1,6 +1,6 @@
 import type { EventOrigin, RuntimeConnectionStatus } from '../contracts/provider';
-import type { CatalogStatus, ModelDescriptor, Skill, Plugin, PermissionProfile, ApprovalPreset, ConversationMessage, ClientRequest, Approval, ConversationMessageTextPart, ConversationMessageToolPart, ConversationMessageToolPartUpdate, ApprovalDecision, ApprovalScope, ClientRequestResponse } from '../contracts/ui';
-import type { ConversationHistoryReason, ConversationExecutionPlan, AgentContextUsage, ThreadGoal, ConversationTurnGitDiff, ConversationQueuedPrompt, FileActivityAction, FileActivityStatus, ThreadPlanStep } from '../contracts/conversation';
+import type { CatalogStatus, ModelDescriptor, Skill, Plugin, PermissionProfile, ApprovalPreset, ConversationMessage, ClientRequest, Approval, ConversationMessageTextPart, ConversationMessageToolPart, ConversationMessageToolPartUpdate, ApprovalDecision, ApprovalScope, ClientRequestResponse, ConversationQueuedPrompt } from './codex-client-contracts';
+import type { ConversationHistoryReason, ConversationExecutionPlan, AgentContextUsage, ThreadGoal, ConversationTurnGitDiff, FileActivityAction, FileActivityStatus, ThreadPlanStep } from '../contracts/conversation';
 import type { Turn, TurnExecutionUsage, JsonValue, TurnStatus, TurnError, SafetyFindings } from '../contracts/turn';
 
 export type CodexConversationSummary = {

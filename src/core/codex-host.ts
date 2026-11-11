@@ -2,10 +2,10 @@ import type { CodexConversationSummary, CodexThreadStatus, CodexRateLimits, Code
 export type { CodexConversationSummary, CodexRemoteControlConnectionStatus, CodexThreadStatus, CodexRateLimitWindow, CodexRateLimitSnapshot, CodexRateLimits, CodexConversationLoadingStrategy, CodexConversationHistoryState, CodexAccountState, CodexLoginStatus, CodexLoginState, CodexAuthenticationState, CodexSnapshot, CodexConversationSnapshot, CodexConversationHistoryReplacementState, CodexConversationHistoryPrependState, CodexSubagentItemLifecycle, CodexSubagentTool, CodexSubagentToolCallStatus, CodexSubagentStatus, CodexSubagentState, CodexSubagentToolCall, CodexSubagentActivity, ContinueCodexSafetyReviewOptions, CodexRealtimeAudioChunk, CodexRealtimeInputAudioChunk, CodexRealtimeOutputModality, CodexRealtimeVersion, CodexRealtimeChannel, StartCodexRealtimeOptions, CodexEvent, CodexConversationEvent, CodexRealtimeEvent } from './codex-conversation-types';
 export type { AgentContextUsage, ThreadGoal, ThreadPlanStep, ThreadPlanStepStatus } from '../contracts/conversation';
 export type { RuntimeConnectionStatus, EventOrigin } from '../contracts/provider';
-export type { ConversationQueuedPrompt, ConversationTurnGitDiff, ConversationExecutionPlan, ConversationHistoryReason, FileActivityAction, FileActivityStatus } from '../contracts/conversation';
-import type { ModelDescriptor } from '../contracts/ui';
-export type { ConversationMessageToolPartUpdate, CatalogStatus, ReasoningEffortOption, ModelDescriptor, PermissionProfile } from '../contracts/ui';
-import type { ClientSendMessageOptions, ApprovalDecision, ApprovalScope, ClientRequestResponse, Skill, SendMessageOptions, UpdateConversationSettings, ConversationMessage, ApprovalPreset } from '../contracts/ui';
+export type { ConversationTurnGitDiff, ConversationExecutionPlan, ConversationHistoryReason, FileActivityAction, FileActivityStatus } from '../contracts/conversation';
+import type { ModelDescriptor } from './codex-client-contracts';
+export type { ConversationQueuedPrompt, ConversationMessageToolPartUpdate, CatalogStatus, ReasoningEffortOption, ModelDescriptor, PermissionProfile } from './codex-client-contracts';
+import type { ClientSendMessageOptions, ApprovalDecision, ApprovalScope, ClientRequestResponse, Skill, SendMessageOptions, UpdateConversationSettings, ConversationMessage, ApprovalPreset } from './codex-client-contracts';
 export type {
   ClientAttachment,
   ClientSendMessageOptions,
@@ -38,7 +38,7 @@ export type {
   SkillInput,
   ApprovalPreset,
   ConversationMessageReasoningPart,
-} from '../contracts/ui';
+} from './codex-client-contracts';
 import type { JsonValue } from '../contracts/turn';
 export type {
   JsonValue,

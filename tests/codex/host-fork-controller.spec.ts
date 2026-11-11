@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ModelDescriptor, ConversationMessage } from '../../src/index';
+import type { ModelDescriptor, ConversationMessage } from '../../src/core/codex-client-contracts';
 import type { CodexSnapshot } from '../../src/internal';
 import type { CodexAppServerClient, v2 } from '@korus-dev/codex-sdk';
 import { initialAuthentication } from '../../src/providers/codex/host-authentication';

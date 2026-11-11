@@ -13,3 +13,4 @@ export type {
   CodexTurnEventEnvelope
 } from './core/codex-conversation-types';
 export type { CodexPermission } from './contracts/permissions';
+export type { ClientRequest as CodexClientRequest, ConversationMessage as CodexConversationMessage } from './core/codex-client-contracts';

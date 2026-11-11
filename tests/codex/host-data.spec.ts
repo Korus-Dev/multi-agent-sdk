@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { v2 } from '@korus-dev/codex-sdk';
-import type { ModelDescriptor, ConversationMessage } from '../../src/index';
+import type { ModelDescriptor, ConversationMessage } from '../../src/core/codex-client-contracts';
 import type { CodexConversationSummary, CodexRateLimitSnapshot, CodexSnapshot } from '../../src/internal';
 import {
   attachmentInput,

@@ -64,6 +64,20 @@ for (const provider of providers) {
   }).map(symbol => symbol.name);
   assert(!values.length, `./${provider} must export types only; it exports values: ${values.join(', ')}`);
 }
+// Codex's client contracts (conversationId/turnId/itemId-shaped requests, approvals and messages) are Codex-internal:
+// nothing under contracts/ui exists, only Codex files import them, and only ./codex names them, with a Codex prefix.
+const codexClient = path.join(root, 'dist/core/codex-client-contracts.d.ts');
+const legacyUi = [...seen.keys()].filter(file => /[\\/]contracts[\\/]ui(\.d\.ts$|[\\/])/.test(file)).map(file => path.relative(root, file));
+assert(!legacyUi.length, `Public API reaches contracts/ui (${legacyUi.join(', ')}); keep Codex client contracts in core/codex-client-contracts and expose neutral contracts instead.`);
+const importsOf = file => [...fs.readFileSync(file, 'utf8').matchAll(/(?:from|import\()\s*['"](\.{1,2}\/[^'"]+)['"]/g)].map(match => `${path.resolve(path.dirname(file), match[1]).replace(/\.js$/, '')}.d.ts`);
+const codexClientImporters = [...seen.keys()].filter(file => importsOf(file).includes(codexClient) && !/^codex[-.]/.test(path.basename(file))).map(file => path.relative(root, file));
+assert(!codexClientImporters.length, `Neutral declarations import Codex client contracts (${codexClientImporters.length}):\n${codexClientImporters.map(file => `  ${file}`).join('\n')}\nUse the neutral contracts (Message, AgentRequest, ProviderApprovalRequest, ...) instead.`);
+const codexClientExports = entries.flatMap(([entry, file]) => exportsOf(file).filter(symbol => {
+  const target = symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
+  const fromCodexClient = (target.declarations ?? []).some(declaration => path.resolve(declaration.getSourceFile().fileName) === codexClient);
+  return fromCodexClient && !(entry === './codex' && providerNamed.test(symbol.name));
+}).map(symbol => `${symbol.name}  (${entry})`));
+assert(!codexClientExports.length, `Public entries export Codex client contracts (${codexClientExports.length}):\n${codexClientExports.map(line => `  ${line}`).join('\n')}\nExport a neutral contract, or a Codex-prefixed type from ./codex.`);
 // ./contracts only shrinks: it lists what apps still need without Node, and each removal retires a transitional export.
 const allowed = new Set(JSON.parse(fs.readFileSync(path.join(root, 'scripts/contracts-entry-allowlist.json'), 'utf8')));
 const contractsFile = entries.find(([entry]) => entry === './contracts')?.[1];

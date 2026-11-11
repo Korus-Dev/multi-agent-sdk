@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ConversationMessage } from '../../src/index';
+import type { ConversationMessage } from '../../src/core/codex-client-contracts';
 import type { CodexConversationSummary, CodexSnapshot } from '../../src/internal';
 import { CodexHostRuntimeController } from '../../src/providers/codex/host-runtime-controller';
 import { initialAuthentication } from '../../src/providers/codex/host-authentication';

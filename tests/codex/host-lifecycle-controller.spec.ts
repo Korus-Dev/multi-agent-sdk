@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ModelDescriptor } from '../../src/index';
+import type { ModelDescriptor } from '../../src/core/codex-client-contracts';
 import type { CodexSnapshot } from '../../src/internal';
 import type { HarnessDiagnostic } from '../../src/diagnostics';
 import type { v2 } from '@korus-dev/codex-sdk';
