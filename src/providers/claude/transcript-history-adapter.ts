@@ -661,4 +661,3 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /** @deprecated Use claudeTranscriptToMessages. */
-export { claudeTranscriptToMessages as claudeTranscriptToRendererMessages };

@@ -16,4 +16,4 @@ export { claudeConfigDirectory, claudeConfigDirectoryOverride } from './config-d
 export { claudeModelOptions, claudeModelOptionsFromSdk } from './models';
 export { parseClaudeSdkMessage, claudeMessageSessionId, claudeMessageContentBlocks, claudeResultErrorMessage, claudeStreamTextDelta, claudeStreamToolUseStart, claudeStreamToolInputDelta, claudeCompactionEvent, type ClaudeSdkMessage, type ClaudeSdkContentBlock, type ClaudeStreamToolUseStart, type ClaudeCompactionEvent } from './protocol';
 export { listClaudeSkills, type ClaudeSkillCatalogOptions } from './skills';
-export { loadClaudeTranscriptHistory, claudeTranscriptGoal, claudeTranscriptSettings, listClaudeTranscriptSummaries, claudeTranscriptToMessages, claudeTranscriptToRendererMessages, type ClaudeTranscriptHistory, type ClaudeTranscriptHistoryOptions, type ClaudeTranscriptSettings } from './transcript-history-adapter';
+export { loadClaudeTranscriptHistory, claudeTranscriptGoal, claudeTranscriptSettings, listClaudeTranscriptSummaries, claudeTranscriptToMessages, type ClaudeTranscriptHistory, type ClaudeTranscriptHistoryOptions, type ClaudeTranscriptSettings } from './transcript-history-adapter';

@@ -8,7 +8,7 @@
 | `/prompt` | Pure prompt authoring helpers for browser consumers. |
 | `/runtime` | Node helpers that find a provider's executable and build the search path it runs with. |
 | `/testing` | Harnesses over scripted providers, for testing an application without a real provider. |
-| `/renderer` | Browser-safe capability constants, work-phase helpers, the Codex conversation replica, conversation projections and provider guards. |
+| `/contracts` | Capability tables, provider and reference guards, and other data helpers with no Node dependencies. |
 
 Paths in this table are appended to `@korus-dev/multi-agent-sdk`. An explicit exports map resolves the root and extensionless subpaths directly into the published build. Use root `import type` declarations for public types.
 
@@ -20,7 +20,7 @@ import { normalizePromptContent } from '@korus-dev/multi-agent-sdk/prompt';
 
 Renderer integrations import `createCodexConversationReplica`, `projectSessionSelection`,
 the four `project*Conversation` helpers, capability constants, `isHarnessProvider`,
-`isProviderConversationRef` and `withInferredWorkPhases` / `withInferredTurnWorkPhases` from `/renderer`.
+`isProviderConversationRef` and `withInferredWorkPhases` / `withInferredTurnWorkPhases` from `/contracts`.
 This entry loads no provider code or Node modules.
 
 ## Shared contracts

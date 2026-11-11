@@ -36,4 +36,4 @@ Use `loadOlderHistory` and `loadTurnHistory` for provider-supported paging. `his
 
 `release` detaches the binding. `archiveConversation` and `deleteConversation` are explicit native mutations and require the corresponding capabilities. `close` releases the driver runtime. Scoped sessions have their own continuation, cancellation, and disposal rules; see [tools and permissions](tools.md).
 
-`readConversationContent` reads scoped content IDs belonging to the session. Runtime paths and content URLs are not durable media identifiers. Hosts own retention and must not replace this boundary with arbitrary renderer-provided filesystem paths.
+`readConversationContent` reads scoped content IDs belonging to the session. Runtime paths and content URLs are not durable media identifiers. Hosts own retention and must not replace this boundary with arbitrary filesystem paths supplied by browser code.

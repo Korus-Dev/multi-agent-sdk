@@ -60,4 +60,3 @@ export function isPromptContent(value: unknown): boolean {
   catch { return false; }
 }
 /** @deprecated Use isMessage. */
-export { isMessage as isRendererMessage };

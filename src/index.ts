@@ -24,9 +24,7 @@ export type {
   ConversationResumeTarget, ConversationReviewTarget, ConversationStorageState, ConversationSummary as ProviderConversationSummary,
   ConversationTurnGitDiff, FileActivityAction, FileActivityStatus, Message, MessageAttachment, MessageMedia, MessagePart,
   PromptAttachment, PromptContentOptions, PromptReferenceAttachment, PromptSkillInput, ProviderConversationRef,
-  ProviderPromptOptions, ReferenceSendPromptOptions, RendererMessage, RendererMessageAttachment, RendererMessageMedia,
-  RendererMessagePart, RendererPromptAttachment, RendererSendPromptOptions, RendererToolPart, RendererToolPartUpdate,
-  SendPromptOptions, SubagentActivity, SubagentActivityChange, SubagentActivityKind, SubagentIdentityChange, SubagentNode,
+  ProviderPromptOptions, ReferenceSendPromptOptions, SendPromptOptions, SubagentActivity, SubagentActivityChange, SubagentActivityKind, SubagentIdentityChange, SubagentNode,
   SubagentOperation, SubagentOperationChange, SubagentOperationKind, SubagentOperationLifecycle, SubagentOperationStatus,
   SubagentStatus, SubagentStatusChange, ThreadGoal, ThreadGoalStatus, ThreadPlan, ThreadPlanKind, ThreadPlanStatus, ThreadPlanStep,
   ThreadPlanStepStatus, ToolConfirmationDecision, ToolPart, ToolPartUpdate

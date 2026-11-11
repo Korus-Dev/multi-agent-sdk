@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, utimes, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { homedir, tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
-import { claudeTranscriptGoal, claudeTranscriptSettings, claudeTranscriptToRendererMessages, listClaudeTranscriptSummaries, loadClaudeTranscriptHistory } from '../../../src/providers/claude/transcript-history-adapter';
+import { claudeTranscriptGoal, claudeTranscriptSettings, claudeTranscriptToMessages, listClaudeTranscriptSummaries, loadClaudeTranscriptHistory } from '../../../src/providers/claude/transcript-history-adapter';
 import type { Agent } from '../../../src/contracts/index';
 
 describe('native Claude goal history', () => {
@@ -18,21 +18,21 @@ describe('native Claude goal history', () => {
   });
 });
 
-describe('claudeTranscriptToRendererMessages', () => {
+describe('claudeTranscriptToMessages', () => {
   it('excludes unfinished tool chains from fork cutoffs and includes trailing goal records', () => {
     const rows = [
       { type: 'user', uuid: 'user', message: { content: 'work' } },
       { type: 'assistant', uuid: 'tool-call', message: { content: [{ type: 'tool_use', id: 'tool', name: 'Read', input: {} }] } },
     ];
     const unfinished: Record<string, string> = {};
-    claudeTranscriptToRendererMessages(rows.map((row) => JSON.stringify(row)).join('\n'), 'agent', 'session', unfinished);
+    claudeTranscriptToMessages(rows.map((row) => JSON.stringify(row)).join('\n'), 'agent', 'session', unfinished);
     expect(unfinished).toEqual({});
     const finished: Record<string, string> = {};
     const complete = [...rows,
       { type: 'user', uuid: 'tool-result', message: { content: [{ type: 'tool_result', tool_use_id: 'tool', content: 'done' }] } },
       { type: 'attachment', uuid: 'goal-met', attachment: { type: 'goal_status', condition: 'work', met: true } },
     ];
-    claudeTranscriptToRendererMessages(complete.map((row) => JSON.stringify(row)).join('\n'), 'agent', 'session', finished);
+    claudeTranscriptToMessages(complete.map((row) => JSON.stringify(row)).join('\n'), 'agent', 'session', finished);
     expect(finished).toEqual({ 'claude-user': 'goal-met' });
   });
 
@@ -60,7 +60,7 @@ describe('claudeTranscriptToRendererMessages', () => {
       }),
     ].join('\n');
 
-    expect(claudeTranscriptToRendererMessages(content, 'agent-claude', 'session-1')).toStrictEqual([
+    expect(claudeTranscriptToMessages(content, 'agent-claude', 'session-1')).toStrictEqual([
       expect.objectContaining({
         id: 'user-session-1-user-1',
         parts: [{ type: 'text', text: 'keep this' }],
@@ -92,7 +92,7 @@ describe('claudeTranscriptToRendererMessages', () => {
       }),
     ].join('\n');
 
-    expect(claudeTranscriptToRendererMessages(content, 'agent-claude', 'session-1')).toStrictEqual([
+    expect(claudeTranscriptToMessages(content, 'agent-claude', 'session-1')).toStrictEqual([
       expect.objectContaining({ id: 'user-session-1-user-1' }),
       expect.objectContaining({
         id: 'assistant-claude-prompt-1',

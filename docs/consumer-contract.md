@@ -55,7 +55,7 @@ Each provider's existing replica owns transcript changes. The facade only dispat
 | --- | --- |
 | `@korus-dev/multi-agent-sdk` | `createHarness`, `HarnessUnsupportedError`, `TypedEventBus`, `TtlCache` and the public types |
 | `@korus-dev/multi-agent-sdk/prompt` | Pure prompt authoring helpers |
-| `@korus-dev/multi-agent-sdk/renderer` | Pure capabilities, work phases, conversation projections and provider guards (`isHarnessProvider`, `isProviderConversationRef`) |
+| `@korus-dev/multi-agent-sdk/contracts` | Capability tables, provider and reference guards (`isHarnessProvider`, `isProviderConversationRef`) and data helpers with no Node dependencies |
 
 Providers are reached only through `createHarness`. Provider engines, hosts and transports are internal and have no import path.
 

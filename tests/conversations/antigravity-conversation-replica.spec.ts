@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { createAntigravityConversationReplica, emptyAntigravitySnapshot } from '../../src/conversations/antigravity-conversation-replica';
-import type { RendererMessage } from '../../src/contracts';
+import type { Message } from '../../src/contracts';
 
 const identity = { agentId: 'agent', sessionId: 'session', turnId: 'turn', occurredAt: '2026-10-06T10:00:00.000Z' };
 describe('Antigravity replica ownership', () => {
   it('applies ordered replay replacements so a denied tool ends failed without duplicate messages', () => {
     const replica = createAntigravityConversationReplica(emptyAntigravitySnapshot('agent', 'session'));
-    const message: RendererMessage = { id: 'replayed-tool', agentId: 'agent', role: 'assistant', status: 'complete', createdAt: identity.occurredAt,
+    const message: Message = { id: 'replayed-tool', agentId: 'agent', role: 'assistant', status: 'complete', createdAt: identity.occurredAt,
       parts: [{ type: 'tool', id: 'replayed-call', kind: 'edit', title: 'Create file', status: 'completed' }] };
     replica.apply({ ...identity, type: 'message.upsert', payload: { message } });
     const denied = { ...message, parts: [{ type: 'tool' as const, id: 'replayed-call', kind: 'edit', title: 'Create file', status: 'failed' as const }] };

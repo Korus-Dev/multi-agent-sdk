@@ -35,6 +35,11 @@ const leaks = [];
 for (const [file] of seen) for (const name of exportedNames(fs.readFileSync(file, 'utf8'))) {
   if (forbidden.test(name)) leaks.push(`${name}  (${path.relative(root, file)})`);
 }
+// The SDK is a harness interface: display belongs to the app or a UI library, so no Electron or presentation wording either.
+const display = /(Renderer|Electron|Presentation)/;
+const wording = [...entries.map(([entry]) => entry).filter(entry => /renderer|electron|presentation/i.test(entry)).map(entry => `${entry}  (package entry)`),
+  ...[...seen.keys()].flatMap(file => [...exportedNames(fs.readFileSync(file, 'utf8'))].filter(name => display.test(name)).map(name => `${name}  (${path.relative(root, file)})`))];
+assert(!wording.length, `Public API uses display wording (${new Set(wording).size}):\n${[...new Set(wording)].sort().map(line => `  ${line}`).join('\n')}\nName it for what it is to a harness, or keep it in the app.`);
 const unique = [...new Set(leaks)].sort();
 if (unique.length) {
   console.error(`Public API reaches provider engine names (${unique.length}):\n${unique.map(line => `  ${line}`).join('\n')}\nExpose a neutral type instead, or keep the engine type out of public signatures.`);

@@ -6,7 +6,7 @@ import type { ClaudeTurnHandle, ClaudeTurnParams, ClaudeTurnTransport } from '..
 import type { Agent } from '../../../src/contracts/index';
 import type { NativeHarnessEvent as HarnessEvent } from '../../../src/internal';
 import { createClaudeConversationReplica, type ClaudeConversationReplica } from '../../../src/conversations/claude-conversation-replica';
-import { claudeTranscriptToRendererMessages } from '../../../src/providers/claude/transcript-history-adapter';
+import { claudeTranscriptToMessages } from '../../../src/providers/claude/transcript-history-adapter';
 
 const agent: Agent = {
   id: 'agent-claude',
@@ -679,7 +679,7 @@ describe('ClaudeBackendDriver', () => {
     const session = { kind: 'claude' as const, sessionId: 'claude-session-existing', transport: 'stdio' as const };
     const persistedAgent = { ...agent, providerSession: session };
     const tool = { type: 'tool_use' as const, id: 'git-log', name: 'Bash', input: { command: 'git log -10' } };
-    const messages = claudeTranscriptToRendererMessages([
+    const messages = claudeTranscriptToMessages([
       { type: 'user', uuid: 'prompt-history', message: { content: 'Summarize commits' } },
       { type: 'assistant', message: { content: [tool] } },
       { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: tool.id, content: '10 commits' }] } },

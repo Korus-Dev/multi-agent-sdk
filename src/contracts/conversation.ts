@@ -472,22 +472,6 @@ export type ClientRequestResponse = {
   };
 };
 
-/** @deprecated Use PromptReferenceAttachment. */
-export type RendererPromptAttachment = PromptReferenceAttachment;
-/** @deprecated Use ReferenceSendPromptOptions. */
-export type RendererSendPromptOptions = ReferenceSendPromptOptions;
-/** @deprecated Use MessageAttachment. */
-export type RendererMessageAttachment = MessageAttachment;
-/** @deprecated Use MessageMedia. */
-export type RendererMessageMedia = MessageMedia;
-/** @deprecated Use MessagePart. */
-export type RendererMessagePart = MessagePart;
-/** @deprecated Use ToolPart. */
-export type RendererToolPart = ToolPart;
-/** @deprecated Use ToolPartUpdate. */
-export type RendererToolPartUpdate = ToolPartUpdate;
-/** @deprecated Use Message. */
-export type RendererMessage = Message;
 
 
 

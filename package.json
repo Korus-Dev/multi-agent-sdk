@@ -37,9 +37,9 @@
       "types": "./dist/prompt.d.ts",
       "default": "./dist/prompt.js"
     },
-    "./renderer": {
-      "types": "./dist/renderer.d.ts",
-      "default": "./dist/renderer.js"
+    "./contracts": {
+      "types": "./dist/contracts-entry.d.ts",
+      "default": "./dist/contracts-entry.js"
     },
     "./runtime": {
       "types": "./dist/runtime.d.ts",

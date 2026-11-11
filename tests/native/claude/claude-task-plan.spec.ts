@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { RendererToolPart } from '../../../src/contracts/index';
+import type { ToolPart } from '../../../src/contracts/index';
 import { ClaudeTaskPlan } from '../../../src/providers/claude/claude-task-plan';
 
 let sequence = 0;
-const tool = (title: string, input: unknown = {}): RendererToolPart => ({ type: 'tool', id: `tool-${++sequence}`, kind: 'generic', title, status: 'completed', input });
+const tool = (title: string, input: unknown = {}): ToolPart => ({ type: 'tool', id: `tool-${++sequence}`, kind: 'generic', title, status: 'completed', input });
 const create = (plan: ClaudeTaskPlan, turnId: string, id: string, subject: string) =>
   plan.apply(tool('TaskCreate', { subject }), { task: { id, subject } }, 'thread', turnId, '2026-10-25T00:00:00.000Z');
 const complete = (plan: ClaudeTaskPlan, turnId: string, id: string) =>

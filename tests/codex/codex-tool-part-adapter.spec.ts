@@ -421,7 +421,7 @@ describe('tool-part-adapter', () => {
             '--- a/src/main/codex/tool-part-adapter.ts',
             '+++ b/src/main/codex/tool-part-adapter.ts',
             '@@ -1,2 +1,4 @@',
-            ' import type { RendererToolPart } from "../../shared/contracts";',
+            ' import type { ToolPart } from "../../shared/contracts";',
             '+const next = true;',
             '+const label = "Editing";',
             '-const old = false;',

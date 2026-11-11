@@ -2,7 +2,7 @@
 
 Run the Node harness in trusted server or main-process code. The host authorizes working folders, provider homes, executables, MCP endpoints, permission changes, and tool scope. UI capabilities are presentation metadata, not authorization.
 
-Keep native credentials, home paths, raw runtime configuration, and restoration data in application-private storage. Do not expose provider host options or arbitrary filesystem reads to a renderer. Supply paths/resolvers explicitly; the SDK does not discover product configuration from ambient `APP_*` variables.
+Keep native credentials, home paths, raw runtime configuration, and restoration data in application-private storage. Do not expose provider runtime options or arbitrary filesystem reads to browser code. Supply paths/resolvers explicitly; the SDK does not discover product configuration from ambient `APP_*` variables.
 
 Attachment readers are session-scoped. Authorize uploads and resolve opaque references in trusted host code. Applications own durable attachment retention: a path left in provider history does not guarantee that a preview remains readable after restart.
 

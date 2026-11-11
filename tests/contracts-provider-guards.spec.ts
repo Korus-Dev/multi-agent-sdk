@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { harnessProviders, isHarnessProvider, isProviderConversationRef } from '../src/renderer';
+import { harnessProviders, isHarnessProvider, isProviderConversationRef } from '../src/contracts-entry';
 
 describe('provider guards', () => {
   it('recognises exactly the supported providers', () => {

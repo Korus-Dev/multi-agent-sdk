@@ -31,7 +31,7 @@ try {
   fs.writeFileSync(path.join(temporary, 'consumer.ts'), entries.map((entry, index) => `import type * as Public${index} from '${entry}';`).join('\n') + `
 import { createHarness, TypedEventBus, TtlCache, type Harness, type HarnessOptions, type Session, type SessionState, type ConversationMessage, type ModelDescriptor } from '${manifest.name}';
 import { normalizePromptContent } from '${manifest.name}/prompt';
-import { codexHarnessCapabilities, claudeHarnessCapabilities, cursorHarnessCapabilities, antigravityHarnessCapabilities, withInferredWorkPhases, withInferredTurnWorkPhases, createCodexConversationReplica, projectSessionSelection, projectCodexConversation, projectClaudeConversation, projectCursorConversation, projectAntigravityConversation, harnessProviders, isHarnessProvider, isProviderConversationRef } from '${manifest.name}/renderer';
+import { codexHarnessCapabilities, claudeHarnessCapabilities, cursorHarnessCapabilities, antigravityHarnessCapabilities, withInferredWorkPhases, withInferredTurnWorkPhases, createCodexConversationReplica, harnessProviders, isHarnessProvider, isProviderConversationRef } from '${manifest.name}/contracts';
 const driver: Harness = createHarness('codex', { client: { name: 'pack-check' } });
 const session: Session = driver.open({ id: 'test', folder: null });
 const state: SessionState = driver.readSession(session);
@@ -41,7 +41,7 @@ bus.emit('changed', 'ready');
 const options: HarnessOptions = { client: { name: 'pack-check' } };
 const sharedTypes: [ConversationMessage?, ModelDescriptor?] = []; void [options, sharedTypes, TtlCache];
 void [text, normalizePromptContent, harnessProviders, isHarnessProvider, isProviderConversationRef];
-void [codexHarnessCapabilities, claudeHarnessCapabilities, cursorHarnessCapabilities, antigravityHarnessCapabilities, withInferredWorkPhases, withInferredTurnWorkPhases, createCodexConversationReplica, projectSessionSelection, projectCodexConversation, projectClaudeConversation, projectCursorConversation, projectAntigravityConversation];
+void [codexHarnessCapabilities, claudeHarnessCapabilities, cursorHarnessCapabilities, antigravityHarnessCapabilities, withInferredWorkPhases, withInferredTurnWorkPhases, createCodexConversationReplica];
 `);
   fs.writeFileSync(path.join(temporary, 'tsconfig.json'), JSON.stringify({ compilerOptions: {
     strict: true, noEmit: true, target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler',
