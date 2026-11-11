@@ -318,18 +318,15 @@ export class CodexHostController<Context extends Agent = Agent> implements Provi
     await this.sessionManager.reconcileConversations(agents);
   }
 
-  async forkWorktreeConversation(agent: Context, targetAgent: Context): Promise<ProviderConversationForkResult> {
-    const result = await this.sessionManager.forkWorktreeConversation(agent, targetAgent);
-    return { providerSession: codexProviderSession(result.threadId), ...(result.activeTurnId ? { activeTurnId: result.activeTurnId } : {}) };
-  }
-
-  async forkConversation(agent: Context, targetAgent: Context, turnId?: string): Promise<ProviderConversationForkResult> {
+  async forkConversation(agent: Context, targetAgent: Context, turnId?: string): Promise<ProviderConversationForkResult | null> {
     const result = turnId === undefined
       ? await this.sessionManager.forkConversation(agent, targetAgent)
       : await this.sessionManager.forkConversation(agent, targetAgent, turnId);
+    if (!result) return null;
     return {
       providerSession: codexProviderSession(result.threadId),
       ...(result.activeTurnId ? { activeTurnId: result.activeTurnId } : {}),
+      ...(result.forkedFromTurnId === undefined ? {} : { forkedFromTurnId: result.forkedFromTurnId }),
     };
   }
 

@@ -802,21 +802,18 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
     }
   }
 
-  async forkWorktreeConversation(agent: Context, targetAgent: Context) {
-    const source = await this.ensureSession(agent);
-    const snapshot = source.handle.getSnapshot();
-    if (snapshot.busy || snapshot.activeTurnId) {
-      // The delegating turn contains an unfinished tool call. Fork only a
-      // completed native boundary; never interrupt or replay the parent.
-      const boundary = [...snapshot.turns].reverse().find(turn => turn.status === 'completed' && turn.id !== snapshot.activeTurnId);
-      if (!boundary) throw new Error('No completed conversation turn is available to continue from.');
-      return this.forkConversation(agent, targetAgent, boundary.id);
-    }
-    return this.forkConversation(agent, targetAgent);
-  }
-
   async forkConversation(agent: Context, targetAgent: Context, turnId?: string) {
     const source = await this.ensureSession(agent);
+    let forkedFromTurnId = turnId;
+    if (turnId === undefined) {
+      const snapshot = source.handle.getSnapshot();
+      if (snapshot.busy || snapshot.activeTurnId) {
+        // A running turn can hold an unfinished tool call. Fork only a completed native boundary; never interrupt or replay the source.
+        const boundary = [...snapshot.turns].reverse().find(turn => turn.status === 'completed' && turn.id !== snapshot.activeTurnId);
+        if (!boundary) return null;
+        forkedFromTurnId = boundary.id;
+      }
+    }
     const defaults = targetAgent.providerDefaults?.kind === 'codex' ? targetAgent.providerDefaults : undefined;
     const preset = effectiveApprovalPreset(this.approvalPreset(defaults), this.host.getSnapshot().approvalPresets);
     const options = {
@@ -826,11 +823,11 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
       ...(defaults?.reasoningEffort ? { reasoningEffort: defaults.reasoningEffort } : {}),
       ...(defaults?.serviceTier !== undefined ? { serviceTier: defaults.serviceTier } : {}),
     };
-    const result = await (turnId === undefined ? source.handle.fork(
+    const result = await (forkedFromTurnId === undefined ? source.handle.fork(
       options,
       { extensionContext: this.extensionContext(targetAgent) },
     ) : source.handle.forkTurn(
-      turnId,
+      forkedFromTurnId,
       options,
       { extensionContext: this.extensionContext(targetAgent) },
     ));
@@ -838,6 +835,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
     return {
       threadId: result.conversationId,
       activeTurnId: result.snapshot.activeTurnId,
+      ...(forkedFromTurnId === undefined ? {} : { forkedFromTurnId }),
     };
   }
 

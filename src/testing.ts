@@ -9,7 +9,7 @@ import type { ProviderDriver } from './driver';
 export type ScriptedOperation =
   | 'sendPrompt' | 'steerPrompt' | 'interrupt' | 'setGoal' | 'clearGoal' | 'deleteTurn' | 'editTurn' | 'retryTurn'
   | 'continueInterruptedTurn' | 'loadConversation' | 'loadOlderHistory' | 'loadTurnHistory' | 'readConversationContent' | 'listConversations' | 'resumeConversation' | 'forkConversation' | 'readConversationMessages' | 'readConversationSummary' | 'executeScopedPrompt'
-  | 'cancelScopedPrompt' | 'startReview' | 'forkWorktreeConversation' | 'tryHandlePromptCommand' | 'preparePromptOptions' | 'disposeScopedSession' | 'generateText' | 'generateImage' | 'setConversationTitle' | 'setPermissionMode' | 'setApprovalPreset' | 'releaseConversation' | 'archiveAgentConversation' | 'deleteAgentConversation' | 'reconcileConversations' | 'respondToAgentRequest' | 'listModels' | 'listSkills'
+  | 'cancelScopedPrompt' | 'startReview' | 'tryHandlePromptCommand' | 'preparePromptOptions' | 'disposeScopedSession' | 'generateText' | 'generateImage' | 'setConversationTitle' | 'setPermissionMode' | 'setApprovalPreset' | 'releaseConversation' | 'archiveAgentConversation' | 'deleteAgentConversation' | 'reconcileConversations' | 'respondToAgentRequest' | 'listModels' | 'listSkills'
   | 'listPlugins' | 'authenticate' | 'getAccountRateLimits' | 'getBankedResets' | 'useBankedReset' | 'setConversationStorage' | 'startRealtime' | 'getRemoteControlStatus' | 'enableRemoteControl' | 'disableRemoteControl' | 'startDevicePairing' | 'checkDevicePairing' | 'listPairedDevices' | 'revokePairedDevice' | 'getRuntimeStatus' | 'getCapabilities' | 'close';
 type Handler = (...args: never[]) => unknown;
 
@@ -84,7 +84,7 @@ export function createScriptedHarness(provider: HarnessProvider, options: Script
       if (property === 'provider') return provider;
       if (property === 'onUsage' || property === 'onRequestUsage') return () => () => {};
       if (property === 'getRuntimeStatus' || property === 'getCapabilities') return (...args: unknown[]) => (handlers.get(property) ?? defaults[property]!)(...(args as never[]));
-      if ((property === 'tryHandlePromptCommand' || property === 'preparePromptOptions' || property === 'forkWorktreeConversation') && !handlers.has(property)) return undefined;
+      if ((property === 'tryHandlePromptCommand' || property === 'preparePromptOptions') && !handlers.has(property)) return undefined;
       if (typeof property !== 'string' || unsupported.has(property) || property === 'then') return (target as Record<string, unknown>)[property as string];
       return operation(property);
     },

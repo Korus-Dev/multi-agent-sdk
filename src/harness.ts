@@ -257,10 +257,6 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
   }
   async retryTurn(session: Session, turnId: string) { return this.turnAction(session, await (this.native.retryTurn?.(this.main(session).context, turnId) ?? unavailable('Turn retry'))); }
   async startReview(session: Session, target?: Parameters<Harness['startReview']>[1]) { return this.admitted(session, await (this.native.startReview?.(this.main(session).context, target) ?? unavailable('Review'))); }
-  async forkWorktreeConversation(session: Session, target: Session) {
-    const result = await (this.native.forkWorktreeConversation?.(this.main(session).context, this.main(target).context) ?? unavailable('Worktree conversation fork'));
-    return result ? this.admitted(target, result) : null;
-  }
   handlePromptCommand(session: Session, prompt: string) {
     const handled = this.native.tryHandlePromptCommand?.(this.main(session).context, prompt);
     return handled ? handled.then(result => this.admitted(session, result)) : null;
@@ -273,7 +269,9 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
   }
   async reconcileConversations(sessions: Session[]) { await this.native.reconcileConversations?.(sessions.map(session => this.main(session).context)); }
   async forkConversation(session: Session, target: Session, turnId?: string) {
-    return this.admitted(target, await (this.native.forkConversation?.(this.main(session).context, this.main(target).context, turnId) ?? unavailable('Conversation fork')));
+    const result = await (this.native.forkConversation?.(this.main(session).context, this.main(target).context, turnId) ?? unavailable('Conversation fork'));
+    if (!result) return null;
+    return { ...this.admitted(target, result), ...(result.forkedFromTurnId === undefined ? {} : { forkedFromTurnId: result.forkedFromTurnId }) };
   }
   archiveConversation(session: Session) { return this.native.archiveAgentConversation?.(this.main(session).context) ?? unavailable('Conversation archive'); }
   deleteConversation(session: Session) { return this.native.deleteAgentConversation?.(this.main(session).context) ?? unavailable('Conversation deletion'); }

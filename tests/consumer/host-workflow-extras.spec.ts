@@ -11,15 +11,15 @@ const open = (native: object) => {
   return { harness, session: harness.restoreSession({ id: 'main', folder: '/work' }, { provider: 'codex', data, role: 'main' }) };
 };
 
-it('forks a worktree conversation into another session, or reports there is nothing to fork', async () => {
+it('forks into another session, reports the turn it forked from, or reports there is nothing to fork', async () => {
   const target = { kind: 'codex' as const, threadId: 'forked' };
-  const forkWorktreeConversation = vi.fn(async () => ({ providerSession: target }));
-  const { harness, session } = open({ forkWorktreeConversation });
+  const forkConversation = vi.fn(async () => ({ providerSession: target, forkedFromTurnId: 'turn-1' }));
+  const { harness, session } = open({ forkConversation });
   const other = harness.open({ id: 'other', folder: '/work-2' });
-  expect(await harness.forkWorktreeConversation(session, other)).toMatchObject({ session: other });
+  expect(await harness.forkConversation(session, other)).toMatchObject({ session: other, forkedFromTurnId: 'turn-1' });
   expect(harness.getSessionData(other).data).toMatchObject({ threadId: 'forked' });
-  const none = open({ forkWorktreeConversation: async () => null });
-  expect(await none.harness.forkWorktreeConversation(none.session, none.harness.open({ id: 'x', folder: null }))).toBeNull();
+  const none = open({ forkConversation: async () => null });
+  expect(await none.harness.forkConversation(none.session, none.harness.open({ id: 'x', folder: null }))).toBeNull();
 });
 
 it('lets the provider handle a prompt as a command, or declines', async () => {

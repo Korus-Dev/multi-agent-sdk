@@ -26,7 +26,6 @@ const operations: Record<string, string> = {
   conversationTitle: 'setConversationTitle',
   scopedExecution: 'executeScopedPrompt',
   turnContinuation: 'continueInterruptedTurn',
-  worktreeFork: 'forkWorktreeConversation',
   conversationContent: 'readConversationContent',
   turnHistory: 'loadTurnHistory',
   conversationStorage: 'setConversationStorage',

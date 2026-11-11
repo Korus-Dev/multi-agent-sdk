@@ -38,7 +38,7 @@ describe('ClaudeBackendDriver', () => {
   });
 
 
-  it('refuses a running worktree fork without a completed boundary and leaves the source active', async () => {
+  it('reports nothing to fork for a running conversation without a completed boundary and leaves the source active', async () => {
     const transport = createConcurrentFakeTransport();
     const forkWorktreeSession = vi.fn();
     const driver = new ClaudeBackendDriver({ ...transport, forkWorktreeSession });
@@ -47,7 +47,7 @@ describe('ClaudeBackendDriver', () => {
       const running = driver.sendPrompt(parent, 'First task');
       transport.emit(parent.id, { type: 'system', subtype: 'init', session_id: 'source' });
       await running;
-      await expect(driver.forkWorktreeConversation(parent, { ...agent, id: 'worker', folder: '/tmp/worker' })).rejects.toThrow('completed native boundary');
+      await expect(driver.forkConversation(parent, { ...agent, id: 'worker', folder: '/tmp/worker' })).resolves.toBeNull();
       expect(forkWorktreeSession).not.toHaveBeenCalled();
     } finally { await driver.close(); }
   });
@@ -103,9 +103,26 @@ describe('ClaudeBackendDriver', () => {
     expect(forkSession).not.toHaveBeenCalled();
     const result = await driver.forkConversation(parent, child, 'claude-user-1');
     expect(forkSession).toHaveBeenCalledExactlyOnceWith('parent-session', agent.folder, 'native-answer-1');
-    expect(result.providerSession).toMatchObject({ kind: 'claude', sessionId: 'child-session' });
+    expect(result?.providerSession).toMatchObject({ kind: 'claude', sessionId: 'child-session' });
     expect(parent.providerSession?.kind === 'claude' && parent.providerSession.sessionId).toBe('parent-session');
-    await expect(driver.forkConversation(parent, { ...child, folder: '/other' })).rejects.toThrow('folder');
+    // Without a native cross-folder fork there is nothing the provider can do; the app decides what happens instead.
+    await expect(driver.forkConversation(parent, { ...child, folder: '/other' })).resolves.toBeNull();
+    await driver.close();
+  });
+
+  it('forks into another folder through the native cross-folder fork, resumable from the new folder', async () => {
+    const transport = createFakeTransport();
+    const forkSession = vi.fn();
+    const forkWorktreeSession = vi.fn().mockResolvedValue('worker-session');
+    const driver = new ClaudeBackendDriver({ ...transport, forkSession, forkWorktreeSession });
+    const parent: Agent = { ...agent, providerSession: { kind: 'claude', sessionId: 'parent-session', transport: 'stdio' } };
+    const worker: Agent = { ...agent, id: 'worker', folder: '/tmp/worker' };
+    const result = await driver.forkConversation(parent, worker);
+    expect(forkWorktreeSession).toHaveBeenCalledExactlyOnceWith('parent-session', agent.folder, undefined, undefined);
+    expect(forkSession).not.toHaveBeenCalled();
+    // The transcript stays in the source folder so the worker can resume it from its own folder.
+    expect(result?.providerSession).toMatchObject({ kind: 'claude', sessionId: 'worker-session', transcriptFolder: agent.folder });
+    expect(result).not.toHaveProperty('forkedFromTurnId');
     await driver.close();
   });
 

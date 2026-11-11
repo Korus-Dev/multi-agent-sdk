@@ -112,8 +112,6 @@ export type Harness = {
   retryTurn(session: Session, turnId: string): Promise<TurnActionResult>;
   /** Starts the provider's own review (Codex `review/start`). Without a target it reviews uncommitted changes. */
   startReview(session: Session, target?: import('./contracts/conversation').ConversationReviewTarget): Promise<Admission>;
-  /** Forks the conversation for a new worktree into `target`. Resolves null when the provider has nothing to fork. */
-  forkWorktreeConversation(session: Session, target: Session): Promise<Admission | null>;
   /** Lets the provider treat a prompt (such as `/compact`) as a command. Returns null right away when it is an ordinary prompt. */
   handlePromptCommand(session: Session, prompt: string): Promise<Admission> | null;
   /** The options the provider will actually send with a prompt (for example with skills resolved). */
@@ -122,7 +120,11 @@ export type Harness = {
   continueInterruptedTurn(session: Session, safetyReview?: import('./contracts/safety-review').ProviderSafetyReviewTarget): Promise<TurnActionResult>;
   /** Brings stored conversation state in line with the provider's own records. A no-op for providers that need no reconciliation. */
   reconcileConversations(sessions: Session[]): Promise<void>;
-  forkConversation(session: Session, target: Session, turnId?: string): Promise<Admission>;
+  /**
+   * Forks the conversation into `target`, in the target's folder. Without `turnId`, a running source forks from its last completed turn.
+   * Resolves null when the provider cannot fork this conversation right now; `forkedFromTurnId` names the turn the fork ends at when it is not the latest.
+   */
+  forkConversation(session: Session, target: Session, turnId?: string): Promise<(Admission & { forkedFromTurnId?: string }) | null>;
   archiveConversation(session: Session): Promise<void>;
   deleteConversation(session: Session): Promise<void>;
   /** `view: 'last'` reads only the most recent page, which is much cheaper on long conversations. */

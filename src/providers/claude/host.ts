@@ -812,11 +812,16 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
     };
   }
 
-  async forkConversation(agent: Context, targetAgent: Context, turnId?: string): Promise<import('../../driver').ProviderConversationForkResult> {
+  async forkConversation(agent: Context, targetAgent: Context, turnId?: string): Promise<import('../../driver').ProviderConversationForkResult | null> {
     const sessionId = claudeSessionId(agent);
     if (!sessionId) throw new Error('Claude needs an existing conversation to fork.');
-    if (this.activeTurnsByAgentId.has(agent.id) || this.forkingAgentIds.has(agent.id)) throw new Error('Claude must be idle before forking.');
-    if (agent.folder !== targetAgent.folder) throw new Error('Claude fork folder must match the source folder.');
+    const snapshot = this.conversationReplicasByAgentId.get(agent.id)?.getSnapshot();
+    const running = this.activeTurnsByAgentId.has(agent.id) || Boolean(snapshot?.busy);
+    if (agent.folder !== targetAgent.folder || (running && turnId === undefined)) {
+      // Another folder, or a running source, needs the native fork that keeps the transcript resumable from elsewhere.
+      return turnId === undefined ? this.forkElsewhere(agent, sessionId, running ? snapshot?.turns ?? [] : undefined) : null;
+    }
+    if (running || this.forkingAgentIds.has(agent.id)) throw new Error('Claude must be idle before forking.');
     if (!this.transport.forkSession) throw new Error('Native Claude forks are unavailable.');
     this.forkingAgentIds.add(agent.id);
     try {
@@ -827,37 +832,40 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
       if (turnId && !boundary) throw new Error('Native Claude message boundary is unavailable for this turn. Reload the conversation and retry.');
       const storageFolder = agent.providerSession?.kind === 'claude' ? agent.providerSession.transcriptFolder : undefined;
       const childId = await this.transport.forkSession(sessionId, claudeWorkingDirectory(agent), boundary, ...(storageFolder ? [storageFolder] : []));
-      await this.flushPromptContent(sessionId);
-      await cp(promptContentDirectory(this.promptContentHome(), sessionId), promptContentDirectory(this.promptContentHome(), childId), { recursive: true }).catch(error => { if (error.code !== 'ENOENT') throw error; });
+      await this.copyPromptContent(sessionId, childId);
       const providerSession = claudeProviderSession(childId,
         agent.providerSession?.kind === 'claude' ? agent.providerSession.model : undefined,
         agent.providerSession?.kind === 'claude' ? agent.providerSession.reasoningEffort as ClaudeTurnParams['effort'] : undefined, storageFolder);
-      return { providerSession };
+      return { providerSession, ...(turnId === undefined ? {} : { forkedFromTurnId: turnId }) };
     } finally { this.forkingAgentIds.delete(agent.id); }
   }
 
-  async forkWorktreeConversation(agent: Context, _targetAgent: Context): Promise<import('../../driver').ProviderConversationForkResult | null> {
+  /** Forks for another folder, or from the last completed turn of a running source; null when there is nothing to fork. */
+  private async forkElsewhere(agent: Context, sessionId: string, runningTurns: readonly { id: string; status: string }[] | undefined): Promise<import('../../driver').ProviderConversationForkResult | null> {
     if (!this.transport.forkWorktreeSession) return null;
-    const sessionId = claudeSessionId(agent);
-    if (!sessionId) throw new Error('Claude needs an existing conversation to fork.');
     if (this.forkingAgentIds.has(agent.id)) throw new Error('Claude conversation is being forked.');
-    const snapshot = this.conversationReplicasByAgentId.get(agent.id)?.getSnapshot();
     let boundary: string | undefined;
-    if (this.activeTurnsByAgentId.has(agent.id) || snapshot?.busy) {
-      const completed = snapshot ? [...snapshot.turns].reverse().find(turn => turn.status === 'completed') : undefined;
+    let forkedFromTurnId: string | undefined;
+    if (runningTurns) {
+      const completed = [...runningTurns].reverse().find(turn => turn.status === 'completed');
       boundary = completed ? this.turnBoundariesByAgentId.get(agent.id)?.get(completed.id) : undefined;
-      if (!boundary) throw new Error('Claude needs a completed native boundary to delegate while running.');
+      if (!completed || !boundary) return null;
+      forkedFromTurnId = completed.id;
     }
     this.forkingAgentIds.add(agent.id);
     try {
       const storageFolder = agent.providerSession?.kind === 'claude' ? agent.providerSession.transcriptFolder : undefined;
       const childId = await this.transport.forkWorktreeSession(sessionId, claudeWorkingDirectory(agent), boundary, storageFolder);
-      await this.flushPromptContent(sessionId);
-      await cp(promptContentDirectory(this.promptContentHome(), sessionId), promptContentDirectory(this.promptContentHome(), childId), { recursive: true }).catch(error => { if (error.code !== 'ENOENT') throw error; });
-      // The destination query resumes the provider-owned fork with the worker's
-      // cwd, permissions, model, system appendix and identity-scoped MCP URL.
-      return { providerSession: claudeProviderSession(childId, undefined, undefined, storageFolder ?? claudeWorkingDirectory(agent)) };
+      await this.copyPromptContent(sessionId, childId);
+      // The target resumes the provider-owned fork with its own folder, permissions, model, system appendix and MCP servers.
+      return { providerSession: claudeProviderSession(childId, undefined, undefined, storageFolder ?? claudeWorkingDirectory(agent)),
+        ...(forkedFromTurnId ? { forkedFromTurnId } : {}) };
     } finally { this.forkingAgentIds.delete(agent.id); }
+  }
+
+  private async copyPromptContent(sessionId: string, childId: string): Promise<void> {
+    await this.flushPromptContent(sessionId);
+    await cp(promptContentDirectory(this.promptContentHome(), sessionId), promptContentDirectory(this.promptContentHome(), childId), { recursive: true }).catch(error => { if (error.code !== 'ENOENT') throw error; });
   }
 
   async readConversationMessages(ref: ProviderConversationRef, agentId: string): Promise<Message[]> {

@@ -153,7 +153,7 @@ describe(`Codex SDK → ${product.name} backend controls`, () => {
     } finally { release(); await guestSending; }
   });
 
-  it('forks a worktree assignment at the last completed native turn with the worker configuration', async () => {
+  it('forks a running conversation at its last completed native turn with the target configuration', async () => {
     const { driver, conversation, host } = setup();
     const source = sdkAgent();
     const original = structuredClone(source);
@@ -165,7 +165,7 @@ describe(`Codex SDK → ${product.name} backend controls`, () => {
       providerDefaults: { kind: 'codex' as const, model: 'worker-model', reasoningEffort: 'high', serviceTier: null } };
     const handle = conversation('conversation-a').handle;
     handle.forkTurn.mockResolvedValue({ conversationId: 'worker-thread', conversation: host.conversation('worker-thread'), snapshot: sdkSnapshot('worker-thread') });
-    await expect(driver.forkWorktreeConversation(source, target)).resolves.toMatchObject({ providerSession: { kind: 'codex', threadId: 'worker-thread' } });
+    await expect(driver.forkConversation(source, target)).resolves.toMatchObject({ providerSession: { kind: 'codex', threadId: 'worker-thread' }, forkedFromTurnId: 'discussion' });
     expect(handle.forkTurn).toHaveBeenCalledWith('discussion', expect.objectContaining({ cwd: '/repo-worktree', model: 'worker-model', reasoningEffort: 'high', serviceTier: null }), { extensionContext: target });
     expect(handle.fork).not.toHaveBeenCalled();
     expect(source).toStrictEqual(original);
@@ -174,10 +174,10 @@ describe(`Codex SDK → ${product.name} backend controls`, () => {
     expect(handle.sendMessage).not.toHaveBeenCalled();
   });
 
-  it('rejects a busy delegation without a completed boundary without creating a child', async () => {
+  it('reports nothing to fork for a running conversation without a completed turn', async () => {
     const { driver, conversation } = setup();
     conversation('conversation-a').setSnapshot({ activeTurnId: 'first-turn', busy: true });
-    await expect(driver.forkWorktreeConversation(sdkAgent(), { ...sdkAgent('worker'), folder: '/worker' })).rejects.toThrow('No completed');
+    await expect(driver.forkConversation(sdkAgent(), { ...sdkAgent('worker'), folder: '/worker' })).resolves.toBeNull();
     expect(conversation('conversation-a').handle.fork).not.toHaveBeenCalled();
     expect(conversation('conversation-a').handle.forkTurn).not.toHaveBeenCalled();
   });
@@ -188,7 +188,7 @@ describe(`Codex SDK → ${product.name} backend controls`, () => {
     const target = { ...sdkAgent('worker'), folder: '/worker', providerSession: undefined,
       providerDefaults: { kind: 'codex' as const, approvalPreset: 'ask-for-approval' as const } };
     conversation('conversation-a').handle.fork.mockResolvedValue({ conversationId: 'child', conversation: host.conversation('child'), snapshot: sdkSnapshot('child') });
-    await driver.forkWorktreeConversation(sdkAgent(), target);
+    await expect(driver.forkConversation(sdkAgent(), target)).resolves.not.toHaveProperty('forkedFromTurnId');
     expect(conversation('conversation-a').handle.fork).toHaveBeenCalledExactlyOnceWith({ cwd: '/worker', approvalPreset: 'ask-for-approval' }, { extensionContext: target });
   });
 

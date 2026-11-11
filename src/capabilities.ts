@@ -2,7 +2,7 @@ import type { HarnessProvider, ProviderCapabilities } from './contracts';
 
 export const codexHarnessCapabilities: ProviderCapabilities = {
   mcpRequiredServers: true, mcpAutoApproval: true,
-  turnContinuation: true, worktreeFork: true, conversationContent: true, turnHistory: true, conversationStorage: true,
+  turnContinuation: true, conversationContent: true, turnHistory: true, conversationStorage: true,
   accountUsage: true,
   textGeneration: true, structuredOutput: true, imageGeneration: true, review: true, bankedResets: true, conversationDelete: true, conversationTitle: true, scopedExecution: true,
   reportsTokens: true,
@@ -34,7 +34,7 @@ export const codexHarnessCapabilities: ProviderCapabilities = {
 
 export const claudeHarnessCapabilities: ProviderCapabilities = {
   mcpRequiredServers: false, mcpAutoApproval: true,
-  turnContinuation: true, worktreeFork: true, conversationContent: true, turnHistory: true,
+  turnContinuation: true, conversationContent: true, turnHistory: true,
   accountUsage: true,
   textGeneration: true, structuredOutput: true, conversationDelete: true, scopedExecution: true,
   reportsTokens: true,

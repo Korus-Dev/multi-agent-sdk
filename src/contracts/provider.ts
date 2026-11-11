@@ -117,8 +117,6 @@ export type ProviderCapabilities = {
   scopedExecution?: boolean;
   /** `continueInterruptedTurn` resumes a turn a restart or safety block interrupted. */
   turnContinuation?: boolean;
-  /** `forkWorktreeConversation` forks the conversation into another working directory. */
-  worktreeFork?: boolean;
   /** `readConversationContent` reads stored tool output and attachments by offset. */
   conversationContent?: boolean;
   /** `loadTurnHistory` loads one turn's full items. */
