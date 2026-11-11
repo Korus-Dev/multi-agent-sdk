@@ -1,15 +1,18 @@
 import type { HarnessProvider } from './shared';
 
-/** Codex approval presets. */
-export type CodexPermission = 'ask-for-approval' | 'approve-for-me' | 'full-access';
-/** Claude permission modes. */
-export type ClaudePermission = 'default' | 'acceptEdits' | 'dontAsk' | 'auto' | 'bypassPermissions';
-/** Cursor permission modes. */
-export type CursorPermission = 'default' | 'full-access';
-/** Antigravity permission modes. */
-export type AntigravityPermission = 'default' | 'auto_edit';
+import type { harnessPermissionIds } from '../capabilities';
 
-type PermissionByProvider = { codex: CodexPermission; claude: ClaudePermission; cursor: CursorPermission; antigravity: AntigravityPermission };
+type Ids = typeof harnessPermissionIds;
+/** Codex approval presets. */
+export type CodexPermission = Ids['codex'][number];
+/** Claude permission modes. */
+export type ClaudePermission = Ids['claude'][number];
+/** Cursor permission modes. */
+export type CursorPermission = Ids['cursor'][number];
+/** Antigravity permission modes. */
+export type AntigravityPermission = Ids['antigravity'][number];
+
+type PermissionByProvider = { [P in keyof Ids]: Ids[P][number] };
 /**
  * The permission ids a provider accepts. A harness whose provider is known only at runtime takes any id,
  * which it checks against `getCapabilities().permissions`.

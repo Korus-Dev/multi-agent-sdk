@@ -1,7 +1,6 @@
 import type { SendMessageOptions } from './ui';
 import type { ExecutionSelectionOverrides } from './execution';
 import type { PromptPart } from './prompt';
-import type { ConversationMessageQuestionPart } from './ui';
 
 export type ThreadGoalStatus = 'active' | 'paused' | 'blocked' | 'usageLimited' | 'budgetLimited' | 'complete';
 
@@ -311,7 +310,8 @@ export type MessagePart =
   | { type: 'attachment'; attachment: MessageAttachment }
   /** Media from a tool observation belongs to the work; final-answer media stays visible. */
   | { type: 'media'; media: MessageMedia; itemId?: string; phase?: 'commentary' | 'partial_answer' | 'final_answer' }
-  | ConversationMessageQuestionPart
+  /** A question the agent asked; `historical` marks replayed transcript content, not a live request to answer. */
+  | { type: 'question'; historical?: boolean; request: Extract<import('../conversations/agent-request').AgentRequest, { kind: 'question' }> }
   | { type: 'reasoning'; summary: string; itemId: string; summaryIndex: number }
   | { type: 'text'; text: string; itemId?: string; phase?: 'commentary' | 'partial_answer' | 'final_answer' }
   | {

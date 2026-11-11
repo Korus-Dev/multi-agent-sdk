@@ -1371,7 +1371,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
         type: 'item.updated',
         payload: {
           itemId: streamedTool.id,
-          statusText: 'Preparing tool input...',
+          statusText: JSON.stringify({ source: 'claude', action: 'prepare', phase: 'running', params: {} }),
         },
       });
       return;
@@ -1497,7 +1497,8 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
         type: 'agent.statusChanged',
         payload: {
           type: 'awaitingInput',
-          detail: request.questions?.[0]?.question ?? 'Waiting for user input',
+          reason: 'input',
+          ...(request.questions?.[0]?.question ? { detail: request.questions[0].question } : {}),
         },
       });
       return;
@@ -1510,7 +1511,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
         confirmation: {
           argumentsPreview: formatPermissionArguments(request),
           integrationId: mcp?.server ?? 'claude',
-          integrationName: mcp?.server ?? 'Claude',
+          integrationName: mcp?.server ?? 'claude',
           summary: permissionSummary(request),
           toolName: mcp?.tool ?? request.toolName,
           allowConversation: request.allowConversation,
@@ -1532,6 +1533,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
       type: 'agent.statusChanged',
       payload: {
         type: 'awaitingInput',
+        reason: 'approval',
         detail: payload.payload.confirmation.summary,
       },
     });

@@ -1,5 +1,15 @@
 import type { HarnessProvider, ProviderCapabilities } from './contracts';
 
+/** The permission ids each harness accepts. The capability tables and the permission types both derive from these. */
+export const harnessPermissionIds = {
+  codex: ['ask-for-approval', 'approve-for-me', 'full-access'],
+  claude: ['default', 'acceptEdits', 'dontAsk', 'auto', 'bypassPermissions'],
+  cursor: ['default', 'full-access'],
+  antigravity: ['default', 'auto_edit'],
+} as const;
+const unrestricted = new Set<string>(['full-access', 'bypassPermissions']);
+const permissionModes = (ids: readonly string[]) => ids.map(id => ({ id, ...(unrestricted.has(id) ? { dangerous: true } : {}) }));
+
 export const codexHarnessCapabilities: ProviderCapabilities = {
   mcpRequiredServers: true, mcpAutoApproval: true,
   turnContinuation: true, conversationContent: true, turnHistory: true, conversationStorage: true,
@@ -29,7 +39,7 @@ export const codexHarnessCapabilities: ProviderCapabilities = {
   editTurn: true,
   retryTurn: true,
   approvals: true,
-  approvalPresets: ['ask-for-approval', 'approve-for-me', 'full-access'],
+  approvalPresets: [...harnessPermissionIds.codex],
 };
 
 export const claudeHarnessCapabilities: ProviderCapabilities = {
@@ -61,24 +71,7 @@ export const claudeHarnessCapabilities: ProviderCapabilities = {
   retryTurn: false,
   approvals: true,
   approvalPresets: [],
-  permissionModes: [
-    {
-      id: 'default',
-    },
-    {
-      id: 'acceptEdits',
-    },
-    {
-      id: 'dontAsk',
-    },
-    {
-      id: 'auto',
-    },
-    {
-      id: 'bypassPermissions',
-      dangerous: true,
-    },
-  ],
+  permissionModes: permissionModes(harnessPermissionIds.claude),
 };
 
 export function defaultHarnessCapabilities(provider: HarnessProvider): ProviderCapabilities {
@@ -99,10 +92,7 @@ export const antigravityHarnessCapabilities: ProviderCapabilities = {
   planMode: 'native', goals: false, steerPrompt: false, interrupt: true, history: true,
   conversationFork: false, deleteTurn: false, editTurn: false, retryTurn: false,
   approvals: true, approvalPresets: [],
-  permissionModes: [
-    { id: 'default' },
-    { id: 'auto_edit' },
-  ],
+  permissionModes: permissionModes(harnessPermissionIds.antigravity),
 };
 
 // Cursor enables only capabilities implemented and verified by its host.
@@ -117,8 +107,5 @@ export const cursorHarnessCapabilities: ProviderCapabilities = {
   reasoningEffort: true, serviceTier: false, thinkingBudget: false, planMode: 'native',
   goals: false, steerPrompt: false, interrupt: true, history: true, conversationFork: false,
   deleteTurn: false, editTurn: false, retryTurn: false, approvals: false,
-  approvalPresets: [], permissionModes: [
-    { id: 'default' },
-    { id: 'full-access', dangerous: true },
-  ],
+  approvalPresets: [], permissionModes: permissionModes(harnessPermissionIds.cursor),
 };

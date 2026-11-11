@@ -47,7 +47,7 @@ import { randomUUID } from 'node:crypto';
 import { isBankedResetResult, isUseBankedResetInput, type BankedResetResult, type UseBankedResetInput } from '../../contracts/banked-resets';
 
 import os from 'node:os';
-import { approvalAgentRequest, approvalOutcome, requestFromClientRequest, agentResponseFromClientResponse } from '../../conversations/agent-request';
+import { approvalAgentRequest, approvalOutcome, requestFromClientRequest, agentResponseFromClientResponse, type AgentRequest } from '../../conversations/agent-request';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type {
@@ -2007,6 +2007,10 @@ function messageParts(parts: readonly ConversationMessagePart[], omitToolPayload
 function messagePart(part: ConversationMessagePart, omitToolPayloads = false): MessagePart {
   if (part.type === 'tool') return toolPartProjection(part, omitToolPayloads);
   if (part.type === 'attachment') return { type: 'attachment', attachment: { ...part.attachment } };
+  if (part.type === 'question') {
+    const request = requestFromClientRequest(part.request, { conversationId: part.request.conversationId ?? '' }) as Extract<AgentRequest, { kind: 'question' }>;
+    return { type: 'question', ...(part.historical ? { historical: true } : {}), request };
+  }
   return { ...part };
 }
 

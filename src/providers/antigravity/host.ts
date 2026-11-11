@@ -399,6 +399,13 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
     this.emit({ ...identity, type: 'antigravity.conversationEventReceived', payload: { revision: this.nextRevision(event.agentId), event } });
     if (event.type === 'request.created') this.emit({ ...identity, type: 'agentRequest.created', payload: { request: requestFromClientRequest(event.payload.request, { conversationId: event.sessionId, turnId: event.turnId }) } });
     else if (event.type === 'request.resolved') this.emit({ ...identity, type: 'agentRequest.resolved', payload: event.payload });
+    if (event.type === 'request.created') {
+      // The turn now waits on the person: an approval for a tool call, or an answer.
+      this.emit({ ...identity, type: 'agent.statusChanged', payload: { type: 'awaitingInput', reason: event.payload.request.kind === 'confirm_tool' ? 'approval' : 'input' } });
+    } else if (event.type === 'request.resolved') {
+      const snapshot = this.sessions.get(event.agentId)?.snapshot;
+      if (snapshot?.busy && !snapshot.clientRequests.some(request => request.id !== event.payload.id)) this.emit({ ...identity, type: 'agent.statusChanged', payload: { type: 'working' } });
+    }
     else if (event.type === 'turn.started') this.emit({ ...identity, type: 'agent.statusChanged', payload: { type: 'working' } });
     else if (event.type === 'turn.completed') this.emit({ ...identity, type: 'agent.statusChanged', payload: event.payload.turn.status === 'failed' ? { type: 'error', message: event.payload.error ?? 'Antigravity turn failed.' } : { type: 'idle' } });
   }

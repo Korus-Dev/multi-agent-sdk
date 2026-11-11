@@ -315,7 +315,7 @@ export class CursorSession {
         if (!allowed) this.transcript.deny(call);
         return record(option) ? { outcome: { outcome: 'selected', optionId: option.optionId } } : cancelled;
       } });
-      this.transcript.request({ id, kind: 'confirm_tool', payload: { confirmation: { integrationId: 'cursor', integrationName: 'Cursor', toolName: plan ? 'create_plan' : String(call.kind ?? 'tool'), summary: typeof call.title === 'string' ? call.title : plan ? 'Review Cursor plan' : 'Approve Cursor tool', argumentsPreview: plan ? params.plan as string : JSON.stringify(call.rawInput ?? call), allowConversation: false, allowAlways: false } } });
+      this.transcript.request({ id, kind: 'confirm_tool', payload: { confirmation: { integrationId: 'cursor', integrationName: 'cursor', toolName: plan ? 'create_plan' : String(call.kind ?? 'tool'), summary: typeof call.title === 'string' ? call.title : plan ? 'Review Cursor plan' : 'Approve Cursor tool', argumentsPreview: plan ? params.plan as string : JSON.stringify(call.rawInput ?? call), allowConversation: false, allowAlways: false } } });
     });
   }
   private appMcpPermission(call: Record<string, unknown>, options: unknown): string | undefined {

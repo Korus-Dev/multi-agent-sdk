@@ -616,6 +616,7 @@ describe('ClaudeBackendDriver', () => {
       allowConversation: true,
       allowAlways: false,
     });
+    expect(events).toContainEqual(expect.objectContaining({ type: 'agent.statusChanged', payload: expect.objectContaining({ type: 'awaitingInput', reason: 'approval' }) }));
 
     expect(events).toContainEqual(expect.objectContaining({
       type: 'approval.requested',
@@ -627,7 +628,7 @@ describe('ClaudeBackendDriver', () => {
           confirmation: {
             argumentsPreview: '{\n  "file_path": "/tmp/project/a.ts"\n}',
             integrationId: 'claude',
-            integrationName: 'Claude',
+            integrationName: 'claude',
             summary: 'Edit file /tmp/project/a.ts?',
             toolName: 'Edit',
             allowConversation: true,
@@ -677,6 +678,7 @@ describe('ClaudeBackendDriver', () => {
         options: [{ label: 'Simple', description: 'Small change.' }],
       }],
     });
+    expect(events).toContainEqual(expect.objectContaining({ type: 'agent.statusChanged', payload: expect.objectContaining({ type: 'awaitingInput', reason: 'input' }) }));
 
     expect(events).toContainEqual(expect.objectContaining({
       type: 'toolInput.requested',

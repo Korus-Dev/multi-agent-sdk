@@ -28,7 +28,7 @@ export function permissionRequest(params: Record<string, unknown>, trustedMcpSer
     }] } },
   } : {
     id, kind: 'confirm_tool', payload: { confirmation: {
-      integrationId: 'antigravity', integrationName: 'Antigravity', toolName: title, summary: title,
+      integrationId: 'antigravity', integrationName: 'antigravity', toolName: title, summary: title,
       argumentsPreview: JSON.stringify(call.rawInput ?? call.content ?? {}),
       allowAlways: options.some(option => option.kind === 'allow_always'), allowConversation: false,
     } },
