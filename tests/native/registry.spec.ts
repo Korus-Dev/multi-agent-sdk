@@ -1,9 +1,9 @@
 import { expect, it } from 'vitest';
-import { createProviderDriver } from '../../src/provider-factory';
+import { createProviderHost } from '../../src/harnesses';
 import type { ProviderContext } from '../../src/driver';
 
 it.each(['codex', 'claude', 'cursor', 'antigravity'] as const)('creates the %s adapter through one provider entry point without starting execution', async provider => {
-  const driver = createProviderDriver(provider, { client: { name: 'cpa-workbench', title: 'CPA workbench' } });
+  const driver = createProviderHost(provider, { client: { name: 'cpa-workbench', title: 'CPA workbench' } });
   const context: ProviderContext = { id: 'tax-assistant', folder: null, provider };
   try {
     expect(driver.provider).toBe(provider);

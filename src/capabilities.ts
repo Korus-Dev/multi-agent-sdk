@@ -1,6 +1,8 @@
 import type { HarnessProvider, ProviderCapabilities } from './contracts';
 
 export const codexHarnessCapabilities: ProviderCapabilities = {
+  mcpRequiredServers: true, mcpAutoApproval: true,
+  turnContinuation: true, worktreeFork: true, conversationContent: true, turnHistory: true, conversationStorage: true,
   accountUsage: true,
   textGeneration: true, structuredOutput: true, imageGeneration: true, review: true, bankedResets: true, conversationDelete: true, conversationTitle: true, scopedExecution: true,
   reportsTokens: true,
@@ -31,6 +33,8 @@ export const codexHarnessCapabilities: ProviderCapabilities = {
 };
 
 export const claudeHarnessCapabilities: ProviderCapabilities = {
+  mcpRequiredServers: false, mcpAutoApproval: true,
+  turnContinuation: true, worktreeFork: true, conversationContent: true, turnHistory: true,
   accountUsage: true,
   textGeneration: true, structuredOutput: true, conversationDelete: true, scopedExecution: true,
   reportsTokens: true,
@@ -84,6 +88,8 @@ export function defaultHarnessCapabilities(provider: HarnessProvider): ProviderC
 }
 
 export const antigravityHarnessCapabilities: ProviderCapabilities = {
+  mcpRequiredServers: false, mcpAutoApproval: false,
+  turnContinuation: true,
   accountUsage: true,
   textGeneration: true, structuredOutput: false, scopedExecution: true,
   reportsTokens: true, questions: true, plugins: false,
@@ -101,6 +107,8 @@ export const antigravityHarnessCapabilities: ProviderCapabilities = {
 
 // Cursor enables only capabilities implemented and verified by its host.
 export const cursorHarnessCapabilities: ProviderCapabilities = {
+  mcpRequiredServers: false, mcpAutoApproval: false,
+  turnContinuation: true,
   accountUsage: true,
   scopedExecution: true,
   reportsTokens: false, questions: false, plugins: false,

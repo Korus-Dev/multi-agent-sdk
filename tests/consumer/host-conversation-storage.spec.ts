@@ -2,7 +2,7 @@ import { expect, it, vi } from 'vitest';
 import { CodexAppServerClient } from '@korus-dev/codex-sdk';
 import { HarnessUnsupportedError, type HarnessOptions } from '../../src';
 import { createInternalHarness } from '../../src/internal';
-import { adaptHarness } from '../../src/consumer';
+import { harnessForHost } from '../../src/internal';
 import type { ProviderContext } from '../../src/context';
 import type { ProviderDriver, ProviderEvent } from '../../src/driver';
 import { MockCodexAppServer, lastRequest, requestsFor, thread } from '../codex/helpers/host-fixture';
@@ -25,7 +25,7 @@ it('A recovery tool unarchives a Codex conversation by reference, with a custom 
 
 it('A provider that cannot change conversation storage rejects with the typed unsupported error', async () => {
   const native = { onEvent: () => () => {}, getCapabilities: () => ({}), close: vi.fn(async () => {}) };
-  const host = adaptHarness('cursor', native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
+  const host = harnessForHost('cursor', native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
   const ref = host.restoreRef({ provider: 'cursor', data: { provider: 'cursor', sessionId: 'chat', folder: '/work' } });
   await expect(host.setConversationStorage(ref, 'archived')).rejects.toBeInstanceOf(HarnessUnsupportedError);
 });

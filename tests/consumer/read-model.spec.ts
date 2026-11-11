@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { adaptHarness } from '../../src/consumer';
+import { harnessForHost } from '../../src/internal';
 import type { SessionState, HarnessEvent } from '../../src/consumer-types';
 import type { ProviderDriver as NativeDriver, ProviderEvent as NativeEvent } from '../../src/driver';
 import type { ProviderContext } from '../../src/context';
@@ -30,7 +30,7 @@ const frames = [
 for (const frame of frames) it(`${frame.provider}: preserves native turn, answered-request and history evidence in state and events`, async () => {
   let deliver!: (event: NativeEvent) => void;
   const native = { onEvent: (listener: typeof deliver) => { deliver = listener; return () => {}; }, close: vi.fn() } as unknown as NativeDriver<ProviderContext, NativeEvent>;
-  const driver = adaptHarness(frame.provider, native);
+  const driver = harnessForHost(frame.provider, native);
   const session = driver.open({ id: 'tax', folder: '/ledger' });
   const changes: SessionState[] = [];
   driver.onEvent((event: HarnessEvent) => { if (event.type === 'session.changed') changes.push(event.state); });
@@ -58,7 +58,7 @@ for (const frame of frames) it(`${frame.provider}: preserves native turn, answer
 it('Codex exposes restored native execution selection without consumer persistence', async () => {
   let deliver!: (event: NativeEvent) => void;
   const native = { onEvent: (listener: typeof deliver) => { deliver = listener; return () => {}; }, close: vi.fn() } as unknown as NativeDriver<ProviderContext, NativeEvent>;
-  const driver = adaptHarness('codex', native);
+  const driver = harnessForHost('codex', native);
   const session = driver.open({ id: 'tax', folder: '/ledger' });
   const snapshot = sdkSnapshot('native', { models: [{ id: 'catalog-terra', model: 'gpt-6.1-terra', displayName: 'Terra',
     supportedReasoningEfforts: [], defaultReasoningEffort: 'high', isDefault: false }],
@@ -79,7 +79,7 @@ it('Claude publishes model settings recovered from provider history and later na
     resumeConversation: async () => ({ providerSession: saved }), loadConversation: async () => ({ ...saved, reasoningEffort: undefined }),
     sendPrompt: async () => ({ providerSession: saved }),
   } as unknown as NativeDriver<ProviderContext, NativeEvent>;
-  const driver = adaptHarness('claude', native);
+  const driver = harnessForHost('claude', native);
   const session = driver.open({ id: 'tax', folder: '/ledger' });
   const ref = driver.restoreRef({ provider: 'claude', data: { provider: 'claude', folder: '/ledger', sessionId: 'native' } });
   await driver.resumeConversation(session, { ref, storageState: 'active' });
@@ -106,7 +106,7 @@ it.each(['codex', 'claude'] as const)('%s publishes accepted permission changes 
     getCapabilities: () => provider === 'codex' ? { approvalPresets: [mode] } : { permissionModes: [{ id: mode }] },
     setApprovalPreset: update, setPermissionMode: update,
   } as unknown as NativeDriver<ProviderContext, NativeEvent>;
-  const driver = adaptHarness(provider, native);
+  const driver = harnessForHost(provider, native);
   const session = driver.open({ id: 'tax', folder: '/ledger' });
   expect(driver.readSession(session).permission).toBeUndefined();
   await driver.setPermission(session, mode);

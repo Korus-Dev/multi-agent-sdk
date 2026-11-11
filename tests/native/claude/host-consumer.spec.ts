@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { expect, it, vi } from 'vitest';
-import { createProviderDriver } from '../../../src/provider-factory';
+import { createProviderHost } from '../../../src/harnesses';
 import { ClaudeAgentSdkTransport } from '../../../src/providers/claude/agent-sdk-transport';
 import type { ProviderContext, ProviderDriver, ProviderEvent } from '../../../src/driver';
 import { createQueryHarness } from './sdk-query-fixture';
@@ -11,7 +11,7 @@ it('keeps CPA instructions and MCP scopes caller-owned through the unified Claud
   const root = await mkdtemp(path.join(tmpdir(), 'harness-claude-cpa-'));
   const harness = createQueryHarness();
   const transport = new ClaudeAgentSdkTransport({ createQuery: harness.createQuery, client: { name: 'CPA workbench' } });
-  const host: ProviderDriver<ProviderContext, ProviderEvent> = createProviderDriver('claude', {
+  const host: ProviderDriver<ProviderContext, ProviderEvent> = createProviderHost('claude', {
     client: { name: 'CPA workbench' }, instructions: () => 'Use the supplied accounting rules.',
     mcpServers: () => [{ name: 'tax_rules', url: 'http://127.0.0.1:1234/tax', enabledTools: ['lookup'] }],
     claude: { transport, host: { homeDir: root } },

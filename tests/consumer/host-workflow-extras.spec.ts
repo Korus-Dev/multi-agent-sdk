@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { adaptHarness } from '../../src/consumer';
+import { harnessForHost } from '../../src/internal';
 import type { ProviderContext } from '../../src/context';
 import type { ProviderDriver, ProviderEvent } from '../../src/driver';
 import { HarnessUnsupportedError } from '../../src';
@@ -7,7 +7,7 @@ import { HarnessUnsupportedError } from '../../src';
 const data = { kind: 'codex' as const, threadId: 't1' };
 const base = { onEvent: () => () => {}, getCapabilities: () => ({}), close: vi.fn(async () => {}) };
 const open = (native: object) => {
-  const harness = adaptHarness('codex', { ...base, ...native } as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
+  const harness = harnessForHost('codex', { ...base, ...native } as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
   return { harness, session: harness.restoreSession({ id: 'main', folder: '/work' }, { provider: 'codex', data, role: 'main' }) };
 };
 
@@ -49,15 +49,15 @@ it('passes the history view to the provider when reading conversation messages',
 });
 
 it('maps the read-only Codex option to the provider\'s read-only permission and no approval prompts', async () => {
-  const { providerOptions } = await import('../../src/options-map');
-  expect(providerOptions({ client: { name: 'x' }, codex: { readOnly: true } }).codex?.host).toMatchObject({ permissionMode: 'read-only', approvalMode: 'never' });
-  expect(providerOptions({ client: { name: 'x' } }).codex?.host).not.toHaveProperty('permissionMode');
+  const { harnesses } = await import('../../src/harnesses');
+  expect(harnesses.codex.mapOptions({ client: { name: 'x' }, codex: { readOnly: true } }).codex?.host).toMatchObject({ permissionMode: 'read-only', approvalMode: 'never' });
+  expect(harnesses.codex.mapOptions({ client: { name: 'x' } }).codex?.host).not.toHaveProperty('permissionMode');
 });
 
 it('leaves plan-exit and every other tool call to the consumer unless it supplies a rule', async () => {
-  const { providerOptions } = await import('../../src/options-map');
-  expect(providerOptions({ client: { name: 'x' } }).claude?.transportOptions).not.toHaveProperty('permissionResult');
-  const rule = providerOptions({ client: { name: 'x' }, claude: { decideTool: tool => tool === 'ExitPlanMode' ? { behavior: 'deny', message: 'Wait for review.' } : undefined } }).claude!.transportOptions!.permissionResult!;
+  const { harnesses } = await import('../../src/harnesses');
+  expect(harnesses.claude.mapOptions({ client: { name: 'x' } }).claude?.transportOptions).not.toHaveProperty('permissionResult');
+  const rule = harnesses.claude.mapOptions({ client: { name: 'x' }, claude: { decideTool: tool => tool === 'ExitPlanMode' ? { behavior: 'deny', message: 'Wait for review.' } : undefined } }).claude!.transportOptions!.permissionResult!;
   expect(rule('ExitPlanMode', {})).toMatchObject({ behavior: 'deny', message: 'Wait for review.' });
   expect(rule('Bash', {})).toBeUndefined();
 });

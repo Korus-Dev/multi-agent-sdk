@@ -175,7 +175,7 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
 
   async executeScopedPrompt(agent: Context, input: ProviderScopedPromptInput): Promise<ProviderScopedPromptResult> {
     input.signal?.throwIfAborted();
-    validateMcpPolicy(input.scope.mcpServers ?? [], 'antigravity');
+    validateMcpPolicy(input.scope.mcpServers ?? [], 'antigravity', antigravityHarnessCapabilities);
     input = { ...input, scope: structuredClone(input.scope) };
     if (input.session && input.session.kind !== this.provider) throw new Error('Antigravity cannot continue another provider execution.');
     const scopedContext = { ...agent, folder: input.cwd, providerSession: input.session };
@@ -214,7 +214,7 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
     input.signal?.throwIfAborted();
     if (input.outputSchema !== undefined) throw new HarnessUnsupportedError('Structured output');
     const servers = input.mcpServers ?? [];
-    validateMcpPolicy(servers, 'antigravity');
+    validateMcpPolicy(servers, 'antigravity', antigravityHarnessCapabilities);
     const session = await this.openSession({ agentId: `generation-${randomUUID()}`, cwd: input.cwd, mcpServers: servers.map(server => sessionMcpServer(server.url, server.name, [...server.enabledTools])), utilityMcpTools: [], tools: false, ...(input.timeoutMs === null ? {promptTimeoutMs:null} : {}), ephemeral: true, changed: () => {}, usage: event => this.observeUsage({ ...event, agentId: agent.id }) });
     this.auxiliary.add(session);
     const abort = () => { void session.interrupt().catch(() => session.close()); };

@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { expect, it } from 'vitest';
-import { createProviderDriver } from '../../../src/provider-factory';
+import { createProviderHost } from '../../../src/harnesses';
 import { AntigravityHost } from '../../../src/providers/antigravity/host';
 import type { ProviderContext, ProviderDriver, ProviderEvent } from '../../../src/driver';
 import { writeAntigravityRuntimeFixture } from './session-fixture';
@@ -15,7 +15,7 @@ it('runs a caller-owned Antigravity client and selects utility models without pr
     await writeFile(path.join(root, 'harness'), '', { mode: 0o700 });
     const runtime = { command: path.join(root, 'runtime'), harness: path.join(root, 'harness'), args: [] };
     const home = path.join(root, 'native-home');
-    host = createProviderDriver('antigravity', { client: { name: 'cpa-workbench', title: 'Accounting workbench', metadataDirectory: 'accounting-sessions' }, stateDirectory: () => root, antigravity: { home: () => home, resolveRuntime: () => runtime,
+    host = createProviderHost('antigravity', { client: { name: 'cpa-workbench', title: 'Accounting workbench', metadataDirectory: 'accounting-sessions' }, stateDirectory: () => root, antigravity: { home: () => home, resolveRuntime: () => runtime,
       runtimeOptions: () => ({ runtime, home }),
     } });
     const context: ProviderContext = { id: 'tax-assistant', provider: 'antigravity', folder: root };

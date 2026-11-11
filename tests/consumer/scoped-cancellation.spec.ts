@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { adaptHarness } from '../../src/consumer';
+import { harnessForHost } from '../../src/internal';
 import type { ProviderContext } from '../../src/context';
 import type { ProviderDriver, ProviderEvent, ProviderScopedPromptInput } from '../../src/driver';
 
@@ -14,7 +14,7 @@ function fixture() {
     releaseConversation: vi.fn(async (id: string) => { released.push(id); }),
     close: vi.fn(async () => {}),
   } satisfies Partial<ProviderDriver<ProviderContext, ProviderEvent>>;
-  const driver = adaptHarness('cursor', native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
+  const driver = harnessForHost('cursor', native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
   return { driver, native, pending, released, cancelled };
 }
 
@@ -106,8 +106,8 @@ it('runs a new scope with the parent session\'s defaults', async () => {
     executeScopedPrompt: async (context: { providerDefaults?: unknown }) => { seen.push(structuredClone(context.providerDefaults)); return { text: 'ok', session: { kind: 'cursor', sessionId: 'scope-1' } }; },
     disposeScopedSession: async () => {},
   };
-  const { adaptHarness } = await import('../../src/consumer');
-  const harness = adaptHarness('cursor', native as never);
+  const { harnessForHost } = await import('../../src/internal');
+  const harness = harnessForHost('cursor', native as never);
   const main = harness.restoreSession({ id: 'main', folder: '/work', defaults: { model: 'beta', reasoningEffort: 'xhigh' } }, { provider: 'cursor', data: { kind: 'cursor', sessionId: 's' }, role: 'main' });
   await harness.executeScopedPrompt(main, { prompt: 'review', cwd: '/work', scope: { id: 'r' } });
   expect(seen[0]).toMatchObject({ kind: 'cursor', model: 'beta', reasoningEffort: 'xhigh' });
@@ -122,8 +122,8 @@ it('opens a scope ahead of its run and steers it while it executes', async () =>
     steerPrompt: async (context: { id: string }) => { steered.push(context.id); return { providerSession: { kind: 'cursor', sessionId: 'scope-1' }, turnId: 't' }; },
     disposeScopedSession: async () => {},
   };
-  const { adaptHarness } = await import('../../src/consumer');
-  const harness = adaptHarness('cursor', native as never);
+  const { harnessForHost } = await import('../../src/internal');
+  const harness = harnessForHost('cursor', native as never);
   const main = harness.restoreSession({ id: 'main', folder: '/work' }, { provider: 'cursor', data: { kind: 'cursor', sessionId: 's' }, role: 'main' });
   const scope = harness.openScope(main, { cwd: '/work' });
   const running = harness.executeScopedPrompt(main, { prompt: 'review', cwd: '/work', scope: { id: 'r' }, session: scope });

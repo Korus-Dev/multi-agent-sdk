@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { adaptHarness } from '../../src/consumer';
+import { harnessForHost } from '../../src/internal';
 import type { ProviderContext } from '../../src/context';
 import type { ProviderDriver, ProviderEvent } from '../../src/driver';
 import { HarnessUnsupportedError } from '../../src';
@@ -7,7 +7,7 @@ import { HarnessUnsupportedError } from '../../src';
 const data = { kind: 'cursor' as const, sessionId: 's1', folder: '/work' };
 const base = { onEvent: () => () => {}, getCapabilities: () => ({}), close: vi.fn(async () => {}) };
 const open = (native: object) => {
-  const harness = adaptHarness('cursor', { ...base, ...native } as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
+  const harness = harnessForHost('cursor', { ...base, ...native } as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
   return { harness, session: harness.restoreSession({ id: 'main', folder: '/work' }, { provider: 'cursor', data, role: 'main' }) };
 };
 

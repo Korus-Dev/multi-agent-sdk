@@ -1,12 +1,16 @@
 import type { HarnessMcpPolicy } from './generation';
+import type { HarnessProvider, ProviderCapabilities } from './contracts';
+
+/** The MCP policy a harness supports, from its capabilities. */
+export type McpPolicySupport = Pick<ProviderCapabilities, 'mcpRequiredServers' | 'mcpAutoApproval'>;
 
 /** Reject unsupported policy rather than silently changing the caller's trust intent. */
-export function validateMcpPolicy(servers: readonly HarnessMcpPolicy[], provider: 'codex' | 'claude' | 'cursor' | 'antigravity'): void {
+export function validateMcpPolicy(servers: readonly HarnessMcpPolicy[], provider: HarnessProvider, support: McpPolicySupport): void {
   for (const server of servers) {
     if (server.approval !== undefined && server.approval !== 'inherit' && server.approval !== 'auto') throw new Error('Unsupported MCP approval policy.');
     if (server.required !== undefined && typeof server.required !== 'boolean') throw new Error('Invalid MCP required flag.');
-    if (provider !== 'codex' && server.required === true) throw new Error(`${provider} does not support required MCP servers.`);
-    if ((provider === 'cursor' || provider === 'antigravity') && server.approval === 'auto') throw new Error(`${provider} does not support automatic MCP approval.`);
+    if (!support.mcpRequiredServers && server.required === true) throw new Error(`${provider} does not support required MCP servers.`);
+    if (!support.mcpAutoApproval && server.approval === 'auto') throw new Error(`${provider} does not support automatic MCP approval.`);
   }
 }
 

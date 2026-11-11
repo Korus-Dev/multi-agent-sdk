@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { adaptHarness } from '../../src/consumer';
+import { harnessForHost } from '../../src/internal';
 import type { ProviderDriver as NativeDriver } from '../../src/driver';
 
 it('publishes authoritative goal mutation results even when the native transport emits no goal frame', async () => {
@@ -9,7 +9,7 @@ it('publishes authoritative goal mutation results even when the native transport
     setGoal: async () => ({ providerSession: { kind: 'claude', sessionId: 'native', transport: 'stdio' }, goal }),
     clearGoal: async () => ({ providerSession: { kind: 'claude', sessionId: 'native', transport: 'stdio' }, cleared: true }),
   } as unknown as NativeDriver<import('../../src/context').ProviderContext, import('../../src/driver').ProviderEvent>;
-  const driver = adaptHarness('claude', native);
+  const driver = harnessForHost('claude', native);
   const session = driver.open({ id: 'main', folder: '/tmp' });
   const changed = vi.fn(); driver.onEvent(event => { if (event.type === 'session.changed') changed(event.state.goal); });
   await driver.setGoal(session, 'Finish checks');

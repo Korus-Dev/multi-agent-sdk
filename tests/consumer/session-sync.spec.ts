@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { adaptHarness } from '../../src/consumer';
+import { harnessForHost } from '../../src/internal';
 import type { ProviderContext } from '../../src/context';
 import type { ProviderDriver, ProviderEvent } from '../../src/driver';
 
@@ -12,7 +12,7 @@ it('lets the host app re-state a session\'s stored identity and folder so the pr
     onEvent: () => () => {}, getCapabilities: () => ({}), close: vi.fn(async () => {}),
     sendPrompt: vi.fn(async (context: ProviderContext) => { seen.push(structuredClone(context)); return { providerSession: context.providerSession! }; }),
   };
-  const harness = adaptHarness('cursor', native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
+  const harness = harnessForHost('cursor', native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
   const session = harness.restoreSession({ id: 'main', folder: '/work', name: 'Main' }, { provider: 'cursor', data: first, role: 'main' });
   harness.syncSession(session, { data: second, folder: '/other', name: 'Renamed' });
   await harness.sendPrompt(session, 'hello');
@@ -21,7 +21,7 @@ it('lets the host app re-state a session\'s stored identity and folder so the pr
 });
 
 it('rejects stored data that belongs to another provider', () => {
-  const harness = adaptHarness('cursor', { onEvent: () => () => {}, getCapabilities: () => ({}), close: async () => {} } as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
+  const harness = harnessForHost('cursor', { onEvent: () => () => {}, getCapabilities: () => ({}), close: async () => {} } as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
   const session = harness.open({ id: 'main', folder: '/work' });
   expect(() => harness.syncSession(session, { data: { kind: 'codex', threadId: 't' } as never })).toThrow(/invalid persisted/i);
 });
@@ -30,7 +30,7 @@ it('clears the stored identity when asked, so the next prompt starts a new conve
   const seen: ProviderContext[] = [];
   const native = { onEvent: () => () => {}, getCapabilities: () => ({}), close: async () => {},
     sendPrompt: async (context: ProviderContext) => { seen.push(structuredClone(context)); return { providerSession: first }; } };
-  const harness = adaptHarness('cursor', native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
+  const harness = harnessForHost('cursor', native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
   const session = harness.restoreSession({ id: 'main', folder: '/work' }, { provider: 'cursor', data: first, role: 'main' });
   harness.syncSession(session, { data: null });
   await harness.sendPrompt(session, 'fresh');
@@ -41,7 +41,7 @@ it('replaces the stored defaults when the host app re-states them, instead of me
   const seen: unknown[] = [];
   const native = { onEvent: () => () => {}, getCapabilities: () => ({}), close: async () => {},
     sendPrompt: async (context: ProviderContext) => { seen.push(structuredClone(context.providerDefaults)); return { providerSession: first }; } };
-  const harness = adaptHarness('cursor', native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
+  const harness = harnessForHost('cursor', native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
   const session = harness.restoreSession({ id: 'main', folder: '/work', defaults: { model: 'alpha', reasoningEffort: 'high' } }, { provider: 'cursor', data: first, role: 'main' });
   harness.syncSession(session, { defaults: { model: 'beta' } });
   await harness.sendPrompt(session, 'hello');
@@ -57,7 +57,7 @@ it('follows the host app\'s record live, so a provider operation in flight sees 
       during = { providerSession: context.providerSession, folder: context.folder };
       return { providerSession: second };
     } };
-  const harness = adaptHarness('cursor', native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
+  const harness = harnessForHost('cursor', native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
   const session = harness.restoreSession({ id: 'main', folder: '/work' }, { provider: 'cursor', data: first, role: 'main' });
   harness.bindSession(session, () => ({ data: record.data, folder: record.folder, defaults: { model: 'live' } }));
   await harness.sendPrompt(session, 'hello');

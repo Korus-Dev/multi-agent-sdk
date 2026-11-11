@@ -1,9 +1,7 @@
 import type { SDKMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import type { Harness } from './consumer-types';
-import { adaptHarness } from './consumer';
 import type { HarnessOptions } from './options';
-import { providerOptions } from './options-map';
-import { createProviderDriver } from './provider-factory';
+import { ClaudeHarness } from './providers/claude/harness';
 
 class Queue<T> implements AsyncIterable<T> {
   private readonly values: T[] = [];
@@ -51,10 +49,10 @@ export function createScriptedClaudeHarness(options: HarnessOptions = { client: 
       close: () => output.close(),
     };
   };
-  const native = providerOptions(options);
-  const driver = createProviderDriver('claude', { ...native, claude: { ...native.claude, transportOptions: { ...native.claude?.transportOptions, createQuery: createQuery as never } } });
+  const native = ClaudeHarness.mapOptions(options);
+  const driver = ClaudeHarness.createHost({ ...native, claude: { ...native.claude, transportOptions: { ...native.claude?.transportOptions, createQuery: createQuery as never } } });
   return {
-    harness: adaptHarness('claude', driver), inputs, queryOptions,
+    harness: new ClaudeHarness(driver), inputs, queryOptions,
     emit: (message, queryIndex) => (queryIndex === undefined ? outputs.at(-1)! : outputs[queryIndex]!).push(message as unknown as SDKMessage),
     closeQuery: queryIndex => (queryIndex === undefined ? outputs.at(-1)! : outputs[queryIndex]!).close(),
     controlCalls: queryIndex => controls[queryIndex ?? controls.length - 1] ?? [],

@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { adaptHarness } from '../../src/consumer';
+import { harnessForHost } from '../../src/internal';
 import type { ProviderDriver as NativeDriver, ProviderEvent as NativeEvent } from '../../src/driver';
 import type { HarnessEvent } from '../../src';
 import { emptyCursorSnapshot } from '../../src/conversations/cursor-conversation-replica';
@@ -7,7 +7,7 @@ import { emptyCursorSnapshot } from '../../src/conversations/cursor-conversation
 it('surfaces a lost native frame and recovers only from a fresh native snapshot', async () => {
   let deliver!: (event: NativeEvent) => void;
   const native = { onEvent: (listener: typeof deliver) => { deliver = listener; return () => {}; }, close: vi.fn() } as unknown as NativeDriver<import('../../src/context').ProviderContext, NativeEvent>;
-  const driver = adaptHarness('cursor', native);
+  const driver = harnessForHost('cursor', native);
   const session = driver.open({ id: 'tax', folder: '/ledger' });
   const events: HarnessEvent[] = []; driver.onEvent(e => events.push(e));
   const initial = emptyCursorSnapshot('tax', 'native-session');

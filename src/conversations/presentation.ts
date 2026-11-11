@@ -20,7 +20,7 @@ export type ConversationPresentation = Pick<NativeSnapshot,
 type Project<S> = (snapshot: S | null | undefined) => ConversationPresentation | null;
 /** Settings evidence carried by native session identity, without caller defaults. */
 export function projectSessionSelection(session: ProviderSessionData | null | undefined): ConversationPresentation['selection'] {
-  return session?.kind === 'claude' && session.model
+  return session && 'model' in session && session.model
     ? { model: session.model, reasoningEffort: session.reasoningEffort ?? null }
     : undefined;
 }

@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { CodexAppServerClient } from '@korus-dev/codex-sdk';
-import { createProviderDriver } from '../../../src/provider-factory';
+import { createProviderHost } from '../../../src/harnesses';
 import type { ProviderContext } from '../../../src/driver';
 import { MockCodexAppServer, lastRequest, resumeResponse, thread, turn } from '../../codex/helpers/host-fixture';
 
@@ -13,7 +13,7 @@ it('configures a CPA conversation and a separate scoped tool set through the rea
     'thread/settings/update': () => ({}),
     'turn/start': () => ({ turn: turn(`tax-turn-${++id}`, 'completed', []) }),
   });
-  const driver = createProviderDriver('codex', {
+  const driver = createProviderHost('codex', {
     client: { name: 'cpa-workbench', title: 'CPA workbench' },
     instructions: () => 'Use only verified tax rules.',
     mcpServers: () => [{ name: 'tax_rules', url: 'http://127.0.0.1:1234/tax', enabledTools: ['lookup'] }],

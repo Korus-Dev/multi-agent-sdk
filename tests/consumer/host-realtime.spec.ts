@@ -2,7 +2,7 @@ import { expect, it, vi } from 'vitest';
 import { CodexAppServerClient } from '@korus-dev/codex-sdk';
 import { HarnessUnsupportedError } from '../../src';
 import { createInternalHarness } from '../../src/internal';
-import { adaptHarness } from '../../src/consumer';
+import { harnessForHost } from '../../src/internal';
 import type { ProviderContext } from '../../src/context';
 import type { ProviderDriver, ProviderEvent } from '../../src/driver';
 import { MockCodexAppServer, lastRequest, requestsFor, resumeResponse, thread } from '../codex/helpers/host-fixture';
@@ -33,7 +33,7 @@ it('Codex realtime: a Host session starts, receives input, and stops through neu
 
 it('A provider without realtime reports it in capabilities and rejects with the typed unsupported error', async () => {
   const native = { onEvent: () => () => {}, getCapabilities: () => ({}), close: vi.fn(async () => {}) };
-  const host = adaptHarness('cursor', native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
+  const host = harnessForHost('cursor', native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
   const session = host.open({ id: 'none', folder: '/work' });
   expect(host.getCapabilities(session).realtime).toBe(false);
   await expect(host.startRealtime(session, { outputModality: 'text' })).rejects.toBeInstanceOf(HarnessUnsupportedError);

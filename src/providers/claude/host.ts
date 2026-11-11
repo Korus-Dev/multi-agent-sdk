@@ -1,3 +1,4 @@
+import { claudeHarnessCapabilities } from '../../capabilities';
 import { validateMcpPolicy } from '../../mcp-policy';
 import type { ProviderHistoryLoadResult, HarnessPromptScope } from '../../driver';
 import { promptContentDispatchText, type PromptPart } from '../../core/prompt-content';
@@ -17,7 +18,7 @@ export type ClaudeHostOptions<Context extends Agent = Agent> = {
   log?: (level: 'warn', component: string, message: string, details?: Record<string, unknown>) => void;
 };
 function scopedConfiguration(scope: HarnessPromptScope): ClaudeScopedTurnConfiguration {
-  validateMcpPolicy(scope.mcpServers ?? [], 'claude');
+  validateMcpPolicy(scope.mcpServers ?? [], 'claude', claudeHarnessCapabilities);
   const [primary, ...hosted] = scope.mcpServers ?? [];
   return { mcpServerUrl: primary?.url ?? null, mcpServerName: primary?.name,
     hostedMcpServerUrls: Object.fromEntries(hosted.map(server => [server.name, server.url])),

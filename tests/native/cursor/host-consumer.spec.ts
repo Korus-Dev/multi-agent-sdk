@@ -2,7 +2,7 @@ import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { expect, it } from 'vitest';
-import { createProviderDriver } from '../../../src/provider-factory';
+import { createProviderHost } from '../../../src/harnesses';
 import type { ProviderContext, ProviderDriver, ProviderEvent } from '../../../src/driver';
 
 it('serves a non-Korus consumer through the unified driver and a caller-owned execution scope', async () => {
@@ -14,7 +14,7 @@ it('serves a non-Korus consumer through the unified driver and a caller-owned ex
     const command = path.join(root, 'agent');
     await writeFile(command, `#!${process.execPath}\nrequire('./acp-agent.cjs');\n`, { mode: 0o700 });
     const events: ProviderEvent[] = [];
-    driver = createProviderDriver('cursor', { client: { name: 'cpa-workbench', metadataDirectory: 'accounting-sessions' }, stateDirectory: () => root, cursor: {
+    driver = createProviderHost('cursor', { client: { name: 'cpa-workbench', metadataDirectory: 'accounting-sessions' }, stateDirectory: () => root, cursor: {
       runtime: { homePath: path.join(root, 'native-home'), isolated: false, environment: { ...process.env, CURSOR_API_KEY: undefined } },
       resolveCommand: () => command,
       sessionOptions: { client: { name: 'cpa-workbench', metadataDirectory: 'accounting-sessions' }, resolveCommand: () => command },

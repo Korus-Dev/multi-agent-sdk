@@ -1,10 +1,9 @@
-import { adaptHarness } from './consumer';
+import { harnesses } from './harnesses';
 import type { Harness, HarnessProvider } from './consumer-types';
 import type { ProviderContext } from './context';
 import type { ProviderEvent } from './contracts/events';
 import type { ProviderSessionData } from './contracts';
 import type { ProviderDriver } from './driver';
-import { antigravityHarnessCapabilities, claudeHarnessCapabilities, codexHarnessCapabilities, cursorHarnessCapabilities } from './capabilities';
 
 /** Provider operations a test can script, named as the provider reports them. */
 export type ScriptedOperation =
@@ -32,14 +31,8 @@ export type HarnessScript = {
   reset(): void;
 };
 
-const capabilitiesOf = { codex: codexHarnessCapabilities, claude: claudeHarnessCapabilities, cursor: cursorHarnessCapabilities, antigravity: antigravityHarnessCapabilities } as const;
-
 function sessionFor(provider: HarnessProvider, context: ProviderContext): ProviderSessionData {
-  if (context.providerSession) return context.providerSession;
-  const id = `${context.id}-session`;
-  if (provider === 'codex') return { kind: 'codex', threadId: id };
-  if (provider === 'claude') return { kind: 'claude', sessionId: id, transport: 'stdio' };
-  return { kind: provider, sessionId: id, folder: context.folder } as ProviderSessionData;
+  return context.providerSession ?? harnesses[provider].sessionData(`${context.id}-session`, context.folder);
 }
 
 /**
@@ -55,7 +48,7 @@ export function createScriptedHarness(provider: HarnessProvider, options: Script
   const turn = (context: ProviderContext) => ({ providerSession: sessionFor(provider, context), turnId: `turn-${++turns}` });
   const defaults: Record<string, (...args: never[]) => unknown> = {
     getRuntimeStatus: () => ({ provider, status: 'running' }),
-    getCapabilities: () => ({ ...capabilitiesOf[provider], ...options.capabilities }),
+    getCapabilities: () => ({ ...harnesses[provider].capabilities, ...options.capabilities }),
     sendPrompt: (context: ProviderContext) => turn(context),
     steerPrompt: (context: ProviderContext) => turn(context),
     startReview: (context: ProviderContext) => turn(context),
@@ -102,7 +95,7 @@ export function createScriptedHarness(provider: HarnessProvider, options: Script
     calls: name => [...(recorded.get(name) ?? [])],
     reset: () => { handlers.clear(); recorded.clear(); },
   };
-  return { harness: adaptHarness(provider, driver), script };
+  return { harness: new harnesses[provider](driver), script };
 }
 export { createScriptedCodexHarness, scriptedCodexSnapshot, type ScriptedCodex, type ScriptedConversation } from './testing-codex';
 export { createScriptedClaudeHarness, type ScriptedClaude } from './testing-claude';

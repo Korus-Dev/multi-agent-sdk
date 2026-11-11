@@ -1,7 +1,7 @@
 import {
   createCodexConversationReplica,
   type CodexConversationReplica,
-} from '../../src/core/conversation-replica';
+} from '../../src/core/codex-conversation-replica';
 import type {
   CodexConversationEvent,
   CodexConversationSnapshot,

@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { adaptHarness } from '../../src/consumer';
+import { harnessForHost } from '../../src/internal';
 import type { ProviderContext } from '../../src/context';
 import type { ProviderDriver, ProviderEvent } from '../../src/driver';
 import { HarnessUnsupportedError } from '../../src';
@@ -12,7 +12,7 @@ it('Reads one conversation summary by reference, returning an opaque reference o
     listConversations: vi.fn(async () => [summary]),
     readConversationSummary: vi.fn(async () => summary),
   };
-  const host = adaptHarness('cursor', native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
+  const host = harnessForHost('cursor', native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
   const session = host.open({ id: 'main', folder: '/work' });
   const [listed] = await host.listConversations(session);
   const read = await host.readConversationSummary(session, listed!.ref);
@@ -23,7 +23,7 @@ it('Reads one conversation summary by reference, returning an opaque reference o
 
 it('Rejects with the typed unsupported error when the provider cannot read a conversation summary', async () => {
   const native = { onEvent: () => () => {}, getCapabilities: () => ({}), close: vi.fn(async () => {}), listConversations: vi.fn(async () => [summary]) };
-  const host = adaptHarness('cursor', native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
+  const host = harnessForHost('cursor', native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
   const session = host.open({ id: 'main', folder: '/work' });
   const [listed] = await host.listConversations(session);
   await expect(host.readConversationSummary(session, listed!.ref)).rejects.toBeInstanceOf(HarnessUnsupportedError);

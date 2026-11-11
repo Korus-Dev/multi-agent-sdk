@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { adaptHarness } from '../../src/consumer';
+import { harnessForHost } from '../../src/internal';
 import type { ProviderContext } from '../../src/context';
 import type { ProviderDriver, ProviderEvent } from '../../src/driver';
 import { emptyAntigravitySnapshot } from '../../src/conversations/antigravity-conversation-replica';
@@ -22,7 +22,7 @@ function fixture(provider: 'cursor' | 'antigravity' | 'codex' | 'claude' = 'curs
     releaseConversation: vi.fn(async (id: string) => { log.push(`release:${id}`); }),
     respondToAgentRequest: vi.fn(async () => {}), close: vi.fn(async () => {}),
   };
-  const driver = adaptHarness(provider, native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
+  const driver = harnessForHost(provider, native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
   return { driver, native, log, deliver: (event: ProviderEvent) => deliver(event) };
 }
 const question = { id: 'question', kind: 'ask_user' as const, payload: { request: { itemId: 'item', questions: [{ id: 'choice', header: 'Choose', question: 'Continue?', isOther: false, isSecret: false, options: null }] } } };

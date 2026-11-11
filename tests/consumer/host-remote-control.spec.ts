@@ -2,7 +2,7 @@ import { expect, it, vi } from 'vitest';
 import { CodexAppServerClient } from '@korus-dev/codex-sdk';
 import { HarnessUnsupportedError } from '../../src';
 import { createInternalHarness } from '../../src/internal';
-import { adaptHarness } from '../../src/consumer';
+import { harnessForHost } from '../../src/internal';
 import type { ProviderContext } from '../../src/context';
 import type { ProviderDriver, ProviderEvent } from '../../src/driver';
 import { MockCodexAppServer, configRequirements, lastRequest } from '../codex/helpers/host-fixture';
@@ -37,7 +37,7 @@ it('Codex remote control: status, enable, disable, pairing and paired devices go
 
 it('A provider without remote control reports it in capabilities and rejects with a typed unsupported error', async () => {
   const native = { onEvent: () => () => {}, getCapabilities: () => ({}), close: vi.fn(async () => {}) };
-  const host = adaptHarness('claude', native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
+  const host = harnessForHost('claude', native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
   expect(host.getCapabilities(host.open({ id: 'none', folder: '/work' }))).toMatchObject({ remoteControl: false, realtime: false, login: [] });
   const failure = await host.getRemoteControl().catch((error: unknown) => error);
   expect(failure).toBeInstanceOf(HarnessUnsupportedError);

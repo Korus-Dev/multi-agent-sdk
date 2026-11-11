@@ -405,7 +405,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
   async generateText(_agent: Context, input: HarnessTextGenerationInput): Promise<HarnessTextGenerationResult> {
     input.signal?.throwIfAborted();
     const servers = input.mcpServers ?? [];
-    validateMcpPolicy(servers, 'codex');
+    validateMcpPolicy(servers, 'codex', codexHarnessCapabilities);
     const selection = input.selectModel ? input.selectModel(await this.listModels()) : input.selection ?? {};
     input.signal?.throwIfAborted();
     return this.host.generateText(input.prompt, {
@@ -435,7 +435,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
 
   async executeScopedPrompt(agent: Context, input: ProviderScopedPromptInput): Promise<ProviderScopedPromptResult> {
     input.signal?.throwIfAborted();
-    validateMcpPolicy(input.scope.mcpServers ?? [], 'codex');
+    validateMcpPolicy(input.scope.mcpServers ?? [], 'codex', codexHarnessCapabilities);
     await this.start();
     input.signal?.throwIfAborted();
     if (input.session && input.session.kind !== 'codex') {

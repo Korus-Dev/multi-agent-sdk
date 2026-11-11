@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { createProviderDriver } from '../../src/provider-factory';
+import { createProviderHost } from '../../src/harnesses';
 import type { HarnessMcpEndpoint } from '../../src/generation';
 const captured = vi.hoisted(() => ({ claude: null as any, codex: null as any, cursor: null as any, antigravity: null as any }));
 vi.mock('../../src/providers/claude/host', () => ({ ClaudeHost: class { constructor(_transport: unknown, _state: unknown, options: unknown) { captured.claude = options; } } }));
@@ -11,7 +11,7 @@ vi.mock('../../src/providers/antigravity/host', () => ({ AntigravityHost: class 
 const context = { id: 'test', provider: 'claude' as const, folder: '/workspace' };
 const endpoint = (extra: Partial<HarnessMcpEndpoint> = {}): HarnessMcpEndpoint => ({ name: 'tools', url: 'http://localhost/tools', enabledTools: ['read'], ...extra });
 function configure(provider: 'claude'|'codex'|'cursor'|'antigravity', servers: HarnessMcpEndpoint[]) {
-  createProviderDriver(provider, { client: { name: 'test' }, mcpServers: () => servers, claude: { transport: {} as any } });
+  createProviderHost(provider, { client: { name: 'test' }, mcpServers: () => servers, claude: { transport: {} as any } });
   if (provider === 'claude') return captured.claude.configurePrompt(context);
   if (provider === 'codex') return captured.codex.extensions.at(-1).configureConversation({ extensionContext: { context } });
   return captured[provider].mcpServers(context);

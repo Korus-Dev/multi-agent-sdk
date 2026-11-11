@@ -4,7 +4,7 @@ export { harnessProviders, isHarnessProvider } from './contracts/shared';
 export { isProviderConversationRef } from './contracts/conversation';
 export * from './conversations/work-phases';
 export * from './conversations/presentation';
-export { createCodexConversationReplica, type CodexConversationReplica } from './core/conversation-replica';
+export { createCodexConversationReplica, type CodexConversationReplica } from './core/codex-conversation-replica';
 export * from './contracts/safety-review';
 export * from './contracts/shared';
 export * from './contracts/conversation';

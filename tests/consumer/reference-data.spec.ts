@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { adaptHarness } from '../../src/consumer';
+import { harnessForHost } from '../../src/internal';
 import type { ProviderDriver as NativeDriver } from '../../src/driver';
 
 it('exposes new-chat references and restoration data without owning serialization or storage', async () => {
@@ -10,7 +10,7 @@ it('exposes new-chat references and restoration data without owning serializatio
     resumeConversation: vi.fn(async () => ({ providerSession: { kind: 'codex', threadId: 'created-chat' } })),
     readConversationMessages: vi.fn(async () => []),
   } as unknown as NativeDriver<import('../../src/context').ProviderContext, import('../../src/driver').ProviderEvent>;
-  const driver = adaptHarness('codex', native);
+  const driver = harnessForHost('codex', native);
   const session = driver.open({ id: 'chat', folder: '/workspace', defaults: { model: 'chosen' } });
   try {
     expect(driver.getConversationRef(session)).toBeNull();

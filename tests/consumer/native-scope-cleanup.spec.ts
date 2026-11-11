@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { expect, it, vi } from 'vitest';
-import { adaptHarness } from '../../src/consumer';
+import { harnessForHost } from '../../src/internal';
 import { codexSdkFixture, sdkSnapshot } from '../native/codex/sdk-host-fixture';
 import { ClaudeHost } from '../../src/providers/claude/host';
 import { ClaudeAgentSdkTransport } from '../../src/providers/claude/agent-sdk-transport';
@@ -19,7 +19,7 @@ it('repeated Codex scoped execution/disposal removes adapter ownership and subsc
     });
     return sdkSnapshot(nativeId);
   });
-  const driver = adaptHarness('codex', fixture.driver);
+  const driver = harnessForHost('codex', fixture.driver);
   const main = driver.restoreSession({ id: 'main', folder: '/repo' }, { provider: 'codex', role: 'main', data: { kind: 'codex', threadId: 'main-native' } });
   const ownership = fixture.adapter as unknown as { sessionsByAgentId: Map<string, unknown>; agentIdsByThreadId: Map<string, string> };
   try {
@@ -45,7 +45,7 @@ it('repeated Claude scoped execution/disposal releases host replicas, history an
   const native = new ClaudeHost(transport, undefined, { homeDir: home });
   const execute = vi.spyOn(native, 'executeScopedPrompt');
   const ownership = native as unknown as { liveSessionIdsByAgentId: Map<string, string>; conversationReplicasByAgentId: Map<string, unknown>; historyWindows: Map<string, unknown> };
-  const driver = adaptHarness('claude', native);
+  const driver = harnessForHost('claude', native);
   const main = driver.open({ id: 'main', folder: home });
   const complete = (session: string, index: number) => {
     query.emit({ type: 'system', subtype: 'init', session_id: session }, index);

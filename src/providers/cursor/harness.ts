@@ -1,0 +1,59 @@
+import type { ProviderContext } from '../../context';
+import type { ProviderDefaults, ProviderSessionData } from '../../contracts';
+import type { ProviderDriver, ProviderEvent } from '../../driver';
+import type { HarnessOptions } from '../../options';
+import { SessionHarness } from '../../session-harness';
+import { cursorHarnessCapabilities } from '../../capabilities';
+import { bridgedMcpServers, providerHome, sharedProviderOptions, type SharedProviderOptions } from '../../harness-options';
+import { replicaProjection, transcriptState, type HarnessProjection } from '../../harness-projection';
+import { createCursorConversationReplica } from '../../conversations/cursor-conversation-replica';
+import { CursorHost, type CursorHostOptions } from './host';
+import { cursorRuntime } from './runtime';
+
+export type CursorProviderOptions<Context extends ProviderContext = ProviderContext> = SharedProviderOptions<Context> & { cursor?: CursorHostOptions<Context> };
+
+const permissionOf = (defaults: ProviderDefaults) => 'permissionMode' in defaults ? defaults.permissionMode : undefined;
+
+export class CursorHarness extends SessionHarness<'cursor'> {
+  static readonly provider = 'cursor';
+  static readonly capabilities = cursorHarnessCapabilities;
+  /** A fresh session record for a conversation id. */
+  static sessionData(id: string, folder: string | null): ProviderSessionData { return { kind: 'cursor', sessionId: id, folder } as ProviderSessionData; }
+
+  constructor(native: ProviderDriver<ProviderContext, ProviderEvent>) { super('cursor', native); }
+
+  /** Maps app-facing options onto the Cursor runtime. */
+  static mapOptions(options: HarnessOptions): CursorProviderOptions {
+    return {
+      ...sharedProviderOptions(options, permissionOf),
+      cursor: {
+        ...(options.cursor?.command ? { resolveCommand: options.cursor.command } : {}),
+        ...(options.cursor?.steeringFallback ? { steeringFallbackEnabled: options.cursor.steeringFallback } : {}),
+        ...(options.trustedMcpServerName ? { trustedMcpServerName: options.trustedMcpServerName } : {}),
+        sessionOptions: { client: options.client, ...(options.cursor?.command ? { resolveCommand: options.cursor.command } : {}) },
+      },
+    };
+  }
+
+  /** Starts the Cursor runtime without connecting, authenticating or executing a turn. */
+  static createHost<Context extends ProviderContext = ProviderContext>(options: CursorProviderOptions<Context>): ProviderDriver<Context, ProviderEvent> {
+    const home = providerHome(options);
+    return new CursorHost({ ...options.cursor,
+      ...(home ? { runtime: cursorRuntime({ isolated: true, homePath: home }, options.cursor?.runtime?.environment) } : {}),
+      stateDirectory: options.stateDirectory ?? options.cursor?.stateDirectory,
+      instructions: options.instructions ?? options.cursor?.instructions,
+      formatPrompt: options.formatPrompt ?? options.cursor?.formatPrompt,
+      ...(options.mcpServers ? { mcpServers: bridgedMcpServers(options, 'cursor', cursorHarnessCapabilities) } : {}),
+      sessionOptions: { ...options.cursor?.sessionOptions, client: options.client },
+    });
+  }
+
+  protected createProjection(): HarnessProjection {
+    return replicaProjection({
+      snapshotEvent: 'cursor.conversationSnapshotChanged', conversationEvent: 'cursor.conversationEventReceived', label: 'Cursor',
+      create: createCursorConversationReplica,
+      apply: (replica, event) => replica.apply(event),
+      state: replica => transcriptState(replica.getSnapshot()),
+    });
+  }
+}

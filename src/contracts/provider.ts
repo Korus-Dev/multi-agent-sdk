@@ -115,6 +115,20 @@ export type ProviderCapabilities = {
   conversationTitle?: boolean;
   /** `executeScopedPrompt` runs a prompt in a separate scope. */
   scopedExecution?: boolean;
+  /** `continueInterruptedTurn` resumes a turn a restart or safety block interrupted. */
+  turnContinuation?: boolean;
+  /** `forkWorktreeConversation` forks the conversation into another working directory. */
+  worktreeFork?: boolean;
+  /** `readConversationContent` reads stored tool output and attachments by offset. */
+  conversationContent?: boolean;
+  /** `loadTurnHistory` loads one turn's full items. */
+  turnHistory?: boolean;
+  /** `setConversationStorage` archives or restores a conversation by reference. */
+  conversationStorage?: boolean;
+  /** MCP servers can be marked `required`, so the conversation fails to start without them. */
+  mcpRequiredServers?: boolean;
+  /** MCP servers can be marked `approval: 'auto'`, so their tools run without a permission request. */
+  mcpAutoApproval?: boolean;
   attachments: boolean;
   models: boolean;
   skills: boolean;

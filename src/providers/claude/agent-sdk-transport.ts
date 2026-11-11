@@ -1,3 +1,4 @@
+import { claudeHarnessCapabilities } from '../../capabilities';
 import { validateMcpPolicy, mcpToolEnabled } from '../../mcp-policy';
 import { ClaudeRequestUsageObserver, type ClaudeRequestUsage, type ClaudeRequestUsageOwner } from './request-usage';
 import { ClaudeModelObserver } from './claude-model-observer';
@@ -327,7 +328,7 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
     const prompt = new AsyncPushQueue<SDKUserMessage>();
     const sessionId = this.createSessionId();
     const servers = this.options.validateMcpServers?.(input.mcpServers) ?? input.mcpServers ?? [];
-    validateMcpPolicy(servers, 'claude');
+    validateMcpPolicy(servers, 'claude', claudeHarnessCapabilities);
     const enabledMcpTools = Object.fromEntries(servers.map(server => [server.name, server.enabledTools]));
     const allowedTools = servers.filter(server => server.approval === 'auto').flatMap(server => server.enabledTools.map(tool => `mcp__${server.name}__${tool}`));
     const canUseTool: CanUseTool = async (name, args, context) => {

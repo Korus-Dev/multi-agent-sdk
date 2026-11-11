@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { adaptHarness } from '../../src/consumer';
+import { harnessForHost } from '../../src/internal';
 import type { ProviderContext } from '../../src/context';
 import type { ProviderDriver, ProviderEvent } from '../../src/driver';
 import type { HarnessEvent } from '../../src';
@@ -13,7 +13,7 @@ function fixture() {
     sendPrompt: vi.fn(async (context: ProviderContext) => { seen.push(structuredClone(context.providerDefaults)); return { providerSession: { kind: 'cursor' as const, sessionId: context.id } }; }),
     close: vi.fn(async () => {}),
   };
-  const harness = adaptHarness('cursor', native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
+  const harness = harnessForHost('cursor', native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
   return { harness, native, seen, deliver: (event: ProviderEvent) => deliver(event) };
 }
 
@@ -45,6 +45,6 @@ it('applies new session defaults to the next native call without reopening the s
 
 it('reports the provider-level capabilities without needing a session', () => {
   const native = { onEvent: () => () => {}, close: async () => {}, getCapabilities: () => ({ steerPrompt: false, permissionModes: [{ id: 'default' }, { id: 'full-access', dangerous: true }] }) };
-  const harness = adaptHarness('cursor', native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
+  const harness = harnessForHost('cursor', native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
   expect(harness.getProviderCapabilities()).toMatchObject({ steerPrompt: false, permissions: [{ id: 'default' }, { id: 'full-access', dangerous: true }] });
 });

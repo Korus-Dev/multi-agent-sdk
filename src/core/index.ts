@@ -2,7 +2,7 @@ export { TypedEventBus, type EventListener } from './typed-event-bus';
 export {
   createCodexConversationReplica,
   type CodexConversationReplica,
-} from './conversation-replica';
+} from './codex-conversation-replica';
 export type * from './codex-host';
 export {
   applyCodexHostStateChanges,

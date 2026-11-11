@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { createProviderDriver } from '../src/provider-factory';
+import { createProviderHost } from '../src/harnesses';
 import type { HarnessProvider } from '../src/contracts';
 
 // A capability flag is a promise to consumers: they should never have to learn about support by catching an error.
@@ -25,6 +25,11 @@ const operations: Record<string, string> = {
   conversationDelete: 'deleteAgentConversation',
   conversationTitle: 'setConversationTitle',
   scopedExecution: 'executeScopedPrompt',
+  turnContinuation: 'continueInterruptedTurn',
+  worktreeFork: 'forkWorktreeConversation',
+  conversationContent: 'readConversationContent',
+  turnHistory: 'loadTurnHistory',
+  conversationStorage: 'setConversationStorage',
 };
 
 const providers: HarnessProvider[] = ['codex', 'claude', 'cursor', 'antigravity'];
@@ -32,7 +37,7 @@ describe.each(providers)('%s capabilities', provider => {
   const drivers: Array<{ close(): Promise<void> }> = [];
   afterEach(async () => { for (const driver of drivers.splice(0)) await driver.close(); });
   it('match the operations the provider implements', () => {
-    const driver = createProviderDriver(provider, { client: { name: 'conformance' } });
+    const driver = createProviderHost(provider, { client: { name: 'conformance' } });
     drivers.push(driver);
     const capabilities = driver.getCapabilities() as Record<string, unknown>;
     const mismatches = Object.entries(operations).flatMap(([flag, method]) => {

@@ -159,7 +159,7 @@ export class CursorHost<Context extends ProviderContext = ProviderContext> imple
 
   async executeScopedPrompt(agent: Context, input: ProviderScopedPromptInput): Promise<ProviderScopedPromptResult> {
     input.signal?.throwIfAborted();
-    validateMcpPolicy(input.scope.mcpServers ?? [], 'cursor');
+    validateMcpPolicy(input.scope.mcpServers ?? [], 'cursor', cursorHarnessCapabilities);
     input = { ...input, scope: structuredClone(input.scope) };
     if (input.session && input.session.kind !== this.provider) throw new Error('Cursor cannot continue another provider execution.');
     if (this.runningScopes.has(agent.id)) throw new Error('Cursor execution is already running.');

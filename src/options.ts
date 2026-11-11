@@ -78,3 +78,8 @@ export type HarnessOptions = {
     harnessPath?: string;
   };
 };
+
+/** Options every harness takes, without any provider's own block. */
+export type SharedHarnessOptions = Omit<HarnessOptions, import('./contracts/shared').HarnessProvider>;
+/** Options for one harness: the shared options plus that provider's own block. A provider union accepts each of its blocks. */
+export type HarnessOptionsFor<P extends import('./contracts/shared').HarnessProvider> = SharedHarnessOptions & Pick<HarnessOptions, P>;

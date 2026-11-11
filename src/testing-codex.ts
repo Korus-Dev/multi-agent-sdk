@@ -1,10 +1,8 @@
 import type { CodexConversationEvent, CodexConversationSnapshot, CodexEvent } from './core/codex-conversation-types';
 import type { CodexHost } from './providers/codex';
 import type { Harness } from './consumer-types';
-import { adaptHarness } from './consumer';
 import type { HarnessOptions } from './options';
-import { providerOptions } from './options-map';
-import { createProviderDriver } from './provider-factory';
+import { CodexHarness } from './providers/codex/harness';
 
 type Handler = (...args: never[]) => unknown;
 type Recorded = { args: unknown[] };
@@ -93,10 +91,10 @@ export function createScriptedCodexHarness(options: HarnessOptions = { client: {
     onEvent: (listener: (event: CodexEvent) => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
     conversation: (id: string) => conversation(id).handle,
   });
-  const native = providerOptions(options);
-  const driver = createProviderDriver('codex', { ...native, codex: { ...native.codex, existingHost: engine.object as unknown as CodexHost } });
+  const native = CodexHarness.mapOptions(options);
+  const driver = CodexHarness.createHost({ ...native, codex: { ...native.codex, existingHost: engine.object as unknown as CodexHost } });
   return {
-    harness: adaptHarness('codex', driver),
+    harness: new CodexHarness(driver),
     conversation: id => { const c = conversation(id); return { emit: c.emit, setSnapshot: c.setSnapshot, on: c.scripted.on, calls: c.scripted.calls, listenerCount: c.listenerCount, handle: c.handle }; },
     engine: { emit: event => { for (const listener of [...listeners]) listener(event); }, on: engine.on, calls: engine.calls },
   };
