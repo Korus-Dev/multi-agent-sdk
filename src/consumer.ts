@@ -202,7 +202,7 @@ export function adaptHarness(provider: HarnessProvider, native: NativeDriver<Nat
     async deleteTurn(session, turnId) { return turnAction(session, await (native.deleteTurn?.(main(session).context, turnId) ?? unavailable('Turn deletion'))); },
     async editTurn(session, turnId, content, options) { return turnAction(session, await (native.editTurn?.(main(session).context, turnId, content, options) ?? unavailable('Turn editing'))); },
     async retryTurn(session, turnId) { return turnAction(session, await (native.retryTurn?.(main(session).context, turnId) ?? unavailable('Turn retry'))); },
-    async assertHandoffReady(session) { await (native.assertHandoffReady?.(main(session).context) ?? unavailable('Hand-off readiness checks')); },
+    async startReview(session, target) { return admitted(session, await (native.startReview?.(main(session).context, target) ?? unavailable('Review'))); },
     async forkWorktreeConversation(session, target) {
       const result = await (native.forkWorktreeConversation?.(main(session).context, main(target).context) ?? unavailable('Worktree conversation fork'));
       return result ? admitted(target, result) : null;
@@ -215,7 +215,6 @@ export function adaptHarness(provider: HarnessProvider, native: NativeDriver<Nat
     async continueInterruptedTurn(session, safetyReview) { return turnAction(session, await (native.continueInterruptedTurn?.(main(session).context, safetyReview) ?? unavailable('Interrupted turn continuation'))); },
     async reconcileConversations(sessions) { await native.reconcileConversations?.(sessions.map(session => main(session).context)); },
     async forkConversation(session, target, turnId) { return admitted(target, await (native.forkConversation?.(main(session).context, main(target).context, turnId) ?? unavailable('Conversation fork'))); },
-    async replaceConversationWithSummary(session) { return admitted(session, await (native.replaceConversationWithSummary?.(main(session).context) ?? unavailable('Conversation summary replacement'))); },
     archiveConversation: session => native.archiveAgentConversation?.(main(session).context) ?? unavailable('Conversation archive'),
     deleteConversation: session => native.deleteAgentConversation?.(main(session).context) ?? unavailable('Conversation deletion'),
     readConversationMessages(session, ref, options) {
@@ -333,8 +332,8 @@ export function adaptHarness(provider: HarnessProvider, native: NativeDriver<Nat
       const parent = main(session);
       if (parent.kind !== 'main') throw new Error('Scoped execution requires a main parent session.');
       input.signal?.throwIfAborted();
-      if (!native.executeScopedPrompt) throw new Error('Scoped execution is unavailable.');
-      if (input.signal && !native.cancelScopedPrompt) throw new Error('Scoped cancellation is unavailable.');
+      if (!native.executeScopedPrompt) throw new HarnessUnsupportedError('Scoped execution');
+      if (input.signal && !native.cancelScopedPrompt) throw new HarnessUnsupportedError('Scoped cancellation');
       const scoped = input.session ?? open({ id: `${parent.context.id}:scope:${crypto.randomUUID()}`, folder: input.cwd, ...(consumerContext(parent.context).defaults ? { defaults: consumerContext(parent.context).defaults } : {}) });
       const binding = get(scoped);
       if (input.session) {

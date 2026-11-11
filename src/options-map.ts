@@ -58,7 +58,7 @@ export function providerOptions(options: HarnessOptions): ProviderOptions {
         client: { name: options.client.name, ...(options.trustedMcpServerName ? { mcpServerName: options.trustedMcpServerName } : {}), ...(options.client.entrypoint ? { entrypoint: options.client.entrypoint } : {}), ...(options.client.clientApp ? { clientApp: options.client.clientApp } : {}) },
         ...(options.claude?.launch ? { resolveLaunch: (command?: string, env?: NodeJS.ProcessEnv) => resolveClaudeLaunch(command, env, {}, ((found?: string, environment?: NodeJS.ProcessEnv) => options.claude!.launch!(found, environment)) as never) } : {}),
         ...(options.generationMcpServers ? { validateMcpServers: options.generationMcpServers } : {}),
-        permissionResult: tool => tool === 'ExitPlanMode' ? { behavior: 'deny', message: `${options.client.title ?? options.client.name} captured the proposed plan. Wait for the user to review or request implementation.` } : undefined,
+        ...(options.claude?.decideTool ? { permissionResult: (tool: string, input: Record<string, unknown>) => options.claude!.decideTool!(tool, input) } : {}),
         ...(options.claude?.disallowedTools ? { disallowedTools: [...options.claude.disallowedTools] } : {}),
         ...(log ? { log: (level, component, message, details) => log(level, component, message, details) } : {}),
       },

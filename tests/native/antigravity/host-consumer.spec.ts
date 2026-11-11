@@ -65,3 +65,11 @@ it('leaves an active Antigravity turn intact when another scope is requested', a
     await host.interrupt(context, started.turnId);
   } finally { await host.close(); await rm(root, { recursive: true, force: true }); }
 });
+
+it('rejects structured output instead of adding wording of its own to the prompt', async () => {
+  const { HarnessUnsupportedError } = await import('../../../src/errors');
+  const host = new AntigravityHost({});
+  try {
+    await expect(host.generateText({ id: 'a', provider: 'antigravity', folder: '/tmp' }, { cwd: '/tmp', prompt: 'x', outputSchema: { type: 'object' } })).rejects.toBeInstanceOf(HarnessUnsupportedError);
+  } finally { await host.close(); }
+});

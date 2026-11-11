@@ -622,12 +622,6 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
     await this.transport.closeSession?.(sessionId);
   }
 
-  async assertHandoffReady(agent: Context): Promise<void> {
-    const snapshot = this.conversationReplicasByAgentId.get(agent.id)?.getSnapshot();
-    if (this.activeTurnsByAgentId.has(agent.id) || snapshot?.busy || snapshot?.activeTurnId || [...this.pendingRequestOwners.values()].some(turn => turn.agentId === agent.id)) {
-      throw new Error('Resolve the Claude turn and requests before handing off.');
-    }
-  }
 
   async loadConversation(agent: Context): Promise<ProviderSessionData | null> {
     const sessionId = claudeSessionId(agent);

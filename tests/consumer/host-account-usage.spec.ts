@@ -5,8 +5,7 @@ import type { ProviderDriver, ProviderEvent } from '../../src/driver';
 import { antigravityHarnessCapabilities, claudeHarnessCapabilities, codexHarnessCapabilities, cursorHarnessCapabilities } from '../../src/capabilities';
 
 it('Providers with a built-in account usage reader advertise it, so a UI needs no provider knowledge', () => {
-  expect([codexHarnessCapabilities, claudeHarnessCapabilities, cursorHarnessCapabilities].map(caps => caps.accountUsage)).toEqual([true, true, true]);
-  expect(antigravityHarnessCapabilities.accountUsage).not.toBe(true);
+  expect([codexHarnessCapabilities, claudeHarnessCapabilities, cursorHarnessCapabilities, antigravityHarnessCapabilities].map(caps => caps.accountUsage)).toEqual([true, true, true, true]);
 });
 
 it('Host capabilities report accountUsage only when the provider can read it', () => {

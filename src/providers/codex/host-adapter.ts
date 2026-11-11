@@ -101,11 +101,6 @@ type ThreadProviderEvent<Event extends ProviderEvent = ProviderEvent> = Event ex
   : never;
 
 const AGENT_HISTORY_CACHE_TTL_MS = 15 * 60 * 1_000;
-const SESSION_HANDOFF_TARGET_CHARACTERS = 4_000;
-const SESSION_HANDOFF_MAX_CHARACTERS = 6_000;
-const SESSION_HANDOFF_TIMEOUT_MS = 8 * 60 * 1_000;
-const SESSION_HANDOFF_MODEL = 'gpt-5.6-luna';
-const SESSION_HANDOFF_REASONING_EFFORT = 'low';
 
 function selectedCodexModel(snapshot: CodexConversationSnapshot): string | null {
   const selected = snapshot.models.find(
@@ -115,13 +110,7 @@ function selectedCodexModel(snapshot: CodexConversationSnapshot): string | null 
   ) ?? snapshot.models.find((model) => model.isDefault) ?? snapshot.models[0];
   return selected?.model ?? snapshot.selectedModelId;
 }
-const SESSION_HANDOFF_PROMPT = `Prepare a handoff for a fresh continuation of this coding session.
 
-Return only a concise Markdown handoff. Do not call tools, modify files, spawn agents, ask questions, or continue the implementation.
-
-Summarize the full session from beginning to end, not only its recent messages. Cover every meaningful activity in chronological order, including completed work, discarded approaches, discoveries, decisions, implementation, fixes, validation, user feedback, and changes in direction. Give earlier activities concise but sufficient coverage, then give substantially more detail to the most recent activity so work can continue without rediscovery. An activity means a coherent body of work, not an individual message or turn.
-
-End with the current objective and status, constraints, unresolved problems, precise next steps, and important user preferences. Preserve exact identifiers, paths, commands, errors, and commit hashes when they matter. Aim for about ${SESSION_HANDOFF_TARGET_CHARACTERS} characters and never exceed ${SESSION_HANDOFF_MAX_CHARACTERS} characters.`;
 
 type AgentConversation<Context extends Agent = Agent> = {
   agent: Context;
@@ -177,6 +166,13 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
   private approvalPreset(defaults: import('../../contracts').ProviderDefaults | undefined): ApprovalPreset | undefined { return this.options.approvalPresetFromDefaults?.(defaults) ?? nativeApprovalPreset(defaults); }
   async start(): Promise<void> {
     await this.host.connect();
+  }
+
+  /** The signed-in account's current rate limits, or null when the runtime cannot report them. */
+  async getAccountRateLimits(): Promise<import('../../contracts').AccountRateLimits | null> {
+    const host = this.host as CodexHost & { readRateLimits?: (options: { excludeResetCreditDetails: boolean }) => Promise<CodexRateLimits> };
+    if (!host.readRateLimits) return null;
+    return (await host.readRateLimits({ excludeResetCreditDetails: true })).rateLimits as unknown as import('../../contracts').AccountRateLimits;
   }
 
   async getBankedResets(): Promise<import('../../contracts/banked-resets').BankedResets> {
@@ -485,7 +481,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
         throw new Error(`Scoped execution was ${status}.`);
       }
       return {
-        text: sessionHandoffText(snapshot.messages, targetTurnId),
+        text: assistantTurnText(snapshot.messages, targetTurnId),
         session: { kind: 'codex', threadId: conversationId },
       };
     } finally {
@@ -516,52 +512,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
     });
   }
 
-  async assertHandoffReady(agent: Context): Promise<void> {
-    const session = await this.ensureSession(agent);
-    const snapshot = session.handle.getSnapshot();
-    if (snapshot.activeTurnId || snapshot.busy || snapshot.queuedPrompts.length || snapshot.approvals.length || snapshot.clientRequests.length) {
-      throw new Error('Resolve the Codex turn, queue and requests before handing off.');
-    }
-  }
 
-  async replaceConversationWithSummary(agent: Context) {
-    const currentSession = await this.ensureSession(agent);
-    const currentSnapshot = currentSession.handle.getSnapshot();
-    if (currentSnapshot.activeTurnId || currentSnapshot.busy) {
-      throw new Error('Context must be idle before compressing its session.');
-    }
-
-    const defaults = agent.providerDefaults?.kind === 'codex'
-      ? { ...agent.providerDefaults }
-      : undefined;
-    const requestedPreset = this.approvalPreset(defaults);
-    const effectivePreset = effectiveApprovalPreset(requestedPreset, this.host.getSnapshot().approvalPresets);
-    const handoff = await this.captureSessionHandoff(currentSession);
-    const previousThreadId = currentSession.handle.id;
-    const replacementSnapshot = await this.host.createConversation({
-      ...agentCwd(agent),
-      threadSource: 'user',
-      ...(effectivePreset ? { approvalPreset: effectivePreset } : {}),
-      ...(defaults?.model ? { model: defaults.model } : {}),
-      ...(defaults?.reasoningEffort ? { reasoningEffort: defaults.reasoningEffort } : {}),
-      ...(defaults?.serviceTier !== undefined ? { serviceTier: defaults.serviceTier } : {}),
-    }, { extensionContext: this.extensionContext(agent) });
-    const replacementThreadId = replacementSnapshot.activeConversationId;
-    if (!replacementThreadId || replacementThreadId === previousThreadId) {
-      throw new Error('Codex did not create a replacement conversation.');
-    }
-
-    try {
-      await this.host.conversation(replacementThreadId).sendMessage(sessionHandoffPrompt(handoff));
-      await this.host.archiveConversation(previousThreadId);
-    } catch (error) {
-      await this.host.archiveConversation(replacementThreadId).catch(() => undefined);
-      throw error;
-    }
-
-    this.bindRuntime(agent, replacementThreadId, true, false);
-    return { threadId: replacementThreadId };
-  }
 
   async setConversationTitle(agent: Context, title: string): Promise<void> {
     const session = await this.ensureSession(agent);
@@ -1105,48 +1056,6 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
     return session;
   }
 
-  private async captureSessionHandoff(session: AgentConversation<Context>): Promise<string> {
-    const completedBeforeTarget = new Map<string, TurnStatus>();
-    let targetTurnId: string | null = null;
-    let resolveCompletion: ((status: TurnStatus) => void) | null = null;
-    const completion = new Promise<TurnStatus>((resolve) => {
-      resolveCompletion = resolve;
-    });
-    const unsubscribe = session.handle.onEvent((event) => {
-      if (event.type !== 'turn.completed') return;
-      if (event.turnId === targetTurnId) {
-        resolveCompletion?.(event.payload.status);
-      } else {
-        completedBeforeTarget.set(event.turnId, event.payload.status);
-      }
-    });
-    const wasSuppressingEvents = session.suppressEvents;
-    session.suppressEvents = true;
-
-    try {
-      const beforeTurnIds = session.handle.getSnapshot().turnIds;
-      const started = await session.handle.sendMessage(SESSION_HANDOFF_PROMPT, {
-        model: SESSION_HANDOFF_MODEL,
-        reasoningEffort: SESSION_HANDOFF_REASONING_EFFORT,
-      });
-      targetTurnId = resultTurnId(started, beforeTurnIds) ?? null;
-      if (!targetTurnId) throw new Error('Codex did not start the session handoff turn.');
-
-      const alreadyCompleted = completedBeforeTarget.get(targetTurnId)
-        ?? started.turns.find((turn) => turn.id === targetTurnId && turn.status !== 'inProgress')?.status;
-      const status = alreadyCompleted ?? await sessionHandoffCompletion(completion);
-      if (status !== 'completed') {
-        throw new Error(`Session handoff was ${status}.`);
-      }
-
-      const handoff = sessionHandoffText(session.handle.getSnapshot().messages, targetTurnId);
-      if (!handoff) throw new Error('The agent returned an empty session handoff.');
-      return handoff.slice(0, SESSION_HANDOFF_MAX_CHARACTERS);
-    } finally {
-      session.suppressEvents = wasSuppressingEvents;
-      unsubscribe();
-    }
-  }
 
   private async renameSessionIfNeeded(session: AgentConversation<Context>, title: string): Promise<void> {
     const name = title.trim();
@@ -1952,16 +1861,6 @@ function conversationSummary(
   };
 }
 
-function sessionHandoffText(messages: readonly ConversationMessage[], turnId: string): string {
-  const assistantMessages = messages.filter((message) => (
-    message.role === 'assistant' && message.turnId === turnId
-  ));
-  const finalText = sessionFinalAnswerText(messages, turnId);
-  if (finalText) return finalText;
-  return assistantMessages.flatMap((message) => message.parts.flatMap((part) => (
-    part.type === 'text' ? [part.text] : []
-  ))).join('\n').trim();
-}
 
 function sessionFinalAnswerText(messages: readonly ConversationMessage[], turnId: string): string {
   return messages.filter((message) => (
@@ -1971,29 +1870,7 @@ function sessionFinalAnswerText(messages: readonly ConversationMessage[], turnId
   ))).join('\n').trim();
 }
 
-function sessionHandoffPrompt(handoff: string): string {
-  return `<context>\n${handoff}\n\nInstruction: Treat this handoff only as background context. Do not respond, acknowledge, summarize, or take any action. Wait for the user's next prompt.\n</context>\n\nSummary of previous activity. Do not respond or take any action. Wait for my next prompt.`;
-}
 
-function sessionHandoffCompletion(
-  completion: Promise<TurnStatus>,
-): Promise<TurnStatus> {
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      reject(new Error('Timed out waiting for the agent to prepare the session handoff.'));
-    }, SESSION_HANDOFF_TIMEOUT_MS);
-    void completion.then(
-      (status) => {
-        clearTimeout(timeout);
-        resolve(status);
-      },
-      (error: unknown) => {
-        clearTimeout(timeout);
-        reject(error);
-      },
-    );
-  });
-}
 
 function subagentStatusFromTurn(
   status: Extract<CodexConversationEvent, { type: 'turn.completed' }>['payload']['status'],
@@ -2338,4 +2215,15 @@ function isClientConversationEvent(event: CodexConversationEvent): boolean {
     default:
       return true;
   }
+}
+
+function assistantTurnText(messages: readonly ConversationMessage[], turnId: string): string {
+  const assistantMessages = messages.filter((message) => (
+    message.role === 'assistant' && message.turnId === turnId
+  ));
+  const finalText = sessionFinalAnswerText(messages, turnId);
+  if (finalText) return finalText;
+  return assistantMessages.flatMap((message) => message.parts.flatMap((part) => (
+    part.type === 'text' ? [part.text] : []
+  ))).join('\n').trim();
 }

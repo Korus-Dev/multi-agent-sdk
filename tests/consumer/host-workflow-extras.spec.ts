@@ -11,17 +11,6 @@ const open = (native: object) => {
   return { harness, session: harness.restoreSession({ id: 'main', folder: '/work' }, { provider: 'codex', data, role: 'main' }) };
 };
 
-it('asks the provider whether a conversation is ready to hand off', async () => {
-  const assertHandoffReady = vi.fn(async () => {});
-  const { harness, session } = open({ assertHandoffReady });
-  await expect(harness.assertHandoffReady(session)).resolves.toBeUndefined();
-  expect(assertHandoffReady).toHaveBeenCalledWith(expect.objectContaining({ id: 'main' }));
-  const refusing = open({ assertHandoffReady: async () => { throw new Error('Resolve the turn first.'); } });
-  await expect(refusing.harness.assertHandoffReady(refusing.session)).rejects.toThrow('Resolve the turn first.');
-  const plain = open({});
-  await expect(plain.harness.assertHandoffReady(plain.session)).rejects.toBeInstanceOf(HarnessUnsupportedError);
-});
-
 it('forks a worktree conversation into another session, or reports there is nothing to fork', async () => {
   const target = { kind: 'codex' as const, threadId: 'forked' };
   const forkWorktreeConversation = vi.fn(async () => ({ providerSession: target }));
@@ -63,4 +52,21 @@ it('maps the read-only Codex option to the provider\'s read-only permission and 
   const { providerOptions } = await import('../../src/options-map');
   expect(providerOptions({ client: { name: 'x' }, codex: { readOnly: true } }).codex?.host).toMatchObject({ permissionMode: 'read-only', approvalMode: 'never' });
   expect(providerOptions({ client: { name: 'x' } }).codex?.host).not.toHaveProperty('permissionMode');
+});
+
+it('leaves plan-exit and every other tool call to the consumer unless it supplies a rule', async () => {
+  const { providerOptions } = await import('../../src/options-map');
+  expect(providerOptions({ client: { name: 'x' } }).claude?.transportOptions).not.toHaveProperty('permissionResult');
+  const rule = providerOptions({ client: { name: 'x' }, claude: { decideTool: tool => tool === 'ExitPlanMode' ? { behavior: 'deny', message: 'Wait for review.' } : undefined } }).claude!.transportOptions!.permissionResult!;
+  expect(rule('ExitPlanMode', {})).toMatchObject({ behavior: 'deny', message: 'Wait for review.' });
+  expect(rule('Bash', {})).toBeUndefined();
+});
+
+it('starts the provider\'s own review, and rejects when it has none', async () => {
+  const startReview = vi.fn(async () => ({ providerSession: data, turnId: 'review-1' }));
+  const { harness, session } = open({ startReview });
+  expect(await harness.startReview(session, { type: 'baseBranch', branch: 'main' })).toMatchObject({ turnId: 'review-1' });
+  expect(startReview).toHaveBeenCalledWith(expect.objectContaining({ id: 'main' }), { type: 'baseBranch', branch: 'main' });
+  const plain = open({});
+  await expect(plain.harness.startReview(plain.session)).rejects.toBeInstanceOf(HarnessUnsupportedError);
 });

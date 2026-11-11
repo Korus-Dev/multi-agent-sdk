@@ -2,8 +2,6 @@ const product = { name: 'CPA workbench' };
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { codexSdkFixture, sdkAgent, sdkSnapshot, sdkSummary } from './sdk-host-fixture';
 
-const metadata = { seq: 1, origin: 'notification' as const, occurredAt: '2026-09-16T00:00:00Z', conversationId: 'conversation-a', turnId: 'turn' };
-const completion = { status: 'completed' as const, error: null, willRetry: false, startedAt: null, completedAt: null, durationMs: null };
 
 describe(`Codex SDK → ${product.name} session policy`, () => {
   const fixtures: ReturnType<typeof codexSdkFixture>[] = [];
@@ -101,40 +99,5 @@ describe(`Codex SDK → ${product.name} session policy`, () => {
     const settings = events.filter(event => event.type === 'conversation.settingsUpdated');
     expect(settings).toHaveLength(1);
     expect(settings[0]).toMatchObject({ payload: { settings: { model, reasoningEffort: 'high', serviceTier: null } } });
-  });
-
-  it.each([false, true])('rolls over via a bounded handoff and archives only after replacement acceptance (failure=%s)', async (fail) => {
-    const { driver, host, conversation, events } = setup();
-    const session = conversation('conversation-a');
-    const agent = { ...sdkAgent(), providerDefaults: { kind: 'codex' as const, model: 'original', reasoningEffort: 'high', serviceTier: 'fast' } };
-    await driver.loadConversation(agent);
-    events.length = 0;
-    session.handle.sendMessage.mockImplementationOnce(async () => {
-      session.setSnapshot({ turnIds: ['handoff'], messages: [{ id: 'answer', turnId: 'handoff', role: 'assistant', status: 'complete', createdAt: metadata.occurredAt, parts: [{ type: 'text', text: 'Carry this context forward.' }] }] });
-      session.emit({ ...metadata, turnId: 'handoff', type: 'turn.completed', payload: completion });
-      return session.handle.getSnapshot();
-    });
-    host.createConversation.mockResolvedValue(sdkSnapshot('replacement'));
-    const order: string[] = [];
-    conversation('replacement').handle.sendMessage.mockImplementationOnce(async () => {
-      order.push('replacement-acceptance');
-      if (fail) throw new Error('replacement rejected');
-      return sdkSnapshot('replacement');
-    });
-    host.archiveConversation.mockImplementation(async (id) => { order.push(`archive:${id}`); return sdkSnapshot(id); });
-    if (fail) {
-      await expect(driver.replaceConversationWithSummary(agent)).rejects.toThrow('replacement rejected');
-      expect(order).toStrictEqual(['replacement-acceptance', 'archive:replacement']);
-      expect(session.listenerCount()).toBe(1);
-    } else {
-      await expect(driver.replaceConversationWithSummary(agent)).resolves.toStrictEqual({ providerSession: { kind: 'codex', threadId: 'replacement' } });
-      expect(order).toStrictEqual(['replacement-acceptance', 'archive:conversation-a']);
-      expect(session.listenerCount()).toBe(0);
-    }
-    expect(session.handle.sendMessage).toHaveBeenCalledWith(expect.any(String), { model: 'gpt-5.6-luna', reasoningEffort: 'low' });
-    expect(host.createConversation).toHaveBeenCalledWith({ cwd: '/repo', threadSource: 'user', model: 'original', reasoningEffort: 'high', serviceTier: 'fast' }, { extensionContext: agent });
-    expect(conversation('replacement').handle.sendMessage).toHaveBeenCalledWith(expect.stringContaining('Carry this context forward.'));
-    expect(events.filter((event) => event.type === 'codex.conversationEventReceived')).toStrictEqual([]);
-    expect(agent.providerDefaults.model).toBe('original');
   });
 });

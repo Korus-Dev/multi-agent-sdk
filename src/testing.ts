@@ -9,8 +9,8 @@ import { antigravityHarnessCapabilities, claudeHarnessCapabilities, codexHarness
 /** Provider operations a test can script, named as the provider reports them. */
 export type ScriptedOperation =
   | 'sendPrompt' | 'steerPrompt' | 'interrupt' | 'setGoal' | 'clearGoal' | 'deleteTurn' | 'editTurn' | 'retryTurn'
-  | 'continueInterruptedTurn' | 'loadConversation' | 'loadOlderHistory' | 'loadTurnHistory' | 'readConversationContent' | 'listConversations' | 'resumeConversation' | 'replaceConversationWithSummary' | 'forkConversation' | 'readConversationMessages' | 'readConversationSummary' | 'executeScopedPrompt'
-  | 'cancelScopedPrompt' | 'assertHandoffReady' | 'forkWorktreeConversation' | 'tryHandlePromptCommand' | 'preparePromptOptions' | 'disposeScopedSession' | 'generateText' | 'generateImage' | 'setConversationTitle' | 'setPermissionMode' | 'setApprovalPreset' | 'releaseConversation' | 'archiveAgentConversation' | 'deleteAgentConversation' | 'reconcileConversations' | 'respondToAgentRequest' | 'listModels' | 'listSkills'
+  | 'continueInterruptedTurn' | 'loadConversation' | 'loadOlderHistory' | 'loadTurnHistory' | 'readConversationContent' | 'listConversations' | 'resumeConversation' | 'forkConversation' | 'readConversationMessages' | 'readConversationSummary' | 'executeScopedPrompt'
+  | 'cancelScopedPrompt' | 'forkWorktreeConversation' | 'tryHandlePromptCommand' | 'preparePromptOptions' | 'disposeScopedSession' | 'generateText' | 'generateImage' | 'setConversationTitle' | 'setPermissionMode' | 'setApprovalPreset' | 'releaseConversation' | 'archiveAgentConversation' | 'deleteAgentConversation' | 'reconcileConversations' | 'respondToAgentRequest' | 'listModels' | 'listSkills'
   | 'listPlugins' | 'authenticate' | 'getAccountRateLimits' | 'getBankedResets' | 'useBankedReset' | 'setConversationStorage' | 'startRealtime' | 'getRemoteControlStatus' | 'enableRemoteControl' | 'disableRemoteControl' | 'startDevicePairing' | 'checkDevicePairing' | 'listPairedDevices' | 'revokePairedDevice' | 'getRuntimeStatus' | 'getCapabilities' | 'close';
 type Handler = (...args: never[]) => unknown;
 
@@ -73,7 +73,6 @@ export function createScriptedHarness(provider: HarnessProvider, options: Script
     listSkills: () => [],
     listPlugins: () => [],
     resumeConversation: (context: ProviderContext) => ({ providerSession: sessionFor(provider, context) }),
-    replaceConversationWithSummary: (context: ProviderContext) => ({ providerSession: sessionFor(provider, context) }),
     forkConversation: (_context: ProviderContext, target: ProviderContext) => ({ providerSession: sessionFor(provider, target) }),
     executeScopedPrompt: (context: ProviderContext) => ({ text: '', session: sessionFor(provider, { ...context, providerSession: undefined, id: `${context.id}-scope` }) }),
     disposeScopedSession: () => undefined,

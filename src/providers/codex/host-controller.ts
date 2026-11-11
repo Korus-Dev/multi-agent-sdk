@@ -25,7 +25,7 @@ import type {
 } from '../../contracts/index';
 import { codexHarnessCapabilities } from '../../capabilities';
 import type { AuthenticationLogin } from '../../contracts/authentication';
-import type { ProviderDriver, ProviderApprovalPresetResult, ProviderConversationForkResult, ProviderConversationResumeResult, ProviderEvent, ProviderGoalResult, ProviderSendResult, ProviderConversationReplacementResult, ProviderTurnActionResult } from '../../driver';
+import type { ProviderDriver, ProviderApprovalPresetResult, ProviderConversationForkResult, ProviderConversationResumeResult, ProviderEvent, ProviderGoalResult, ProviderSendResult, ProviderTurnActionResult } from '../../driver';
 import type { CodexHostAdapter } from './host-adapter';
 
 type CodexPromptCommand = { type: 'review'; prompt: string };
@@ -37,6 +37,7 @@ export class CodexHostController<Context extends Agent = Agent> implements Provi
     protected readonly sessionManager: CodexHostAdapter<Context>,
   ) {}
 
+  getAccountRateLimits() { return this.sessionManager.getAccountRateLimits(); }
   getBankedResets() { return this.sessionManager.getBankedResets(); }
   useBankedReset(input: import('../../contracts/banked-resets').UseBankedResetInput) { return this.sessionManager.useBankedReset(input); }
 
@@ -80,10 +81,6 @@ export class CodexHostController<Context extends Agent = Agent> implements Provi
   getCapabilities(agent: Context): ProviderCapabilities {
     return this.sessionManager.getCapabilities?.(agent) ?? codexHarnessCapabilities;
   }
-  async assertHandoffReady(agent: Context): Promise<void> {
-    await this.sessionManager.assertHandoffReady(agent);
-  }
-
   async generateText(agent: Context, input: HarnessTextGenerationInput): Promise<HarnessTextGenerationResult> {
     return this.sessionManager.generateText(agent, input);
   }
@@ -100,10 +97,6 @@ export class CodexHostController<Context extends Agent = Agent> implements Provi
 
   executeScopedPrompt(agent: Context, input: import('../../driver').ProviderScopedPromptInput) { return this.sessionManager.executeScopedPrompt(agent, input); }
   disposeScopedSession(_agent: Context, session: ProviderSessionData) { return this.sessionManager.disposeScopedSession(session); }
-  async replaceConversationWithSummary(agent: Context): Promise<ProviderConversationReplacementResult> {
-    const result = await this.sessionManager.replaceConversationWithSummary(agent);
-    return { providerSession: codexProviderSession(result.threadId) };
-  }
 
   async listModels(_agent: Context): Promise<ProviderModelOption[]> {
     return this.sessionManager.listModels();
@@ -204,12 +197,16 @@ export class CodexHostController<Context extends Agent = Agent> implements Provi
     };
   }
 
-  private async runPromptCommand(agent: Context, command: CodexPromptCommand): Promise<ProviderSendResult> {
-    const result = await this.sessionManager.sendPrompt(agent, command.prompt);
-    return {
-      providerSession: codexProviderSession(result.threadId),
-      turnId: result.turnId,
-    };
+  /** Starts Codex's own review (`review/start`). */
+  async startReview(agent: Context, target: import('../../contracts/conversation').ConversationReviewTarget = { type: 'uncommittedChanges' }): Promise<ProviderSendResult> {
+    const result = await this.sessionManager.reviewThread(agent, target);
+    return { providerSession: codexProviderSession(result.threadId), ...(result.turnId ? { turnId: result.turnId } : {}) };
+  }
+
+  /** `/review` runs the native review; text after it is the review's instructions. */
+  private runPromptCommand(agent: Context, command: CodexPromptCommand): Promise<ProviderSendResult> {
+    const instructions = command.prompt.replace(/^\/review\b/, '').trim();
+    return this.startReview(agent, instructions ? { type: 'custom', instructions } : { type: 'uncommittedChanges' });
   }
 
   async steerPrompt(agent: Context, prompt: string, options?: SendPromptOptions): Promise<ProviderSendResult> {

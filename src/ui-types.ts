@@ -32,3 +32,4 @@ export type {
   ConversationMessageToolPart
 } from './contracts/ui';
 export type { BankedResets, UseBankedResetInput, BankedResetResult } from './contracts/banked-resets';
+export type { ConversationReviewTarget } from './contracts/conversation';

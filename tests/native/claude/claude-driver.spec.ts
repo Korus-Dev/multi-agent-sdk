@@ -49,7 +49,6 @@ describe('ClaudeBackendDriver', () => {
       await running;
       await expect(driver.forkWorktreeConversation(parent, { ...agent, id: 'worker', folder: '/tmp/worker' })).rejects.toThrow('completed native boundary');
       expect(forkWorktreeSession).not.toHaveBeenCalled();
-      await expect(driver.assertHandoffReady(parent)).rejects.toThrow('Claude turn');
     } finally { await driver.close(); }
   });
   it.each([false, true])('waits for native goal clear and reports failure honestly (error: %s)', async (isError) => {
@@ -117,10 +116,8 @@ describe('ClaudeBackendDriver', () => {
     const started = driver.sendPrompt(agent, 'write a handoff note');
     transport.emit({ type: 'system', subtype: 'init', session_id: 'handoff-session' });
     const result = await started;
-    await expect(driver.assertHandoffReady(agent)).rejects.toThrow('Claude turn');
     transport.emit({ type: 'assistant', session_id: 'handoff-session', message: { content: [{ type: 'text', text: 'Continue the fix.' }] } });
     transport.emit({ type: 'result', subtype: 'success', session_id: 'handoff-session', is_error: false });
-    await expect(driver.assertHandoffReady(agent)).resolves.toBeUndefined();
     const messages = await driver.readConversationMessages({ provider: 'claude', sessionId: 'handoff-session', folder: agent.folder }, agent.id);
     expect(messages).toContainEqual(expect.objectContaining({ turnId: result.turnId, role: 'assistant', status: 'complete', parts: expect.arrayContaining([expect.objectContaining({ type: 'text', text: 'Continue the fix.' })]) }));
     expect(historyLoader).not.toHaveBeenCalled();

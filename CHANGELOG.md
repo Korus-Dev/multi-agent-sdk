@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- The SDK adds no prompt text or policy of its own. Plan-exit denial, session-handoff wording, the handoff model and Antigravity's inspection and schema wording are removed; consumers supply them through `claude.decideTool`, `codex.handoff` and their own prompts. `outputSchema` is rejected where the provider cannot enforce it.
+- `startReview` runs a provider's own review. Codex's `/review` prompt command now starts the native review instead of sending text.
+- Capabilities cover text and image generation, structured output, review, banked resets, conversation deletion, titles and scoped execution; a conformance test keeps each flag in step with the operation behind it. Antigravity reports account usage; Codex no longer claims it.
 - `createHarness` is the only way to reach a provider. The `/native`, `/codex` and `/host-bridge` entries are removed; provider hosts, transports and the Codex engine are internal.
 - `Harness` covers login, remote control, realtime, conversation summaries and storage, interrupted-turn continuation, conversation reconciliation, session syncing and provider-level capabilities. Operations a provider lacks reject with `HarnessUnsupportedError`.
 - `harness.onEvent` forwards provider events, including those without a session, as `provider.event`.

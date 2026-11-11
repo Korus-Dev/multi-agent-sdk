@@ -192,13 +192,14 @@ describe(`Codex SDK → ${product.name} backend controls`, () => {
     expect(conversation('conversation-a').handle.fork).toHaveBeenCalledExactlyOnceWith({ cwd: '/worker', approvalPreset: 'ask-for-approval' }, { extensionContext: target });
   });
 
-  it('leaves compact to the app and delegates review slash handling to the SDK', async () => {
+  it('leaves compact to the app and starts the native review for /review', async () => {
     const { driver, conversation } = setup();
     expect(driver.tryHandlePromptCommand(sdkAgent(), '/compact')).toBeNull();
     expect(driver.tryHandlePromptCommand(sdkAgent(), '/compact extra')).toBeNull();
-    conversation('conversation-a').handle.sendMessage.mockResolvedValue(sdkSnapshot('conversation-a', { turnIds: ['review'] }));
+    conversation('conversation-a').handle.startReview.mockResolvedValue(sdkSnapshot('conversation-a', { turnIds: ['review'] }));
     await expect(driver.tryHandlePromptCommand(sdkAgent(), '/review check regressions')).resolves.toMatchObject({ turnId: 'review' });
-    expect(conversation('conversation-a').handle.sendMessage).toHaveBeenCalledWith('/review check regressions', {});
+    expect(conversation('conversation-a').handle.startReview).toHaveBeenCalledWith({ target: { type: 'custom', instructions: 'check regressions' } });
+    expect(conversation('conversation-a').handle.sendMessage).not.toHaveBeenCalled();
   });
 
   it('propagates explicit rename failure without hiding it behind best-effort initial naming', async () => {

@@ -92,7 +92,6 @@ export type ProviderCapabilities = {
   plugins?: boolean;
   conversationArchive?: boolean;
   conversationResume?: boolean;
-  conversationReplaceWithSummary?: boolean;
   remoteControl?: boolean;
   /** Managed login methods `authenticate({ action: 'login' })` can start; absent or empty means none. */
   login?: readonly import('./authentication').AuthenticationLoginMethod[];
@@ -100,6 +99,22 @@ export type ProviderCapabilities = {
   realtime?: boolean;
   /** `getAccountRateLimits` reads subscription usage and rate limits for the signed-in account. */
   accountUsage?: boolean;
+  /** `generateText` runs a one-off text generation. */
+  textGeneration?: boolean;
+  /** `generateText` accepts an `outputSchema` and the provider enforces it natively. */
+  structuredOutput?: boolean;
+  /** `generateImage` creates images. */
+  imageGeneration?: boolean;
+  /** `startReview` runs the provider's own review feature. */
+  review?: boolean;
+  /** `getBankedResets` and `useBankedReset` are available. */
+  bankedResets?: boolean;
+  /** `deleteConversation` removes a conversation from the provider. */
+  conversationDelete?: boolean;
+  /** `setConversationTitle` renames a conversation in the provider. */
+  conversationTitle?: boolean;
+  /** `executeScopedPrompt` runs a prompt in a separate scope. */
+  scopedExecution?: boolean;
   attachments: boolean;
   models: boolean;
   skills: boolean;

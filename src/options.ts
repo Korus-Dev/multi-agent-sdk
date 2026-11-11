@@ -62,6 +62,8 @@ export type HarnessOptions = {
   claude?: {
     launch?: (command: string | undefined, env: NodeJS.ProcessEnv | undefined) => { command?: string; env: NodeJS.ProcessEnv };
     disallowedTools?: readonly string[];
+    /** Decides a tool call before the consumer is asked. Return nothing to let it through to a permission request. */
+    decideTool?: (tool: string, input: Record<string, unknown>) => { behavior: 'deny'; message: string } | undefined;
     /** Rewrites an MCP tool's input for display. */
     presentMcpInput?: (tool: { server: string; tool: string }, input: Record<string, unknown>) => Record<string, unknown>;
   };

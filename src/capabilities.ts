@@ -2,12 +2,12 @@ import type { HarnessProvider, ProviderCapabilities } from './contracts';
 
 export const codexHarnessCapabilities: ProviderCapabilities = {
   accountUsage: true,
+  textGeneration: true, structuredOutput: true, imageGeneration: true, review: true, bankedResets: true, conversationDelete: true, conversationTitle: true, scopedExecution: true,
   reportsTokens: true,
   questions: true,
   plugins: true,
   conversationArchive: true,
   conversationResume: true,
-  conversationReplaceWithSummary: true,
   remoteControl: true,
   login: ['browser', 'deviceCode'],
   realtime: true,
@@ -32,13 +32,13 @@ export const codexHarnessCapabilities: ProviderCapabilities = {
 
 export const claudeHarnessCapabilities: ProviderCapabilities = {
   accountUsage: true,
+  textGeneration: true, structuredOutput: true, conversationDelete: true, scopedExecution: true,
   reportsTokens: true,
   nativeMonitor: true,
   questions: true,
   plugins: false,
   conversationArchive: false,
   conversationResume: true,
-  conversationReplaceWithSummary: false,
   remoteControl: false,
   attachments: true,
   models: true,
@@ -84,8 +84,10 @@ export function defaultHarnessCapabilities(provider: HarnessProvider): ProviderC
 }
 
 export const antigravityHarnessCapabilities: ProviderCapabilities = {
+  accountUsage: true,
+  textGeneration: true, structuredOutput: false, scopedExecution: true,
   reportsTokens: true, questions: true, plugins: false,
-  conversationArchive: false, conversationResume: true, conversationReplaceWithSummary: false,
+  conversationArchive: false, conversationResume: true,
   remoteControl: false, attachments: true, models: true, skills: false,
   reasoningEffort: false, serviceTier: false, thinkingBudget: false,
   planMode: 'native', goals: false, steerPrompt: false, interrupt: true, history: true,
@@ -100,8 +102,9 @@ export const antigravityHarnessCapabilities: ProviderCapabilities = {
 // Cursor enables only capabilities implemented and verified by its host.
 export const cursorHarnessCapabilities: ProviderCapabilities = {
   accountUsage: true,
+  scopedExecution: true,
   reportsTokens: false, questions: false, plugins: false,
-  conversationArchive: false, conversationResume: true, conversationReplaceWithSummary: false,
+  conversationArchive: false, conversationResume: true,
   remoteControl: false, attachments: true, models: true, skills: false,
   reasoningEffort: true, serviceTier: false, thinkingBudget: false, planMode: 'native',
   goals: false, steerPrompt: false, interrupt: true, history: true, conversationFork: false,

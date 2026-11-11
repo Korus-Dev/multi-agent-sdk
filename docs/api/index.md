@@ -53,7 +53,7 @@ For a custom Cursor executable, supply the same resolver through `cursor.resolve
 | Catalogs | `listModels`, `listSkills`, `listPlugins` |
 | Prompting | `sendPrompt`, `steerPrompt`, `interrupt`, `respondToRequest`, `setPermission` |
 | History | `listConversations`, `resumeConversation`, `loadConversation`, `loadOlderHistory`, `loadTurnHistory`, `readConversationMessages`, `readConversationContent` |
-| Native mutations | `setConversationTitle`, `archiveConversation`, `deleteConversation`, `forkConversation`, `replaceConversationWithSummary`, `deleteTurn`, `editTurn`, `retryTurn` |
+| Native mutations | `setConversationTitle`, `archiveConversation`, `deleteConversation`, `forkConversation`, `deleteTurn`, `editTurn`, `retryTurn` |
 | Goals | `setGoal`, `clearGoal` |
 | Auxiliary work | `executeScopedPrompt`, `disposeScopedSession`, `generateText`, `generateImage` |
 | Events | `onEvent` returns an unsubscribe function |

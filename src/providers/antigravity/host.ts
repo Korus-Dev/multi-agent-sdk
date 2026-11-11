@@ -1,3 +1,4 @@
+import { HarnessUnsupportedError } from '../../errors';
 import { validateMcpPolicy } from '../../mcp-policy';
 import type { ProviderContext, ProviderDriver, ProviderEvent, HarnessPromptScope, ProviderScopedPromptInput, ProviderScopedPromptResult } from '../../driver';
 import type { HarnessTextGenerationInput } from '../../generation';
@@ -211,6 +212,7 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
   async generateText(agent: Context, input: HarnessTextGenerationInput): Promise<{ text: string }> {
     if (this.closed) throw new Error('Antigravity host is closed.');
     input.signal?.throwIfAborted();
+    if (input.outputSchema !== undefined) throw new HarnessUnsupportedError('Structured output');
     const inspect = input.tools === true;
     const servers = input.mcpServers ?? [];
     validateMcpPolicy(servers, 'antigravity');
@@ -224,8 +226,8 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
       const selection = input.selectModel?.(antigravityModels(session.configuration.models)) ?? input.selection;
       if (selection?.model) await session.setModel(selection.model);
       await session.setMode('default');
-      const prompt = [input.developerInstructions, inspect ? 'Inspect the working folder with read-only Git and source tools. Use simple Git commands without shell operators. Start every Git command with `git --no-pager --no-optional-locks -c core.fsmonitor=false`. For git diff, show or log, include --no-ext-diff --no-textconv. Never write files or modify Git state. Return only the requested final text.' : (servers.length ? 'Return only the requested text. The supplied MCP tools are available; workspace tools are disabled.' : 'Return only the requested text. Do not call tools.'),
-        input.outputSchema ? `Return JSON matching this schema: ${JSON.stringify(input.outputSchema)}` : '', input.prompt].filter(Boolean).join('\n\n');
+      // The prompt is the consumer's; this provider adds no wording of its own.
+      const prompt = [input.developerInstructions, input.prompt].filter(Boolean).join('\n\n');
       const attachments = await acpAttachments(input.attachments ?? []);
       input.signal?.throwIfAborted();
       const turn = session.prompt(prompt, [{type:'text',text:prompt}, ...attachments]);

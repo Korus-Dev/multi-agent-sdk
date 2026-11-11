@@ -89,12 +89,12 @@ export type ProviderDriver<Context = ProviderSessionContext, Event = unknown, Hi
   readConversationContent?(agent: Context, input: import('./contracts/conversation').ConversationContentInput): Promise<import('./contracts/conversation').ConversationContentChunk>;
   listConversations?(agent: Context, input?: ConversationListInput): Promise<ConversationSummary[]>;
   resumeConversation?(agent: Context, target: ConversationResumeTarget): Promise<ProviderConversationResumeResult>;
-  replaceConversationWithSummary?(agent: Context): Promise<ProviderConversationReplacementResult>;
   forkConversation?(agent: Context, targetAgent: Context, turnId?: string): Promise<ProviderConversationForkResult>;
   readConversationMessages?(ref: ProviderConversationRef, agentId: string, options?: { view?: 'full' | 'last' }): Promise<Message[]>;
   readConversationSummary?(agent: Context, ref: ProviderConversationRef): Promise<ConversationSummary | null>;
   steerPrompt?(agent: Context, prompt: string, options?: SendPromptOptions): Promise<ProviderSendResult>;
-  assertHandoffReady?(agent: Context): Promise<void>;
+  /** The provider's own review feature, when it has one. */
+  startReview?(agent: Context, target?: import('./contracts/conversation').ConversationReviewTarget): Promise<ProviderSendResult>;
   forkWorktreeConversation?(agent: Context, targetAgent: Context): Promise<ProviderConversationForkResult | null>;
   tryHandlePromptCommand?(agent: Context, prompt: string): Promise<ProviderSendResult> | null;
   preparePromptOptions?(agent: Context, options?: SendPromptOptions): SendPromptOptions | undefined;

@@ -321,9 +321,6 @@ export class CursorHost<Context extends ProviderContext = ProviderContext> imple
     this.publishSnapshot(agent.id, current);
     return this.reference(current);
   }
-  async assertHandoffReady(agent: Context): Promise<void> {
-    if (this.queues.has(agent.id) || this.opening.has(agent.id) || this.steering.has(agent.id)) throw new Error('Finish the current Cursor operation first.');
-  }
   async releaseConversation(agentId: string): Promise<void> {
     this.generations.set(agentId, (this.generations.get(agentId) ?? 0) + 1);
     this.opening.get(agentId)?.abort.abort();

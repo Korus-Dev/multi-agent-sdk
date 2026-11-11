@@ -110,8 +110,8 @@ export type Harness = {
   deleteTurn(session: Session, turnId: string): Promise<TurnActionResult>;
   editTurn(session: Session, turnId: string, content: string, options?: Pick<PromptOptions, 'content'>): Promise<TurnActionResult>;
   retryTurn(session: Session, turnId: string): Promise<TurnActionResult>;
-  /** Rejects when the conversation has work in flight (a turn, queued prompts or open requests) that a hand-off would strand. */
-  assertHandoffReady(session: Session): Promise<void>;
+  /** Starts the provider's own review (Codex `review/start`). Without a target it reviews uncommitted changes. */
+  startReview(session: Session, target?: import('./contracts/conversation').ConversationReviewTarget): Promise<Admission>;
   /** Forks the conversation for a new worktree into `target`. Resolves null when the provider has nothing to fork. */
   forkWorktreeConversation(session: Session, target: Session): Promise<Admission | null>;
   /** Lets the provider treat a prompt (such as `/compact`) as a command. Returns null right away when it is an ordinary prompt. */
@@ -123,7 +123,6 @@ export type Harness = {
   /** Brings stored conversation state in line with the provider's own records. A no-op for providers that need no reconciliation. */
   reconcileConversations(sessions: Session[]): Promise<void>;
   forkConversation(session: Session, target: Session, turnId?: string): Promise<Admission>;
-  replaceConversationWithSummary(session: Session): Promise<Admission>;
   archiveConversation(session: Session): Promise<void>;
   deleteConversation(session: Session): Promise<void>;
   /** `view: 'last'` reads only the most recent page, which is much cheaper on long conversations. */

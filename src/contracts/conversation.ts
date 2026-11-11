@@ -75,6 +75,13 @@ export function isProviderConversationRef(value: unknown): value is ProviderConv
   return ref.provider !== 'claude' || ref.subagentId === undefined || nonEmptyString(ref.subagentId);
 }
 
+/** What a provider's own review feature looks at. */
+export type ConversationReviewTarget =
+  | { type: 'uncommittedChanges' }
+  | { type: 'baseBranch'; branch: string }
+  | { type: 'commit'; sha: string; title?: string | null }
+  | { type: 'custom'; instructions: string };
+
 export type ConversationStorageState = 'active' | 'archived';
 
 export type ConversationListInput = {
