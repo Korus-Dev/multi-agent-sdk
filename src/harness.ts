@@ -9,6 +9,7 @@ import type {
 import { harnessContext } from './harness-options';
 import type { HarnessProjection } from './harness-projection';
 import { HarnessUnsupportedError } from './errors';
+import { diffSessionState, emptyPatchBase, type SessionPatchBase, type SessionSnapshot } from './session-patch';
 
 const emptyState = (): SessionState => ({ messages: [], busy: false, activeTurnId: null, turns: [], requests: [], error: null, title: null, goal: null, contextUsage: null, plan: null });
 type Binding = {
@@ -21,6 +22,9 @@ type Binding = {
   state: SessionState;
   project: HarnessProjection;
   recovery?: boolean;
+  /** The last published revision and what it contained, to send the next change as a patch. */
+  revision: number;
+  patchBase: SessionPatchBase;
 };
 type SendResult = import('./driver').ProviderSendResult;
 type TurnResult = import('./driver').ProviderTurnActionResult;
@@ -90,7 +94,20 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
     if (binding.kind !== 'main') throw new Error('Scoped sessions require scoped continuation through their parent.');
     return binding;
   }
-  private changed(session: Session): void { this.emit({ type: 'session.changed', session, state: structuredClone(this.get(session).state) }); }
+  /** Publishes what changed since the last revision as a patch; nothing when nothing changed. */
+  private publishPatch(session: Session): void {
+    const binding = this.get(session);
+    const { ops, base } = diffSessionState(binding.patchBase, binding.state);
+    if (!ops.length) return;
+    binding.revision += 1;
+    binding.patchBase = base;
+    this.emit({ type: 'session.patch', session, patch: { revision: binding.revision, ops } });
+  }
+  private changed(session: Session): void {
+    this.publishPatch(session);
+    const binding = this.get(session);
+    this.emit({ type: 'session.changed', session, state: structuredClone(binding.state), revision: binding.revision });
+  }
   private context(context: ProviderContext): HarnessContext { return harnessContext(context, defaults => this.permissionOf(defaults)); }
   private adoptSession(session: Session, data: ProviderSessionData, preserveRuntimeSelection = false): void {
     const binding = this.get(session);
@@ -329,7 +346,9 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
     const { defaults, ...context } = input;
     const { permission: mode, ...selection } = defaults ?? {};
     const providerDefaults = { kind: this.provider, ...selection, ...(mode ? this.permissionDefaults(mode) : {}) } as ProviderDefaults;
-    this.bindings.set(session, { kind: 'main', context: { ...context, provider: this.provider, providerDefaults }, state: emptyState(), project: this.createProjection() });
+    const state = emptyState();
+    this.bindings.set(session, { kind: 'main', context: { ...context, provider: this.provider, providerDefaults }, state, project: this.createProjection(),
+      revision: 0, patchBase: diffSessionState(emptyPatchBase(), state).base });
     this.byId.set(input.id, session);
     if (mode && !this.getCapabilities(session).permissions.some(p => p.id === mode)) { this.bindings.delete(session); this.byId.delete(input.id); throw new Error('Unsupported permission option.'); }
     return session;
@@ -337,6 +356,11 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
   getCapabilities(session: Session) { return this.capabilitiesFor(this.interactive(session).context); }
   getProviderCapabilities() { return this.capabilitiesFor(); }
   readSession(session: Session) { return structuredClone(this.get(session).state); }
+  readSessionSnapshot(session: Session): SessionSnapshot {
+    this.publishPatch(session);
+    const binding = this.get(session);
+    return { revision: binding.revision, state: structuredClone(binding.state) };
+  }
   async sendPrompt(session: Session, prompt: string, options?: Parameters<Harness['sendPrompt']>[2]) { return this.admitted(session, await this.native.sendPrompt(this.main(session).context, prompt, options)); }
   async interrupt(session: Session, expectedTurnId?: string) { return this.admitted(session, await this.native.interrupt(this.interactive(session).context, expectedTurnId)); }
   async respondToRequest(session: Session, response: Parameters<Harness['respondToRequest']>[1]) {

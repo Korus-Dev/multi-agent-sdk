@@ -1,5 +1,6 @@
 export { createHarness } from './create-harness';
 export { HarnessUnsupportedError } from './errors';
+export { applySessionPatch, SessionPatchGapError, type SessionPatch, type SessionPatchOp, type SessionSnapshot } from './session-patch';
 export { TypedEventBus, type EventListener } from './core/typed-event-bus';
 export { TtlCache, type TtlCacheOptions, type TtlCacheRecord, type TtlCacheEvictionContext, type TtlCacheScheduler, type TtlCacheTimer } from './core/ttl-cache';
 export type {

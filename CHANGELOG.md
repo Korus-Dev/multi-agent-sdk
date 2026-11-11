@@ -11,6 +11,7 @@
 - `startReview` runs a provider's own review. Codex's `/review` prompt command now starts the native review instead of sending text.
 - Every optional operation has a capability flag, kept in step with its implementation by a conformance test. New flags cover interrupted-turn continuation, conversation content and storage, turn history, and MCP support for required servers and automatic approval. Claude reports reasoning effort and service tiers.
 - `Harness` covers login, remote control, realtime, conversation summaries and storage, interrupted-turn continuation, conversation reconciliation, session syncing and provider-level capabilities. Operations a provider lacks reject with `HarnessUnsupportedError`.
+- `session.patch` events carry each change to a session as plain JSON ops with a revision, so a session's state can cross a wire incrementally. `readSessionSnapshot` returns the state at a revision to start from, `applySessionPatch` applies a patch, and a missed revision throws `SessionPatchGapError` so the consumer reads a fresh snapshot. `session.changed` carries the same revision.
 - `harness.onEvent` forwards provider events, including those without a session, as `provider.event`.
 - Persisted and wire names use `provider` instead of `backend`.
 - `/testing` provides `createScriptedHarness`, `createScriptedCodexHarness` and `createScriptedClaudeHarness`: Harnesses whose provider is scripted by the test.

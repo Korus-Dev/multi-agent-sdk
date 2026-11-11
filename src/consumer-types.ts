@@ -73,7 +73,9 @@ export type SessionState = {
   plan: import('./contracts/index').ThreadPlan | null;
 };
 export type HarnessEvent =
-  | { type: 'session.changed'; session: Session; state: SessionState }
+  | { type: 'session.changed'; session: Session; state: SessionState; revision: number }
+  /** The same change as the `session.changed` that follows it, as a revisioned patch for consumers that replicate state elsewhere. */
+  | { type: 'session.patch'; session: Session; patch: import('./session-patch').SessionPatch }
   | { type: 'plan.readyForReview'; session: Session; turnId: string; markdown: string; itemId?: string; requestId?: string }
   | { type: 'recovery.required'; session: Session; reason: string }
   | { type: 'request.created'; session: Session; request: AgentRequest }
@@ -145,6 +147,8 @@ export type Harness<P extends HarnessProvider = HarnessProvider> = {
   /** What the provider offers in general, before any session exists. Session capabilities can be narrower. */
   getProviderCapabilities(): HarnessCapabilities;
   readSession(session: Session): SessionState;
+  /** The full state with its revision: where a replica starts, or resyncs after missing a patch. */
+  readSessionSnapshot(session: Session): import('./session-patch').SessionSnapshot;
   sendPrompt(session: Session, prompt: string, options?: PromptOptions): Promise<Admission>;
   interrupt(session: Session, expectedTurnId?: string): Promise<Admission>;
   respondToRequest(session: Session, response: Omit<AgentRequestResponse, 'agentId'>): Promise<void>;
