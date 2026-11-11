@@ -44,7 +44,9 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
   private readonly offUsage?: () => void;
   private readonly offRequests?: () => void;
 
-  protected constructor(readonly provider: P, protected readonly native: NativeHost<ProviderContext, ProviderEvent>) {
+  /** The app's rules for reading work phases, applied to the session state this harness reports. */
+  protected constructor(readonly provider: P, protected readonly native: NativeHost<ProviderContext, ProviderEvent>,
+    protected readonly phaseRules: import('./conversations/work-phases').WorkPhaseRules = {}) {
     this.unsubscribe = native.onEvent(event => this.receive(event));
     this.offUsage = native.onUsage?.(observation => this.emit({ type: 'usage.observed', observation }));
     this.offRequests = native.onRequestUsage?.(observation => this.emit({ type: 'requestUsage.observed', observation }));

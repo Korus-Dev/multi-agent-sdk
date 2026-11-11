@@ -72,3 +72,13 @@ it('hands the app\'s bookkeeping rule to every harness that tags phases itself',
   expect(harnesses.cursor.mapOptions(options).cursor?.sessionOptions?.isBookkeepingTool).toBe(isBookkeepingTool);
   expect(harnesses.antigravity.mapOptions(options).antigravity?.isBookkeepingTool).toBe(isBookkeepingTool);
 });
+
+it.each(['claude', 'cursor', 'antigravity'] as const)('applies the app\'s bookkeeping rule to the %s session state it reports', async provider => {
+  const { createScriptedHarness } = await import('../../src/testing');
+  const { harness, script } = createScriptedHarness(provider, { isBookkeepingTool: part => part.title === 'finish' });
+  const session = harness.open({ id: 'agent', folder: '/work' });
+  const turn = [message('a1', 'turn-1', 'assistant', [text('Reading.'), tool('read'), text('All done.'), tool('finish')])];
+  const snapshot = provider === 'claude' ? claudeSnapshot(turn) : { ...(provider === 'cursor' ? emptyCursorSnapshot('agent', 'session') : emptyAntigravitySnapshot('agent', 'session')), messages: turn };
+  script.emit({ type: `${provider}.conversationSnapshotChanged`, agentId: 'agent', provider, payload: { revision: 1, snapshot } } as never);
+  expect(phases(harness.readSession(session).messages)).toStrictEqual([['Reading.', 'commentary'], ['All done.', 'final_answer']]);
+});

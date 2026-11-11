@@ -7,6 +7,7 @@ import { cursorHarnessCapabilities } from '../../capabilities';
 import { bridgedMcpServers, providerHome, sharedProviderOptions, type SharedProviderOptions } from '../../harness-options';
 import { replicaProjection, transcriptState, type HarnessProjection } from '../../harness-projection';
 import { createCursorConversationReplica } from '../../conversations/cursor-conversation-replica';
+import type { WorkPhaseRules } from '../../conversations/work-phases';
 import { CursorHost, type CursorHostOptions } from './host';
 import { cursorRuntime } from './runtime';
 
@@ -20,7 +21,7 @@ export class CursorHarness extends SessionHarness<'cursor'> {
   /** A fresh session record for a conversation id. */
   static sessionData(id: string, folder: string | null): ProviderSessionData { return { kind: 'cursor', sessionId: id, folder } as ProviderSessionData; }
 
-  constructor(native: ProviderDriver<ProviderContext, ProviderEvent>) { super('cursor', native); }
+  constructor(native: ProviderDriver<ProviderContext, ProviderEvent>, rules?: WorkPhaseRules) { super('cursor', native, rules); }
 
   /** Maps app-facing options onto the Cursor runtime. */
   static mapOptions(options: HarnessOptions): CursorProviderOptions {
@@ -51,7 +52,7 @@ export class CursorHarness extends SessionHarness<'cursor'> {
   protected createProjection(): HarnessProjection {
     return replicaProjection({
       snapshotEvent: 'cursor.conversationSnapshotChanged', conversationEvent: 'cursor.conversationEventReceived', label: 'Cursor',
-      create: createCursorConversationReplica,
+      create: snapshot => createCursorConversationReplica(snapshot, this.phaseRules),
       apply: (replica, event) => replica.apply(event),
       state: replica => transcriptState(replica.getSnapshot()),
     });

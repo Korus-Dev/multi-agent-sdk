@@ -35,7 +35,7 @@ export class CodexHarness extends ProviderHarness<'codex'> {
   /** A fresh session record for a conversation id. */
   static sessionData(id: string): ProviderSessionData { return { kind: 'codex', threadId: id }; }
 
-  constructor(native: ProviderDriver<ProviderContext, ProviderEvent>) { super('codex', native); }
+  constructor(native: ProviderDriver<ProviderContext, ProviderEvent>, rules?: import('../../conversations/work-phases').WorkPhaseRules) { super('codex', native, rules); }
 
   /** Maps app-facing options onto the Codex runtime. */
   static mapOptions(options: HarnessOptions): CodexProviderOptions {

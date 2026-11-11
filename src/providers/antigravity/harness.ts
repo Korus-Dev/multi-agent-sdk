@@ -7,6 +7,7 @@ import { antigravityHarnessCapabilities } from '../../capabilities';
 import { bridgedMcpServers, harnessContext, providerHome, sharedProviderOptions, type SharedProviderOptions } from '../../harness-options';
 import { replicaProjection, transcriptState, type HarnessProjection } from '../../harness-projection';
 import { createAntigravityConversationReplica } from '../../conversations/antigravity-conversation-replica';
+import type { WorkPhaseRules } from '../../conversations/work-phases';
 import { AntigravityHost, type AntigravityHostOptions } from './host';
 import { antigravityHome, resolveAcpRuntime } from './runtime';
 
@@ -20,7 +21,7 @@ export class AntigravityHarness extends SessionHarness<'antigravity'> {
   /** A fresh session record for a conversation id. */
   static sessionData(id: string, folder: string | null): ProviderSessionData { return { kind: 'antigravity', sessionId: id, folder } as ProviderSessionData; }
 
-  constructor(native: ProviderDriver<ProviderContext, ProviderEvent>) { super('antigravity', native); }
+  constructor(native: ProviderDriver<ProviderContext, ProviderEvent>, rules?: WorkPhaseRules) { super('antigravity', native, rules); }
 
   /** Maps app-facing options onto the Antigravity runtime. */
   static mapOptions(options: HarnessOptions): AntigravityProviderOptions {
@@ -52,7 +53,7 @@ export class AntigravityHarness extends SessionHarness<'antigravity'> {
   protected createProjection(): HarnessProjection {
     return replicaProjection({
       snapshotEvent: 'antigravity.conversationSnapshotChanged', conversationEvent: 'antigravity.conversationEventReceived', label: 'Antigravity',
-      create: createAntigravityConversationReplica,
+      create: snapshot => createAntigravityConversationReplica(snapshot, this.phaseRules),
       apply: (replica, event) => replica.apply(event),
       state: replica => transcriptState(replica.getSnapshot()),
     });

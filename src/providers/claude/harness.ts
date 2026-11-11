@@ -8,6 +8,7 @@ import { claudeHarnessCapabilities } from '../../capabilities';
 import { mcpEndpoints, providerHome, sharedProviderOptions, type SharedProviderOptions } from '../../harness-options';
 import { replicaProjection, transcriptState, type HarnessProjection } from '../../harness-projection';
 import { createClaudeConversationReplica } from '../../conversations/claude-conversation-replica';
+import type { WorkPhaseRules } from '../../conversations/work-phases';
 import { ClaudeHost, type ClaudeHostOptions } from './host';
 import { ClaudeAgentSdkTransport, type ClaudeAgentSdkTransportOptions } from './agent-sdk-transport';
 import type { ClaudeTurnTransport } from './transport';
@@ -25,7 +26,7 @@ export class ClaudeHarness extends SessionHarness<'claude'> {
   /** A fresh session record for a conversation id. */
   static sessionData(id: string): ProviderSessionData { return { kind: 'claude', sessionId: id, transport: 'stdio' }; }
 
-  constructor(native: ProviderDriver<ProviderContext, ProviderEvent>) { super('claude', native); }
+  constructor(native: ProviderDriver<ProviderContext, ProviderEvent>, rules?: WorkPhaseRules) { super('claude', native, rules); }
 
   /** Maps app-facing options onto the Claude runtime. */
   static mapOptions(options: HarnessOptions): ClaudeProviderOptions {
@@ -105,7 +106,7 @@ export class ClaudeHarness extends SessionHarness<'claude'> {
   protected createProjection(): HarnessProjection {
     return replicaProjection({
       snapshotEvent: 'claude.conversationSnapshotChanged', conversationEvent: 'claude.conversationEventReceived', label: 'Claude',
-      create: createClaudeConversationReplica,
+      create: snapshot => createClaudeConversationReplica(snapshot, this.phaseRules),
       apply: (replica, event) => replica.apply(event),
       state: replica => transcriptState(replica.getSnapshot()),
     });
