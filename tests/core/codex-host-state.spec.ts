@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type {
-  CodexHostSnapshot,
-  CodexHostStatePatch,
+  CodexSnapshot,
+  CodexStatePatch,
   ConversationMessage,
 } from '../../src/core/codex-host';
 import {
@@ -15,8 +15,8 @@ function message(id: string, text: string): ConversationMessage {
   return { id, role: 'assistant', status: 'complete', parts: [{ type: 'text', text }] };
 }
 
-function snapshot(messages: ConversationMessage[], extra: Partial<CodexHostSnapshot> = {}): CodexHostSnapshot {
-  return { busy: false, messages, answeredClientRequestIds: [], ...extra } as unknown as CodexHostSnapshot;
+function snapshot(messages: ConversationMessage[], extra: Partial<CodexSnapshot> = {}): CodexSnapshot {
+  return { busy: false, messages, answeredClientRequestIds: [], ...extra } as unknown as CodexSnapshot;
 }
 
 /** Simulates a transport: the receiver only ever sees serialized copies. */
@@ -47,7 +47,7 @@ describe('host state patches', () => {
     const first = message('a', 'A');
     const second = message('b', 'B');
     const third = message('c', 'C');
-    const before = snapshot([first, second, third], { executionPlan: { turnId: 't' } } as Partial<CodexHostSnapshot>);
+    const before = snapshot([first, second, third], { executionPlan: { turnId: 't' } } as Partial<CodexSnapshot>);
     const after = snapshot([third, first]);
     Object.assign(after, { busy: before.busy, answeredClientRequestIds: before.answeredClientRequestIds });
 
@@ -75,7 +75,7 @@ describe('host state patches', () => {
 
 describe('host state mirror', () => {
   const base = snapshot([message('a', 'A')]);
-  const patch = (version: number, busy: boolean): CodexHostStatePatch => ({
+  const patch = (version: number, busy: boolean): CodexStatePatch => ({
     version,
     changes: [{ type: 'set', key: 'busy', value: busy }],
   });
@@ -112,14 +112,14 @@ describe('host state mirror', () => {
 
 describe('subscribeCodexHostState', () => {
   it('mirrors a patch source from its versioned base', async () => {
-    let emit: ((patch: CodexHostStatePatch) => void) | undefined;
+    let emit: ((patch: CodexStatePatch) => void) | undefined;
     const kept = message('a', 'A');
     const source = {
       getVersionedSnapshot: vi.fn(async () => ({ version: 7, snapshot: snapshot([kept]) })),
-      onStatePatch: (listener: (patch: CodexHostStatePatch) => void) => { emit = listener; return () => { emit = undefined; }; },
+      onStatePatch: (listener: (patch: CodexStatePatch) => void) => { emit = listener; return () => { emit = undefined; }; },
       onStateChange: vi.fn(() => () => undefined),
     };
-    const received: CodexHostSnapshot[] = [];
+    const received: CodexSnapshot[] = [];
 
     const unsubscribe = subscribeCodexHostState(source, (value) => received.push(value));
     await vi.waitFor(() => expect(received).toHaveLength(1));
@@ -134,11 +134,11 @@ describe('subscribeCodexHostState', () => {
   });
 
   it('retries a failed base request when the next patch arrives', async () => {
-    let emit: ((patch: CodexHostStatePatch) => void) | undefined;
+    let emit: ((patch: CodexStatePatch) => void) | undefined;
     const getVersionedSnapshot = vi.fn()
       .mockRejectedValueOnce(new Error('main process busy'))
       .mockResolvedValueOnce({ version: 1, snapshot: snapshot([]) });
-    const received: CodexHostSnapshot[] = [];
+    const received: CodexSnapshot[] = [];
     subscribeCodexHostState({
       getVersionedSnapshot,
       onStatePatch: (listener) => { emit = listener; return () => undefined; },
@@ -153,9 +153,9 @@ describe('subscribeCodexHostState', () => {
   });
 
   it('falls back to snapshots when the other side cannot stream patches', async () => {
-    let pushSnapshot: ((value: CodexHostSnapshot) => void) | undefined;
+    let pushSnapshot: ((value: CodexSnapshot) => void) | undefined;
     const stopPatches = vi.fn();
-    const received: CodexHostSnapshot[] = [];
+    const received: CodexSnapshot[] = [];
     const unsubscribe = subscribeCodexHostState({
       getVersionedSnapshot: async () => null,
       onStatePatch: () => stopPatches,
@@ -172,9 +172,9 @@ describe('subscribeCodexHostState', () => {
   });
 
   it('can stay silent about a base another channel already delivered', async () => {
-    let emit: ((patch: CodexHostStatePatch) => void) | undefined;
-    let resolveBase: ((value: { version: number; snapshot: CodexHostSnapshot }) => void) | undefined;
-    const received: CodexHostSnapshot[] = [];
+    let emit: ((patch: CodexStatePatch) => void) | undefined;
+    let resolveBase: ((value: { version: number; snapshot: CodexSnapshot }) => void) | undefined;
+    const received: CodexSnapshot[] = [];
     subscribeCodexHostState({
       getVersionedSnapshot: () => new Promise((resolve) => { resolveBase = resolve; }),
       onStatePatch: (listener) => { emit = listener; return () => undefined; },

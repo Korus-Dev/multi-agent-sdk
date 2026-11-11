@@ -1,13 +1,17 @@
-export { createHarnessDriver } from './consumer';
-export type { HarnessOptions } from './consumer';
+export { createHarness } from './create-harness';
+export { HarnessUnsupportedError } from './errors';
+export type * from './options';
 export type * from './consumer-types';
 export type { HarnessDiagnostic } from './diagnostics';
-export type { HarnessEvent as NativeHarnessEvent, HarnessDriver as NativeHarnessDriver, HarnessContext as NativeHarnessContext } from './driver';
-export type { HarnessOptions as NativeHarnessOptions } from './backend';
+export type * from './contracts';
 export type * from './ui-types';
-export type * from './core/codex-host';
+// The presentation (ui) and neutral session types win the names the provider contracts also use.
+export type { ClientRequest, ClientRequestResponse } from './ui-types';
+export type { ConversationSummary } from './consumer-types';
+export type { ClientRequest as ProviderClientRequest, ClientRequestResponse as ProviderClientRequestResponse } from './contracts';
+export type * from './core/codex-conversation-types';
+export type { ConversationSummary as ProviderConversationSummary } from './contracts';
 export type * from './generation';
-export type * from './providers/codex';
 export { TypedEventBus, type EventListener } from './core/typed-event-bus';
-export type { CodexRemoteControlConnectionStatus } from './core/codex-host';
 export { TtlCache, type TtlCacheOptions, type TtlCacheRecord, type TtlCacheEvictionContext, type TtlCacheScheduler, type TtlCacheTimer } from './core/ttl-cache';
+export type { ProviderSafetyReviewTarget, ProviderSafetyReview } from './contracts/safety-review';

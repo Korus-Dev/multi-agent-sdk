@@ -1,13 +1,6 @@
 import type { CodexAppServerClient, v2 } from '@korus-dev/codex-sdk';
-import type {
-  CodexConversationSummary,
-  CodexApprovalMode,
-  ApprovalPreset,
-  CodexPermissionMode,
-  CodexHostSnapshot,
-  CreateCodexConversationOptions,
-  UpdateConversationSettings,
-} from '../../core/codex-host';
+import type { CodexApprovalMode, ApprovalPreset, CodexPermissionMode, CreateCodexConversationOptions, UpdateConversationSettings } from '../../core/codex-host';
+import type { CodexConversationSummary, CodexSnapshot } from '../../core/codex-conversation-types';
 import type { HostEventInput } from './host-events';
 import { sameValue } from './host-events';
 import {
@@ -26,11 +19,11 @@ export type CodexHostConversationSettingsDependencies = {
   emitSummaryUpserted(summary: CodexConversationSummary, reason: 'updated', origin: 'action'): void;
   ensureConnected(): Promise<void>;
   ensureThreadReady(threadId: string): Promise<ThreadRuntimeState>;
-  getSnapshot(): CodexHostSnapshot;
-  getState(): CodexHostSnapshot;
-  patch(patch: Partial<CodexHostSnapshot>): void;
+  getSnapshot(): CodexSnapshot;
+  getState(): CodexSnapshot;
+  patch(patch: Partial<CodexSnapshot>): void;
   patchRuntime(threadId: string, patch: ThreadRuntimePatch): void;
-  snapshotForRuntime(runtime: ThreadRuntimeState): CodexHostSnapshot;
+  snapshotForRuntime(runtime: ThreadRuntimeState): CodexSnapshot;
 };
 
 export class CodexHostConversationSettingsController {
@@ -99,7 +92,7 @@ export class CodexHostConversationSettingsController {
     if (summary) this.host.emitSummaryUpserted(summary, 'updated', 'action');
   }
 
-  async update(settings: UpdateConversationSettings): Promise<CodexHostSnapshot> {
+  async update(settings: UpdateConversationSettings): Promise<CodexSnapshot> {
     const state = this.host.getState();
     const threadId = state.activeConversationId;
     if (!threadId) {
@@ -145,7 +138,7 @@ export class CodexHostConversationSettingsController {
     if (changed) this.host.emitConversationSettings(threadId, 'action');
   }
 
-  async setGoal(objective: string, tokenBudget?: number | null): Promise<CodexHostSnapshot> {
+  async setGoal(objective: string, tokenBudget?: number | null): Promise<CodexSnapshot> {
     await this.host.ensureConnected();
     if (!this.host.getState().activeConversationId) await this.host.createConversation();
     const threadId = this.host.getState().activeConversationId;
@@ -175,7 +168,7 @@ export class CodexHostConversationSettingsController {
     }
   }
 
-  async clearGoal(): Promise<CodexHostSnapshot> {
+  async clearGoal(): Promise<CodexSnapshot> {
     await this.host.ensureConnected();
     const threadId = this.host.getState().activeConversationId;
     if (!threadId) return this.host.getSnapshot();

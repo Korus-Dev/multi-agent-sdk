@@ -6,7 +6,7 @@ Install in a Node.js 22.19+ application:
 npm install @korus-dev/multi-agent-sdk
 ```
 
-The package is ESM-only. Use `"type": "module"` in your application and configure TypeScript with `module: "ESNext"` and `moduleResolution: "Bundler"`. Use extensionless package subpaths, such as `@korus-dev/multi-agent-sdk/codex`. The legacy `node10` resolution mode cannot resolve these exports. Browser renderers should receive a host-controlled bridge or UI data rather than importing the Node harness root.
+The package is ESM-only. Use `"type": "module"` in your application and configure TypeScript with `module: "ESNext"` and `moduleResolution: "Bundler"`. Use extensionless package subpaths, such as `@korus-dev/multi-agent-sdk/renderer`. The legacy `node10` resolution mode cannot resolve these exports. Browser renderers should receive a host-controlled bridge or UI data rather than importing the Node harness root.
 
 ## Provider runtimes
 
@@ -24,9 +24,9 @@ The package does not provision provider subscriptions or store application API k
 `home` selects a provider configuration/data home. It must be absolute. Omit it to use native discovery. A session's `folder` selects its workspace and is independent of `home`.
 
 ```ts
-import { createHarnessDriver } from '@korus-dev/multi-agent-sdk';
+import { createHarness } from '@korus-dev/multi-agent-sdk';
 
-const driver = createHarnessDriver('codex', {
+const driver = createHarness('codex', {
   client: { name: 'my-app', version: '1.0.0' },
   home: '/srv/my-app/codex-profile',
 });

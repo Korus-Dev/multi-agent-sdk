@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createCodexConversationReplica } from '../../src/core/index';
-import type { CodexHostEvent } from '../../src/index';
+import type { CodexEvent } from '../../src/internal';
 import { CodexAppServerClient, type v2 } from '@korus-dev/codex-sdk';
 import { CodexHost } from '../../src/providers/codex';
 import {
   MockCodexAppServer,
-  createHost,
+  createHarness,
   lastRequest,
   lastResponse,
   resumeResponse,
@@ -16,8 +16,8 @@ import {
 
 describe('CodexHost', () => {
   it('routes item-only turn activity through the host runtime and summary', async () => {
-    const { host, transport } = createHost();
-    const events: CodexHostEvent[] = [];
+    const { host, transport } = createHarness();
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
     await host.connect();
     events.length = 0;
@@ -66,8 +66,8 @@ describe('CodexHost', () => {
   });
 
   it('publishes activity when a started turn completes', async () => {
-    const { host, transport } = createHost();
-    const events: CodexHostEvent[] = [];
+    const { host, transport } = createHarness();
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
     await host.connect();
     events.length = 0;
@@ -93,8 +93,8 @@ describe('CodexHost', () => {
   });
 
   it('projects approval-only activity and clears busy state only without an active turn', async () => {
-    const { host, transport } = createHost();
-    const events: CodexHostEvent[] = [];
+    const { host, transport } = createHarness();
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
     await host.connect();
     events.length = 0;
@@ -134,8 +134,8 @@ describe('CodexHost', () => {
   });
 
   it('keeps approval-only work busy while resolving a turnless MCP confirmation', async () => {
-    const { host, transport } = createHost();
-    const events: CodexHostEvent[] = [];
+    const { host, transport } = createHarness();
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
     await host.connect();
     events.length = 0;
@@ -190,8 +190,8 @@ describe('CodexHost', () => {
   });
 
   it('publishes activity when a turnless client request becomes idle', async () => {
-    const { host, transport } = createHost();
-    const events: CodexHostEvent[] = [];
+    const { host, transport } = createHarness();
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
     await host.connect();
     events.length = 0;
@@ -221,7 +221,7 @@ describe('CodexHost', () => {
   });
 
   it('renders app-server plans and raw response tools instead of dropping them', async () => {
-    const { host, transport } = createHost();
+    const { host, transport } = createHarness();
     await host.connect();
     transport.emitNotification('turn/started', { threadId: 'thread-existing', turn: turn('turn-plan', 'inProgress', []) });
     transport.emitNotification('item/plan/delta', { threadId: 'thread-existing', turnId: 'turn-plan', itemId: 'plan-item', delta: '# Plan\n' });
@@ -250,7 +250,7 @@ describe('CodexHost', () => {
   });
 
   it('surfaces app-server user questions and MCP confirmations and sends their answers back', async () => {
-    const { host, transport } = createHost();
+    const { host, transport } = createHarness();
     await host.connect();
     transport.emitServerRequest('ask-1', 'item/tool/requestUserInput', {
       threadId: 'thread-existing', turnId: 'turn-input', itemId: 'ask-user-item', autoResolutionMs: null,
@@ -338,7 +338,7 @@ describe('CodexHost', () => {
       'turn/start': () => ({ turn: turn('turn-live', 'inProgress', []) }),
     });
     const host = new CodexHost({ client: new CodexAppServerClient(transport), cwd: '/tmp/project' });
-    const events: CodexHostEvent[] = [];
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
     await host.connect();
     events.length = 0;
@@ -765,7 +765,7 @@ describe('CodexHost', () => {
   });
 
   it('backs edit, retry, delete, and queued prompt actions with real host operations', async () => {
-    const edited = createHost('thread/revert', 'turn/start');
+    const edited = createHarness('thread/revert', 'turn/start');
     await edited.host.connect();
     const editedReplica = createCodexConversationReplica(
       edited.host.conversation('thread-existing').getSnapshot(),
@@ -791,7 +791,7 @@ describe('CodexHost', () => {
       ],
     });
 
-    const retried = createHost('thread/revert', 'turn/start');
+    const retried = createHarness('thread/revert', 'turn/start');
     await retried.host.connect();
     await retried.host.conversation('thread-existing').retryTurn('turn-history');
     expect(lastRequest(retried.transport, 'thread/revert')).toMatchObject({ params: { beforeTurnId: 'turn-history' } });
@@ -799,14 +799,14 @@ describe('CodexHost', () => {
       params: { input: [{ type: 'text', text: 'Hello' }] },
     });
 
-    const retriedThroughHost = createHost('thread/revert', 'turn/start');
+    const retriedThroughHost = createHarness('thread/revert', 'turn/start');
     await retriedThroughHost.host.connect();
     await retriedThroughHost.host.retryTurn('turn-history');
     expect(lastRequest(retriedThroughHost.transport, 'turn/start')).toMatchObject({
       params: { input: [{ type: 'text', text: 'Hello' }] },
     });
 
-    const steered = createHost('turn/start', 'turn/steer', 'turn/interrupt');
+    const steered = createHarness('turn/start', 'turn/steer', 'turn/interrupt');
     await steered.host.connect();
     const steeredConversation = steered.host.conversation('thread-existing');
     await steeredConversation.sendMessage('First');
@@ -819,7 +819,7 @@ describe('CodexHost', () => {
       params: { threadId: 'thread-existing', turnId: 'turn-live' },
     });
 
-    const queued = createHost('turn/start', 'turn/steer');
+    const queued = createHarness('turn/start', 'turn/steer');
     await queued.host.connect();
     await queued.host.sendMessage('First');
     const firstQueue = await queued.host.sendMessage('Delete me');

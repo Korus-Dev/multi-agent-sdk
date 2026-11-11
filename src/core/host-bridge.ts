@@ -1,31 +1,6 @@
 import { normalizePromptContent } from './prompt-content';
-import type {
-  CodexConversationEvent,
-  CodexConversationHistory,
-  CodexConversationHistoryPage,
-  CodexConversationPromptHistory,
-  CodexConversationSnapshot,
-  CodexHostApi,
-  ApprovalDecision,
-  ApprovalScope,
-  AskUserAnswers,
-  ClientRequestResponse,
-  JsonValue,
-  ClientAttachment,
-  ClientSendMessageOptions,
-  Attachment,
-  CodexHostClientApi,
-  CreateCodexClientConversationOptions,
-  ListCodexConversationsOptions,
-  ListCodexModelsOptions,
-  ListCodexSkillsOptions,
-  ReadCodexRateLimitsOptions,
-  ConsumeCodexRateLimitResetCreditOptions,
-  SendMessageOptions,
-  StartCodexReviewOptions,
-  StartCodexLiveChatOptions,
-  UpdateConversationSettings,
-} from './codex-host';
+import type { CodexConversationHistory, CodexConversationHistoryPage, CodexConversationPromptHistory, CodexHostApi, ApprovalDecision, ApprovalScope, AskUserAnswers, ClientRequestResponse, JsonValue, ClientAttachment, ClientSendMessageOptions, Attachment, CodexHostClientApi, CreateCodexClientConversationOptions, ListCodexConversationsOptions, ListCodexModelsOptions, ListCodexSkillsOptions, ReadCodexRateLimitsOptions, ConsumeCodexRateLimitResetCreditOptions, SendMessageOptions, StartCodexReviewOptions, StartCodexLiveChatOptions, UpdateConversationSettings } from './codex-host';
+import type { CodexConversationEvent, CodexConversationSnapshot } from './codex-conversation-types';
 
 type RequiredClientApi = Required<CodexHostClientApi>;
 export type CodexHostBridgeOperation = Exclude<

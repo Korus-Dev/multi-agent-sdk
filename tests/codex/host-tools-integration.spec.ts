@@ -2,11 +2,11 @@ import { describe, expect, it, vi, onTestFinished } from 'vitest';
 import { createCodexConversationReplica } from '../../src/core/index';
 import { CodexAppServerClient, type v2 } from '@korus-dev/codex-sdk';
 import { CodexHost } from '../../src/providers/codex';
-import { createHost, lastResponse, turn, thread, resumeResponse, MockCodexAppServer } from './helpers/host-fixture';
+import { createHarness, lastResponse, turn, thread, resumeResponse, MockCodexAppServer } from './helpers/host-fixture';
 
 describe('CodexHost', () => {
   it.each(['mcp', 'dynamic', 'mcp-envelope', 'mcp-nested', 'imageView'] as const)('keeps %s image results visible through streaming, duplicate completion and history reload', async kind => {
-    const { host, transport } = createHost();
+    const { host, transport } = createHarness();
     onTestFinished(() => host.close());
     await host.connect();
     const replica = createCodexConversationReplica(host.getConversationSnapshot('thread-existing'));
@@ -43,7 +43,7 @@ describe('CodexHost', () => {
     ['item/completed', false], ['thread/compacted', false],
   ] as const)(
     'keeps new activity below compaction after a late tool result through %s (start received: %s)', async (method, started) => {
-      const { host, transport } = createHost();
+      const { host, transport } = createHarness();
       await host.connect();
       const replica = createCodexConversationReplica(host.getConversationSnapshot('thread-existing'));
       host.onConversationEvent('thread-existing', (event) => replica.apply(event));
@@ -97,7 +97,7 @@ describe('CodexHost', () => {
   );
 
   it('reduces every streamed tool update and resolves cancellation and confirmation variants', async () => {
-    const { host, transport } = createHost();
+    const { host, transport } = createHarness();
     await host.connect();
     transport.emitNotification('turn/started', { threadId: 'thread-existing', turn: turn('turn-stream', 'inProgress', []) });
     transport.emitNotification('item/started', {
@@ -185,7 +185,7 @@ describe('CodexHost', () => {
   });
 
   it('adapts server approval requests and resolves them through one host API', async () => {
-    const { host, transport } = createHost();
+    const { host, transport } = createHarness();
     await host.connect();
 
     transport.emitServerRequest(90, 'item/commandExecution/requestApproval', { kind: 'command',

@@ -1,11 +1,6 @@
 import type { ServerNotification } from '@korus-dev/codex-sdk';
-import type {
-  CodexConversationSummary,
-  CodexHostEvent,
-  HostEventOrigin,
-  JsonValue,
-  CodexHostSnapshot,
-} from '../../core/codex-host';
+import type { EventOrigin, JsonValue } from '../../core/codex-host';
+import type { CodexConversationSummary, CodexEvent, CodexSnapshot } from '../../core/codex-conversation-types';
 import {
   commandOutputDeltaToToolPartUpdate,
   fileChangePatchToToolPartUpdate,
@@ -40,8 +35,8 @@ import {
   upsertConversationTurn,
 } from './host-events';
 
-type HostEventInput = CodexHostEvent extends infer Event
-  ? Event extends CodexHostEvent
+type HostEventInput = CodexEvent extends infer Event
+  ? Event extends CodexEvent
     ? Omit<Event, 'seq' | 'occurredAt' | 'origin'>
     : never
   : never;
@@ -53,23 +48,23 @@ export interface CodexHostNotificationsDependencies {
     eventReason: 'conversation_closed' | 'conversation_removed' | 'host_disconnected',
   ): void;
   createRuntime(threadId: string, patch?: ThreadRuntimePatch): ThreadRuntimeState;
-  emitConversationActivity(threadId: string, origin: HostEventOrigin): void;
-  emitConversationPermissions(threadId: string, origin: HostEventOrigin): void;
-  emitConversationSettings(threadId: string, origin: HostEventOrigin): void;
-  emitConversationSkills(threadId: string, origin: HostEventOrigin): void;
-  emitEvent(origin: HostEventOrigin, input: HostEventInput): void;
+  emitConversationActivity(threadId: string, origin: EventOrigin): void;
+  emitConversationPermissions(threadId: string, origin: EventOrigin): void;
+  emitConversationSettings(threadId: string, origin: EventOrigin): void;
+  emitConversationSkills(threadId: string, origin: EventOrigin): void;
+  emitEvent(origin: EventOrigin, input: HostEventInput): void;
   emitSummaryUpserted(
     summary: CodexConversationSummary,
-    reason: Extract<CodexHostEvent, { type: 'conversation.summaryUpserted' }>['payload']['reason'],
-    origin: HostEventOrigin,
+    reason: Extract<CodexEvent, { type: 'conversation.summaryUpserted' }>['payload']['reason'],
+    origin: EventOrigin,
   ): void;
-  getState(): CodexHostSnapshot;
+  getState(): CodexSnapshot;
   markRuntimeTurnActive(runtime: ThreadRuntimeState, turnId: string): void;
-  patch(patch: Partial<CodexHostSnapshot>): void;
+  patch(patch: Partial<CodexSnapshot>): void;
   patchConversationStatus(
     threadId: string,
     status: CodexConversationSummary['status'],
-    origin?: HostEventOrigin,
+    origin?: EventOrigin,
   ): void;
   patchConversationTurnCount(threadId: string, turnCount: number): void;
   patchRuntime(threadId: string, patch: ThreadRuntimePatch): void;
@@ -78,7 +73,7 @@ export interface CodexHostNotificationsDependencies {
   runtime(threadId: string): ThreadRuntimeState | undefined;
   runtimes(): Iterable<ThreadRuntimeState>;
   sendNextQueuedPrompt(threadId: string): void;
-  snapshotForRuntime(runtime: ThreadRuntimeState): CodexHostSnapshot;
+  snapshotForRuntime(runtime: ThreadRuntimeState): CodexSnapshot;
   unknownNotification(notification: ServerNotification): void;
 }
 

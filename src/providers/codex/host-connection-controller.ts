@@ -1,12 +1,7 @@
 import { RpcRemoteError } from '@korus-dev/codex-sdk';
 import type { CodexAppServerClient, v2 } from '@korus-dev/codex-sdk';
-import type {
-  CodexHostAuthentication,
-  CodexChatGptDeviceCodeLogin,
-  CodexChatGptLogin,
-  HostEventOrigin,
-  CodexHostSnapshot,
-} from '../../core/codex-host';
+import type { CodexChatGptDeviceCodeLogin, CodexChatGptLogin, EventOrigin } from '../../core/codex-host';
+import type { CodexAuthenticationState, CodexSnapshot } from '../../core/codex-conversation-types';
 import { CodexHostApprovalsController } from './host-approvals-controller';
 import { hostAuthenticationKey } from './host-authentication';
 import { CodexHostAuthenticationController } from './host-authentication-controller';
@@ -34,11 +29,11 @@ export interface CodexHostConnectionDependencies {
     eventReason: 'host_disconnected',
   ): void;
   closed(): boolean;
-  emitAuthenticationChanged(authentication: CodexHostAuthentication, origin: HostEventOrigin): void;
-  emitHostStatus(origin: HostEventOrigin): void;
-  getSnapshot(): CodexHostSnapshot;
-  getState(): CodexHostSnapshot;
-  patch(patch: Partial<CodexHostSnapshot>): void;
+  emitAuthenticationChanged(authentication: CodexAuthenticationState, origin: EventOrigin): void;
+  emitHostStatus(origin: EventOrigin): void;
+  getSnapshot(): CodexSnapshot;
+  getState(): CodexSnapshot;
+  patch(patch: Partial<CodexSnapshot>): void;
 }
 
 const SDK_RUNTIME_FEATURES = new Set([
@@ -47,7 +42,7 @@ const SDK_RUNTIME_FEATURES = new Set([
 ]);
 
 export class CodexHostConnectionController {
-  private connectPromise: Promise<CodexHostSnapshot> | null = null;
+  private connectPromise: Promise<CodexSnapshot> | null = null;
   private hostBootstrapPromise: Promise<void> | null = null;
   private bootstrappedAuthenticationKey: string | null = null;
 
@@ -65,7 +60,7 @@ export class CodexHostConnectionController {
     private readonly host: CodexHostConnectionDependencies,
   ) {}
 
-  connect(): Promise<CodexHostSnapshot> {
+  connect(): Promise<CodexSnapshot> {
     if (this.host.getState().status === 'ready') return Promise.resolve(this.host.getSnapshot());
     if (this.connectPromise) return this.connectPromise;
     if (this.host.closed()) return Promise.reject(new Error('Codex host is closed'));
@@ -186,7 +181,7 @@ export class CodexHostConnectionController {
     return bootstrap;
   }
 
-  async refreshAccount(): Promise<CodexHostSnapshot> {
+  async refreshAccount(): Promise<CodexSnapshot> {
     await this.ensureConnected();
     return this.authentication.refresh('action', true);
   }
@@ -201,12 +196,12 @@ export class CodexHostConnectionController {
     return this.authentication.startChatGptDeviceCodeLogin();
   }
 
-  async cancelLogin(loginId: string): Promise<CodexHostSnapshot> {
+  async cancelLogin(loginId: string): Promise<CodexSnapshot> {
     await this.ensureConnected();
     return this.authentication.cancelLogin(loginId);
   }
 
-  async logout(): Promise<CodexHostSnapshot> {
+  async logout(): Promise<CodexSnapshot> {
     await this.ensureConnected();
     return this.authentication.logout();
   }
@@ -260,8 +255,8 @@ export class CodexHostConnectionController {
   }
 
   patchAuthentication(
-    patch: Partial<CodexHostAuthentication>,
-    origin: HostEventOrigin,
+    patch: Partial<CodexAuthenticationState>,
+    origin: EventOrigin,
   ): void {
     const authentication = { ...this.host.getState().authentication, ...patch };
     this.host.patch({ authentication });

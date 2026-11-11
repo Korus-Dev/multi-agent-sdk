@@ -1,4 +1,7 @@
 import { validateMcpPolicy } from '../../mcp-policy';
+import type { ProviderConversationRef, ConversationStorageState } from '../../contracts';
+import type { StartCodexRealtimeOptions } from '../../core/codex-conversation-types';
+import type { CodexRealtimeSession } from './host-contracts';
 import { notifyListeners } from '@korus-dev/codex-sdk';
 import type { HarnessDiagnostic } from '../../diagnostics';
 import { CodexImageGeneration } from './image-generation';
@@ -15,8 +18,8 @@ export type CodexHostAdapterOptions<Context extends Agent = Agent> = {
   conversationConfiguration?: (context: Context, scope?: HarnessPromptScope) => import('./host-contracts').CodexConversationLoadOptions;
   shouldSyncTitle?: (context: Context) => boolean;
   displayName?: (context: Context) => string;
-  retainedSessions?: (context: Context) => readonly BackendSession[];
-  approvalPresetFromDefaults?: (defaults: import('../../contracts').BackendDefaults | undefined) => ApprovalPreset;
+  retainedSessions?: (context: Context) => readonly ProviderSessionData[];
+  approvalPresetFromDefaults?: (defaults: import('../../contracts').ProviderDefaults | undefined) => ApprovalPreset;
   formatPrompt?: typeof defaultFormatPrompt;
   statusFromSnapshot?: typeof statusFromSnapshot;
   runtimeStatusDetail?: (status: 'connecting' | 'running' | 'notConfigured') => import('../../contracts').AppText;
@@ -24,7 +27,7 @@ export type CodexHostAdapterOptions<Context extends Agent = Agent> = {
 };
 function defaultFormatPrompt(prompt: string, content?: SendPromptOptions['content'], _native?: boolean): string { return content === undefined ? prompt : promptContentDispatchText(content, prompt); }
 function scopedMcpServers(scope: HarnessPromptScope) { return (scope.mcpServers ?? []).map(server => ({ name: server.name, transport: { type: 'http' as const, url: server.url }, ...(server.enabledTools ? { enabledTools: [...server.enabledTools] } : {}), ...(server.approval === 'auto' ? { toolApprovalMode: 'auto' as const } : {}), ...(server.required === undefined ? {} : { required: server.required }) })); }
-function nativeApprovalPreset(defaults: import('../../contracts').BackendDefaults | undefined): ApprovalPreset | undefined {
+function nativeApprovalPreset(defaults: import('../../contracts').ProviderDefaults | undefined): ApprovalPreset | undefined {
   if (defaults?.kind !== 'codex') return undefined;
   // Missing caller policy inherits the native thread; it is not an approval override.
   if (defaults.approvalPreset === undefined && defaults.approvalPolicy === undefined && defaults.sandboxMode === undefined && defaults.approvalsReviewer === undefined) return undefined;
@@ -53,11 +56,11 @@ import type {
   Agent,
   AgentStatus,
   ApprovalPreset,
-  BackendModelOption,
-  BackendPluginSummary,
-  BackendRuntimeStatus,
-  BackendSession,
-  BackendSkillSummary,
+  ProviderModelOption,
+  ProviderPluginSummary,
+  ProviderRuntimeStatus,
+  ProviderSessionData,
+  ProviderSkillSummary,
   ClientRequestResponse,
   ConversationListInput,
   ConversationResumeTarget,
@@ -74,9 +77,9 @@ import type {
   SubagentOperationChange,
   SubagentStatusChange
 } from '../../contracts/index';
-import type { HarnessScopedPromptInput, HarnessScopedPromptResult, HarnessEvent } from '../../driver';
+import type { ProviderScopedPromptInput, ProviderScopedPromptResult, ProviderEvent } from '../../driver';
 import type { HarnessTextGenerationInput, HarnessTextGenerationResult } from '../../generation';
-import { codexBackendCapabilities } from '../../capabilities';
+import { codexHarnessCapabilities } from '../../capabilities';
 
 
 
@@ -85,31 +88,16 @@ import type { CodexConversation, CodexHost } from './index';
 
 
 import { safetyReviewFromSnapshot, statusFromSnapshot } from './status';
-import type {
-  CodexConversationEvent,
-  CodexConversationSummary,
-  CodexConversationSnapshot,
-  CodexHostEvent,
-  CodexRateLimits,
-  CodexReviewTarget,
-  CodexHostSnapshot,
-  Skill,
-  TurnStatus,
-  CodexThreadStatus,
-  SendMessageOptions,
-  UpdateConversationSettings,
-  ConversationMessage,
-  ConversationMessagePart,
-  ConversationMessageToolPart,
-} from '../../core/codex-host';
+import type { CodexReviewTarget, Skill, TurnStatus, SendMessageOptions, UpdateConversationSettings, ConversationMessage, ConversationMessagePart, ConversationMessageToolPart } from '../../core/codex-host';
+import type { CodexConversationEvent, CodexConversationSummary, CodexConversationSnapshot, CodexEvent, CodexRateLimits, CodexSnapshot, CodexThreadStatus } from '../../core/codex-conversation-types';
 import {
   invokeCodexConversationBridgeOperation,
   subscribeCodexConversationReplicaBridge,
 } from '../../core/host-bridge';
 
-type AdapterListener = (event: HarnessEvent) => void;
-type ThreadBackendEvent<Event extends HarnessEvent = HarnessEvent> = Event extends HarnessEvent
-  ? Omit<Event, 'agentId' | 'backend' | 'threadId' | 'conversationId'>
+type AdapterListener = (event: ProviderEvent) => void;
+type ThreadProviderEvent<Event extends ProviderEvent = ProviderEvent> = Event extends ProviderEvent
+  ? Omit<Event, 'agentId' | 'provider' | 'threadId' | 'conversationId'>
   : never;
 
 const AGENT_HISTORY_CACHE_TTL_MS = 15 * 60 * 1_000;
@@ -186,7 +174,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
   private conversationConfiguration(context: Context, scope?: HarnessPromptScope) { return this.options.conversationConfiguration?.(context, scope) ?? { ...agentCwd(context), extensionContext: this.extensionContext(context, scope), mcpServers: scope ? scopedMcpServers(scope) : undefined }; }
   private syncTitle(context: Context): boolean { return this.options.shouldSyncTitle?.(context) ?? Boolean(context.name?.trim()); }
   private displayName(context: Context): string { return this.options.displayName?.(context) ?? context.name?.trim() ?? context.id; }
-  private approvalPreset(defaults: import('../../contracts').BackendDefaults | undefined): ApprovalPreset | undefined { return this.options.approvalPresetFromDefaults?.(defaults) ?? nativeApprovalPreset(defaults); }
+  private approvalPreset(defaults: import('../../contracts').ProviderDefaults | undefined): ApprovalPreset | undefined { return this.options.approvalPresetFromDefaults?.(defaults) ?? nativeApprovalPreset(defaults); }
   async start(): Promise<void> {
     await this.host.connect();
   }
@@ -290,6 +278,17 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
     return authenticationFromHost((await this.host.logout()).authentication);
   }
 
+  async setConversationStorage(ref: ProviderConversationRef, state: ConversationStorageState): Promise<void> {
+    if (ref.provider !== 'codex') throw new Error('Not a Codex conversation reference.');
+    await this.host.connect();
+    await (state === 'archived' ? this.host.archiveConversation(ref.threadId) : this.host.unarchiveConversation(ref.threadId));
+  }
+
+  async startRealtime(agent: Context, options: StartCodexRealtimeOptions): Promise<CodexRealtimeSession> {
+    const session = await this.ensureSession(agent);
+    return session.handle.startRealtime(options);
+  }
+
   async getRemoteControlStatus(): Promise<DevicePairingStatus> {
     const status = await this.host.readRemoteControlStatus();
     const requirements = await this.host.readConfigRequirements();
@@ -354,7 +353,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
     await this.host.revokeRemoteControlClient({ environmentId, clientId });
   }
 
-  getRuntimeStatus(): BackendRuntimeStatus {
+  getRuntimeStatus(): ProviderRuntimeStatus {
     return runtimeStatus(this.host.getSnapshot(), this.options.runtimeStatusDetail);
   }
 
@@ -363,12 +362,12 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
     const presets = session?.handle.getSnapshot().approvalPresets
       ?? this.host.getSnapshot().approvalPresets;
     return {
-      ...codexBackendCapabilities,
-      approvalPresets: presets.length > 0 ? [...presets] : codexBackendCapabilities.approvalPresets,
+      ...codexHarnessCapabilities,
+      approvalPresets: presets.length > 0 ? [...presets] : codexHarnessCapabilities.approvalPresets,
     };
   }
 
-  async listModels(): Promise<BackendModelOption[]> {
+  async listModels(): Promise<ProviderModelOption[]> {
     const models = await this.host.listModels({ includeHidden: false, forceReload: true });
     const preferred = models.find(model => model.model === this.options.defaultModel?.model);
     return models.map((model) => ({
@@ -381,12 +380,12 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
     }));
   }
 
-  async listSkills(agent: Context, forceReload = false): Promise<BackendSkillSummary[]> {
+  async listSkills(agent: Context, forceReload = false): Promise<ProviderSkillSummary[]> {
     const skills = await this.host.listSkills({ ...agentCwd(agent), forceReload });
-    return skills.map(backendSkillSummary);
+    return skills.map(providerSkillSummary);
   }
 
-  async listPlugins(): Promise<BackendPluginSummary[]> {
+  async listPlugins(): Promise<ProviderPluginSummary[]> {
     await this.start();
     const snapshot = this.host.getSnapshot();
     if (snapshot.pluginCatalogStatus === 'loaded' || snapshot.pluginCatalogStatus === 'error') {
@@ -439,7 +438,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
     } finally { this.releaseConversation(agent.id); }
   }
 
-  async executeScopedPrompt(agent: Context, input: HarnessScopedPromptInput): Promise<HarnessScopedPromptResult> {
+  async executeScopedPrompt(agent: Context, input: ProviderScopedPromptInput): Promise<ProviderScopedPromptResult> {
     input.signal?.throwIfAborted();
     validateMcpPolicy(input.scope.mcpServers ?? [], 'codex');
     await this.start();
@@ -447,7 +446,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
     if (input.session && input.session.kind !== 'codex') {
       throw new Error('Codex cannot continue a non-Codex scoped conversation.');
     }
-    const requestedAgent = { ...agent, folder: input.cwd, backendSession: input.session };
+    const requestedAgent = { ...agent, folder: input.cwd, providerSession: input.session };
     const scopedExtensionContext = this.extensionContext(requestedAgent, input.scope);
     const session = await this.ensureSession(requestedAgent, scopedExtensionContext);
     input.signal?.throwIfAborted();
@@ -495,7 +494,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
     }
   }
 
-  async disposeScopedSession(scopedSession: BackendSession): Promise<void> {
+  async disposeScopedSession(scopedSession: ProviderSessionData): Promise<void> {
     if (scopedSession.kind !== 'codex') throw new Error('Codex cannot dispose a non-Codex scoped conversation.');
     await this.host.archiveConversation(scopedSession.threadId);
     this.host.forgetConversation(scopedSession.threadId);
@@ -532,8 +531,8 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
       throw new Error('Context must be idle before compressing its session.');
     }
 
-    const defaults = agent.backendDefaults?.kind === 'codex'
-      ? { ...agent.backendDefaults }
+    const defaults = agent.providerDefaults?.kind === 'codex'
+      ? { ...agent.providerDefaults }
       : undefined;
     const requestedPreset = this.approvalPreset(defaults);
     const effectivePreset = effectiveApprovalPreset(requestedPreset, this.host.getSnapshot().approvalPresets);
@@ -800,7 +799,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
   }
 
   async resumeConversation(agent: Context, target: ConversationResumeTarget) {
-    if (target.ref.backend !== 'codex') throw new Error('Codex cannot resume a non-Codex conversation.');
+    if (target.ref.provider !== 'codex') throw new Error('Codex cannot resume a non-Codex conversation.');
     const threadId = target.ref.threadId;
     const previousThreadId = codexThreadId(agent);
     const targetWasArchived = target.storageState === 'archived';
@@ -868,7 +867,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
 
   async forkConversation(agent: Context, targetAgent: Context, turnId?: string) {
     const source = await this.ensureSession(agent);
-    const defaults = targetAgent.backendDefaults?.kind === 'codex' ? targetAgent.backendDefaults : undefined;
+    const defaults = targetAgent.providerDefaults?.kind === 'codex' ? targetAgent.providerDefaults : undefined;
     const preset = effectiveApprovalPreset(this.approvalPreset(defaults), this.host.getSnapshot().approvalPresets);
     const options = {
       ...agentCwd(targetAgent),
@@ -932,7 +931,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
       const wasSuppressingEvents = existing.suppressEvents;
       existing.suppressEvents = true;
       try {
-        const requestedDefaults = agent.backendDefaults?.kind === 'codex' ? { ...agent.backendDefaults } : undefined;
+        const requestedDefaults = agent.providerDefaults?.kind === 'codex' ? { ...agent.providerDefaults } : undefined;
         await existing.handle.load({ ...agentCwd(agent), extensionContext: this.extensionContext(agent) });
         mark('load.sdk-ready');
         this.historyHydratedAtByAgentId.set(agent.id, Date.now());
@@ -1072,8 +1071,8 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
   ): Promise<AgentConversation<Context>> {
     await this.start();
     if (!isCurrent()) throw new Error('Codex conversation initialization was cancelled.');
-    const defaults = agent.backendDefaults?.kind === 'codex'
-      ? { ...agent.backendDefaults }
+    const defaults = agent.providerDefaults?.kind === 'codex'
+      ? { ...agent.providerDefaults }
       : undefined;
     const requestedPreset = this.approvalPreset(defaults);
     const effectivePreset = effectiveApprovalPreset(requestedPreset, this.host.getSnapshot().approvalPresets);
@@ -1162,9 +1161,9 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
 
   async readConversationContent(agent: Context, input: import('../../contracts/conversation').ConversationContentInput): Promise<import('../../contracts/conversation').ConversationContentChunk> {
     const session = this.sessionsByAgentId.get(agent.id);
-    if (!session || agent.backendSession?.kind !== 'codex' || agent.backendSession.threadId !== input.sessionId || session.handle.id !== input.sessionId) throw new Error('Conversation image is no longer available.');
+    if (!session || agent.providerSession?.kind !== 'codex' || agent.providerSession.threadId !== input.sessionId || session.handle.id !== input.sessionId) throw new Error('Conversation image is no longer available.');
     const chunk = await session.handle.readContent(input.contentId, input.offset);
-    if (this.closed || this.sessionsByAgentId.get(agent.id) !== session || agent.backendSession?.kind !== 'codex' || agent.backendSession.threadId !== input.sessionId) throw new Error('Conversation image is no longer available.');
+    if (this.closed || this.sessionsByAgentId.get(agent.id) !== session || agent.providerSession?.kind !== 'codex' || agent.providerSession.threadId !== input.sessionId) throw new Error('Conversation image is no longer available.');
     return chunk;
   }
 
@@ -1207,8 +1206,8 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
     await this.start();
     mark('bind.driver-connected');
     if (!isCurrent()) throw new Error('Conversation load was cancelled.');
-    const requestedDefaults = agent.backendDefaults?.kind === 'codex'
-      ? { ...agent.backendDefaults }
+    const requestedDefaults = agent.providerDefaults?.kind === 'codex'
+      ? { ...agent.providerDefaults }
       : undefined;
     const session = this.bindRuntime(agent, threadId, false, true);
     mark('bind.runtime-bound');
@@ -1247,7 +1246,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
   private async restoreConversationSettings(
     session: AgentConversation<Context>,
     snapshot: CodexConversationSnapshot,
-    requestedDefaults: Context['backendDefaults'],
+    requestedDefaults: Context['providerDefaults'],
   ): Promise<CodexConversationSnapshot> {
     if (this.options.inheritNativeSettings) return snapshot;
     const settings: UpdateConversationSettings = {};
@@ -1390,7 +1389,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
     }
   }
 
-  private handleHostEvent(event: CodexHostEvent): void {
+  private handleHostEvent(event: CodexEvent): void {
     if (event.type === 'authentication.changed') {
       const identity = JSON.stringify(event.payload.authentication.account);
       if (identity !== this.accountIdentity || event.origin === 'notification') {
@@ -1398,7 +1397,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
         this.resetCreditTokens.clear();
         for (const cancel of this.resetReadCancellations) cancel();
         const state = authenticationFromHost(event.payload.authentication);
-        this.emit({ backend: 'codex', type: 'provider.authenticationChanged', payload: { kind: 'codex', connected: Boolean(state.account || !state.requiresOpenaiAuth), state }, occurredAt: event.occurredAt });
+        this.emit({ provider: 'codex', type: 'provider.authenticationChanged', payload: { kind: 'codex', connected: Boolean(state.account || !state.requiresOpenaiAuth), state }, occurredAt: event.occurredAt });
       }
     }
 
@@ -1460,12 +1459,12 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
       return;
     }
     if (event.type === 'host.statusChanged') {
-      this.emit({ backend: 'codex', type: 'backend.statusChanged', payload: runtimeStatus(this.host.getSnapshot(), this.options.runtimeStatusDetail), occurredAt: event.occurredAt });
+      this.emit({ provider: 'codex', type: 'provider.statusChanged', payload: runtimeStatus(this.host.getSnapshot(), this.options.runtimeStatusDetail), occurredAt: event.occurredAt });
       return;
     }
     if (event.type === 'rateLimits.changed' && event.payload.rateLimits) {
       this.emit({
-        backend: 'codex',
+        provider: 'codex',
         type: 'account.rateLimitsUpdated',
         payload: { rateLimits: event.payload.rateLimits.rateLimits },
         occurredAt: event.occurredAt,
@@ -1474,7 +1473,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
     }
     if (event.type === 'catalog.skillsChanged' && event.payload.status === 'loaded') {
       this.emit({
-        backend: 'codex',
+        provider: 'codex',
         type: 'skills.changed',
         payload: skillsChangedPayload(event.payload.cwd, event.payload.skills, event.payload.status),
         occurredAt: event.occurredAt,
@@ -1483,7 +1482,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
     }
     if (event.type === 'remoteControl.statusChanged') {
       this.emit({
-        backend: 'codex',
+        provider: 'codex',
         type: 'remoteControl.statusChanged',
         payload: event.payload.status,
         occurredAt: event.occurredAt,
@@ -1858,7 +1857,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
 
     session.agent.conversationTitle = conversationTitle;
     this.emit({
-      backend: 'codex',
+      provider: 'codex',
       agentId: session.agent.id,
       threadId: session.handle.id,
       type: 'agent.updated',
@@ -1899,18 +1898,18 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
 
   private emitThread(
     session: AgentConversation<Context>,
-    event: ThreadBackendEvent,
+    event: ThreadProviderEvent,
   ): void {
     this.emit({
       ...event,
       agentId: session.agent.id,
-      backend: 'codex',
+      provider: 'codex',
       threadId: session.handle.id,
       conversationId: session.handle.id,
-    } as HarnessEvent);
+    } as ProviderEvent);
   }
 
-  private emit(event: HarnessEvent): void {
+  private emit(event: ProviderEvent): void {
     for (const listener of this.listeners) listener(event);
   }
 
@@ -1949,7 +1948,7 @@ function conversationSummary(
     updatedAt: conversation.updatedAt,
     messageCount: conversation.turnCount,
     storageState,
-    ref: { backend: 'codex', threadId: conversation.id },
+    ref: { provider: 'codex', threadId: conversation.id },
   };
 }
 
@@ -2018,7 +2017,7 @@ function subagentStatusFromHistory(
 }
 
 function authenticationFromHost(
-  authentication: CodexHostSnapshot['authentication'],
+  authentication: CodexSnapshot['authentication'],
 ): CodexAuthentication {
   return {
     // Older clients cannot decode new account variants; retain connection state without exposing an unknown shape.
@@ -2042,7 +2041,7 @@ function resultTurnId(
 }
 
 function hostPromptOptions(options: SendPromptOptions = {}): SendMessageOptions {
-  const backendOptions = options.backendOptions?.kind === 'codex' ? options.backendOptions : undefined;
+  const providerOptions = options.providerOptions?.kind === 'codex' ? options.providerOptions : undefined;
   return {
     ...(options.content === undefined ? {} : { content: options.content }),
     ...(options.attachments?.length ? { attachments: options.attachments } : {}),
@@ -2050,14 +2049,14 @@ function hostPromptOptions(options: SendPromptOptions = {}): SendMessageOptions 
     ...(typeof options.planMode === 'boolean' ? { planMode: options.planMode } : {}),
     ...(options.selection?.reasoningEffort ? { reasoningEffort: options.selection.reasoningEffort } : {}),
     ...(options.selection?.serviceTier !== undefined ? { serviceTier: options.selection.serviceTier } : {}),
-    ...((options.skills?.length ?? 0) > 0 || (backendOptions?.skills?.length ?? 0) > 0
-      ? { skills: options.skills?.length ? options.skills : backendOptions?.skills }
+    ...((options.skills?.length ?? 0) > 0 || (providerOptions?.skills?.length ?? 0) > 0
+      ? { skills: options.skills?.length ? options.skills : providerOptions?.skills }
       : {}),
   };
 }
 
 function scopedPromptOptions(agent: Agent): SendMessageOptions | undefined {
-  const defaults = agent.backendDefaults?.kind === 'codex' ? agent.backendDefaults : undefined;
+  const defaults = agent.providerDefaults?.kind === 'codex' ? agent.providerDefaults : undefined;
   if (!defaults?.model && !defaults?.reasoningEffort) return undefined;
   return {
     ...(defaults.model ? { model: defaults.model } : {}),
@@ -2135,15 +2134,15 @@ function skillsChangedPayload(
   cwd: string | null,
   skills: readonly Skill[],
   status: 'loaded',
-): { cwd: string | null; skills: BackendSkillSummary[]; status: 'loaded' } {
+): { cwd: string | null; skills: ProviderSkillSummary[]; status: 'loaded' } {
   return {
     cwd,
-    skills: skills.map(backendSkillSummary),
+    skills: skills.map(providerSkillSummary),
     status,
   };
 }
 
-function backendSkillSummary(skill: Skill): BackendSkillSummary {
+function providerSkillSummary(skill: Skill): ProviderSkillSummary {
   const { brandColor, defaultPrompt, ...summary } = skill;
   return {
     id: skill.path,
@@ -2261,17 +2260,17 @@ function boundedToolMetadata(metadata: Record<string, unknown> | undefined): Rec
   return Object.keys(bounded).length > 0 ? bounded : undefined;
 }
 
-function runtimeStatus(snapshot: CodexHostSnapshot, detail?: (status: 'connecting' | 'running' | 'notConfigured') => import('../../contracts').AppText): BackendRuntimeStatus {
+function runtimeStatus(snapshot: CodexSnapshot, detail?: (status: 'connecting' | 'running' | 'notConfigured') => import('../../contracts').AppText): ProviderRuntimeStatus {
   if (snapshot.status === 'connecting') {
-    return { backend: 'codex', status: 'starting', detail: detail?.('connecting') ?? 'Codex connecting' };
+    return { provider: 'codex', status: 'starting', detail: detail?.('connecting') ?? 'Codex connecting' };
   }
   if (snapshot.status === 'ready') {
-    return { backend: 'codex', status: 'running', detail: detail?.('running') ?? 'Codex connected' };
+    return { provider: 'codex', status: 'running', detail: detail?.('running') ?? 'Codex connected' };
   }
   if (snapshot.status === 'error') {
-    return { backend: 'codex', status: 'error', detail: snapshot.error ?? 'Codex app-server failed.' };
+    return { provider: 'codex', status: 'error', detail: snapshot.error ?? 'Codex app-server failed.' };
   }
-  return { backend: 'codex', status: 'notConfigured', detail: detail?.('notConfigured') ?? 'Codex not connected' };
+  return { provider: 'codex', status: 'notConfigured', detail: detail?.('notConfigured') ?? 'Codex not connected' };
 }
 
 function effectiveApprovalPreset(
@@ -2285,7 +2284,7 @@ function effectiveApprovalPreset(
 }
 
 function codexThreadId(agent: Agent): string | null {
-  return agent.backendSession?.kind === 'codex' ? agent.backendSession.threadId : null;
+  return agent.providerSession?.kind === 'codex' ? agent.providerSession.threadId : null;
 }
 
 function agentCwd(agent: Pick<Agent, 'folder'>): { cwd?: string } {

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ModelDescriptor, CodexHostSnapshot, ConversationMessage } from '../../src/index';
+import type { ModelDescriptor, ConversationMessage } from '../../src/index';
+import type { CodexSnapshot } from '../../src/internal';
 import type { CodexAppServerClient, v2 } from '@korus-dev/codex-sdk';
 import { initialAuthentication } from '../../src/providers/codex/host-authentication';
 import { CodexHostForkController } from '../../src/providers/codex/host-fork-controller';
@@ -380,7 +381,7 @@ function createController(options: SetupOptions = {}) {
     emitSummaryUpserted: vi.fn(),
     getState: vi.fn(() => state),
     hydrateCompleteHistory: vi.fn(async () => undefined),
-    patch: vi.fn((patch: Partial<CodexHostSnapshot>) => Object.assign(state, patch)),
+    patch: vi.fn((patch: Partial<CodexSnapshot>) => Object.assign(state, patch)),
     rememberHostOptions: vi.fn(),
     requireRuntime: vi.fn((threadId: string) => {
       const runtime = runtimes.get(threadId);

@@ -20,7 +20,7 @@ Question outcomes use `{ kind: 'answered', answers }`; cancellation uses `{ kind
 Hosts supply named HTTP MCP endpoints through `mcpServers`:
 
 ```ts
-const driver = createHarnessDriver('codex', {
+const driver = createHarness('codex', {
   client: { name: 'my-app' },
   mcpServers: () => [{
     name: 'ledger',

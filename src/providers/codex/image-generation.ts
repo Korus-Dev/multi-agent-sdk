@@ -3,7 +3,7 @@ import type { TurnStatus } from '../../core/codex-host';
 import type { HarnessImageGenerationInput, HarnessImageGenerationResult } from '../../generation';
 import { fileURLToPath } from 'node:url';
 export type CodexImageGenerationOptions = {
-  selectModel?: (models: readonly import('../../contracts').BackendModelOption[]) => { model: string; reasoningEffort?: string };
+  selectModel?: (models: readonly import('../../contracts').ProviderModelOption[]) => { model: string; reasoningEffort?: string };
   log?: (message: string, details: Record<string, unknown>) => void;
 };
 

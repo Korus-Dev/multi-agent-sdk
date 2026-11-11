@@ -1,13 +1,9 @@
 import type { v2 } from '@korus-dev/codex-sdk';
-import type {
-  CodexHostEvent,
-  JsonValue,
-  Turn,
-  TurnError,
-} from '../../core/codex-host';
+import type { JsonValue, Turn, TurnError } from '../../core/codex-host';
+import type { CodexEvent } from '../../core/codex-conversation-types';
 
-export type HostEventInput = CodexHostEvent extends infer Event
-  ? Event extends CodexHostEvent
+export type HostEventInput = CodexEvent extends infer Event
+  ? Event extends CodexEvent
     ? Omit<Event, 'seq' | 'occurredAt' | 'origin'>
     : never
   : never;

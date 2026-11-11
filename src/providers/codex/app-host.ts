@@ -5,19 +5,19 @@ import {
 } from '../../core/ttl-cache';
 import type { CodexHostOptions } from './host-contracts';
 
-export type CodexAppBackendModuleContext = {
+export type CodexAppHostModuleContext = {
   host: CodexHost;
-  closeBackend(): Promise<void>;
+  closeProvider(): Promise<void>;
   createTtlCache<Value>(options: TtlCacheOptions<Value>): TtlCache<Value>;
 };
 
-export type CodexAppBackendModule<Service = unknown> = {
+export type CodexAppHostModule<Service = unknown> = {
   id: string;
-  create(context: CodexAppBackendModuleContext): Service;
+  create(context: CodexAppHostModuleContext): Service;
 };
 
-export type CodexAppBackendOptions = {
-  modules?: readonly CodexAppBackendModule[];
+export type CodexAppHostOptions = {
+  modules?: readonly CodexAppHostModule[];
   host?: CodexHost;
   hostOptions?: CodexHostOptions;
 };
@@ -29,28 +29,28 @@ export type CodexAppBackendOptions = {
  * services such as agents, teams, or work integrations. Transport and process
  * ownership stay with the embedding application.
  */
-export class CodexAppBackend {
+export class CodexAppHost {
   readonly host: CodexHost;
   private readonly moduleServices = new Map<string, unknown>();
   private readonly ttlCaches = new Set<{ close(): Promise<void> }>();
   private closePromise: Promise<void> | null = null;
 
-  constructor(options: CodexAppBackendOptions = {}) {
+  constructor(options: CodexAppHostOptions = {}) {
     if (options.host && options.hostOptions) {
       throw new Error('Provide either host or hostOptions, not both');
     }
     const modules = (options.modules ?? []).map((module) => ({ id: module.id.trim(), module }));
     const moduleIds = new Set<string>();
     for (const { id } of modules) {
-      if (!id) throw new Error('Codex backend module IDs cannot be empty');
-      if (moduleIds.has(id)) throw new Error(`Duplicate Codex backend module '${id}'`);
+      if (!id) throw new Error('Codex module IDs cannot be empty');
+      if (moduleIds.has(id)) throw new Error(`Duplicate Codex module '${id}'`);
       moduleIds.add(id);
     }
     this.host = options.host ?? new CodexHost(options.hostOptions);
     for (const { id, module } of modules) {
       this.moduleServices.set(id, module.create({
         host: this.host,
-        closeBackend: () => this.close(),
+        closeProvider: () => this.close(),
         createTtlCache: (cacheOptions) => this.createTtlCache(cacheOptions),
       }));
     }
@@ -58,12 +58,12 @@ export class CodexAppBackend {
 
   module<Service>(id: string): Service {
     const normalizedId = id.trim();
-    if (!this.moduleServices.has(normalizedId)) throw new Error(`Unknown Codex backend module '${normalizedId}'`);
+    if (!this.moduleServices.has(normalizedId)) throw new Error(`Unknown Codex module '${normalizedId}'`);
     return this.moduleServices.get(normalizedId) as Service;
   }
 
   createTtlCache<Value>(options: TtlCacheOptions<Value>): TtlCache<Value> {
-    if (this.closePromise) throw new Error('Cannot create a cache after the Codex backend is closed');
+    if (this.closePromise) throw new Error('Cannot create a cache after the Codex harness is closed');
     const cache = new TtlCache(options);
     this.ttlCaches.add(cache);
     return cache;
@@ -80,6 +80,6 @@ export class CodexAppBackend {
   }
 }
 
-export function createCodexAppBackend(options: CodexAppBackendOptions = {}): CodexAppBackend {
-  return new CodexAppBackend(options);
+export function createCodexAppHost(options: CodexAppHostOptions = {}): CodexAppHost {
+  return new CodexAppHost(options);
 }

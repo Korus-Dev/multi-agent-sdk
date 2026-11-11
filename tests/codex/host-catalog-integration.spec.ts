@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CodexAppServerClient, type v2 } from '@korus-dev/codex-sdk';
 import { CodexHost } from '../../src/providers/codex';
-import type { CodexHostEvent } from '../../src/index';
+import type { CodexEvent } from '../../src/internal';
 import {
   MockCodexAppServer,
   deferred,
@@ -66,7 +66,7 @@ describe('CodexHost', () => {
         path: '/skills/fresh/SKILL.md', scope: 'user', enabled: true }],
     }] }) });
     const host = new CodexHost({ client: new CodexAppServerClient(transport) });
-    const events: CodexHostEvent[] = [];
+    const events: CodexEvent[] = [];
     host.onEvent(event => events.push(event));
     try {
       await host.connect();
@@ -98,7 +98,7 @@ describe('CodexHost', () => {
       'plugin/installed': () => pluginCatalog.promise,
     });
     const host = new CodexHost({ client: new CodexAppServerClient(transport) });
-    const events: CodexHostEvent[] = [];
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
     await host.connect();
     expect(host.getSnapshot().pluginCatalogStatus).toBe('loading');
@@ -143,7 +143,7 @@ describe('CodexHost', () => {
       }),
     });
     const host = new CodexHost({ client: new CodexAppServerClient(transport), cwd: '/tmp/project' });
-    const events: CodexHostEvent[] = [];
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
     await host.connect();
     events.length = 0;
@@ -442,8 +442,8 @@ describe('CodexHost', () => {
       }),
     });
     const host = new CodexHost({ client: new CodexAppServerClient(transport) });
-    const removedEvents: CodexHostEvent[] = [];
-    const selectedEvents: CodexHostEvent[] = [];
+    const removedEvents: CodexEvent[] = [];
+    const selectedEvents: CodexEvent[] = [];
     host.onEvent((event) => {
       if (event.type === 'conversation.summaryRemoved') removedEvents.push(event);
       if (event.type === 'conversation.selected') selectedEvents.push(event);
@@ -530,8 +530,8 @@ describe('CodexHost', () => {
       'thread/delete': () => ({}),
     });
     const host = new CodexHost({ client: new CodexAppServerClient(transport) });
-    const selectedEvents: CodexHostEvent[] = [];
-    const resolvedEvents: CodexHostEvent[] = [];
+    const selectedEvents: CodexEvent[] = [];
+    const resolvedEvents: CodexEvent[] = [];
     host.onEvent((event) => {
       if (event.type === 'conversation.selected') selectedEvents.push(event);
       if (event.type === 'approval.resolved' || event.type === 'clientRequest.resolved') {

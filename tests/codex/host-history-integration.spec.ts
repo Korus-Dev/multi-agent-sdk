@@ -2,8 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { CodexAppServerClient, type v2 } from '@korus-dev/codex-sdk';
 import { CodexHost } from '../../src/providers/codex';
 import { createCodexConversationReplica } from '../../src/core/index';
-import type { CodexHostEvent, ConversationMessage } from '../../src/index';
-import { MockCodexAppServer, createHost, deferred, lastRequest, resumeResponse, thread, turn } from './helpers/host-fixture';
+import type { ConversationMessage } from '../../src/index';
+import type { CodexEvent } from '../../src/internal';
+import { MockCodexAppServer, createHarness, deferred, lastRequest, resumeResponse, thread, turn } from './helpers/host-fixture';
 
 function historyTurn(id: string, index: number): v2.Turn {
   return turn(id, 'completed', [
@@ -248,8 +249,8 @@ describe('CodexHost', () => {
       },
     });
     const host = new CodexHost({ client: new CodexAppServerClient(transport), loadingStrategy: strategy === 'switch' ? 'lazy' : 'eager' });
-    const historyEvents: CodexHostEvent[] = [];
-    const historyPrependedEvents: CodexHostEvent[] = [];
+    const historyEvents: CodexEvent[] = [];
+    const historyPrependedEvents: CodexEvent[] = [];
     host.onEvent((event) => {
       if (event.type === 'conversation.historyReplaced') historyEvents.push(event);
       if (event.type === 'conversation.historyPrepended') historyPrependedEvents.push(event);
@@ -312,8 +313,8 @@ describe('CodexHost', () => {
       },
     });
     const host = new CodexHost({ client: new CodexAppServerClient(transport), loadingStrategy: 'eager' });
-    const prepended: Extract<CodexHostEvent, { type: 'conversation.historyPrepended' }>[] = [];
-    const replaced: Extract<CodexHostEvent, { type: 'conversation.historyReplaced' }>[] = [];
+    const prepended: Extract<CodexEvent, { type: 'conversation.historyPrepended' }>[] = [];
+    const replaced: Extract<CodexEvent, { type: 'conversation.historyReplaced' }>[] = [];
     host.onEvent((event) => {
       if (event.type === 'conversation.historyPrepended') prepended.push(event);
       if (event.type === 'conversation.historyReplaced') replaced.push(event);
@@ -506,10 +507,10 @@ describe('CodexHost', () => {
   });
 
   it('emits ordered semantic events after matching state mutations for conversation handles', async () => {
-    const { host, transport } = createHost('thread/settings/update', 'turn/start');
+    const { host, transport } = createHarness('thread/settings/update', 'turn/start');
     await host.connect();
-    const events: CodexHostEvent[] = [];
-    const handleEvents: CodexHostEvent[] = [];
+    const events: CodexEvent[] = [];
+    const handleEvents: CodexEvent[] = [];
     const unsubscribeHost = host.onEvent((event) => {
       events.push(event);
       if (event.type === 'message.delta') {
@@ -645,7 +646,7 @@ describe('CodexHost', () => {
   });
 
   it('exposes safe reasoning summaries while keeping raw reasoning content internal', async () => {
-    const { host, transport } = createHost('turn/start');
+    const { host, transport } = createHarness('turn/start');
     await host.connect();
     await host.sendMessage('Think carefully');
     const replica = createCodexConversationReplica(host.getConversationSnapshot('thread-existing'));
@@ -679,9 +680,9 @@ describe('CodexHost', () => {
   });
 
   it('preserves agent message phase before and during streaming', async () => {
-    const { host, transport } = createHost();
+    const { host, transport } = createHarness();
     await host.connect();
-    const events: CodexHostEvent[] = [];
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
     const replica = createCodexConversationReplica(host.getConversationSnapshot('thread-existing'));
     host.onConversationEvent('thread-existing', event => replica.apply(event));

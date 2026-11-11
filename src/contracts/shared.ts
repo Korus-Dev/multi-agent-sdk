@@ -5,11 +5,11 @@ export type AppTextDescriptor = {
 
 export type AppText = string | AppTextDescriptor;
 
-export const agentBackends = ['codex', 'claude', 'cursor', 'antigravity'] as const;
-export type AgentBackend = typeof agentBackends[number];
+export const harnessProviders = ['codex', 'claude', 'cursor', 'antigravity'] as const;
+export type HarnessProvider = typeof harnessProviders[number];
 
-export function isAgentBackend(value: unknown): value is AgentBackend {
-  return agentBackends.includes(value as AgentBackend);
+export function isHarnessProvider(value: unknown): value is HarnessProvider {
+  return harnessProviders.includes(value as HarnessProvider);
 }
 
 export type ApprovalPreset = 'ask-for-approval' | 'approve-for-me' | 'full-access';

@@ -1,12 +1,12 @@
 import { claudeWorkingDirectory } from './working-directory';
-import { claudeBackendCapabilities } from '../../capabilities';
-import type { HarnessEvent, HarnessPermissionModeResult } from '../../driver';
+import { claudeHarnessCapabilities } from '../../capabilities';
+import type { ProviderEvent, ProviderPermissionModeResult } from '../../driver';
 import type {
   Agent,
-  BackendCapabilities,
-  BackendModelOption,
-  BackendRuntimeStatus,
-  BackendSkillSummary,
+  ProviderCapabilities,
+  ProviderModelOption,
+  ProviderRuntimeStatus,
+  ProviderSkillSummary,
 } from '../../contracts/index';
 import { claudeModelOptions, claudeModelOptionsFromSdk } from './models';
 import { listClaudeSkills } from './skills';
@@ -14,7 +14,7 @@ import type { ClaudeAvailableModel, ClaudeTurnTransport } from './transport';
 
 export type ClaudeProviderCatalogOptions = {
   homeDir?: string;
-  emit: (event: HarnessEvent) => void;
+  emit: (event: ProviderEvent) => void;
   transport: ClaudeTurnTransport;
   statusText?: (status: 'notConfigured' | 'running') => import('../../contracts').AppText;
 };
@@ -26,37 +26,37 @@ export class ClaudeProviderCatalog {
 
   constructor(private readonly options: ClaudeProviderCatalogOptions) {}
 
-  getRuntimeStatus(): BackendRuntimeStatus {
+  getRuntimeStatus(): ProviderRuntimeStatus {
     return {
-      backend: 'claude',
+      provider: 'claude',
       status: 'notConfigured',
       detail: this.options.statusText?.('notConfigured') ?? 'Claude has not started',
     };
   }
 
-  getCapabilities(): BackendCapabilities {
+  getCapabilities(): ProviderCapabilities {
     return {
-      ...claudeBackendCapabilities,
+      ...claudeHarnessCapabilities,
       reasoningEffort: this.modelCatalog.some((model) => (model.supportedReasoningEfforts?.length ?? 0) > 0),
       serviceTier: this.modelCatalog.some((model) => (model.serviceTiers?.length ?? 0) > 0),
     };
   }
 
-  async listModels(agent: Agent): Promise<BackendModelOption[]> {
+  async listModels(agent: Agent): Promise<ProviderModelOption[]> {
     await this.discoverModels(agent);
     return this.modelCatalog.map((model) => ({ ...model }));
   }
 
-  async listSkills(agent: Agent): Promise<BackendSkillSummary[]> {
+  async listSkills(agent: Agent): Promise<ProviderSkillSummary[]> {
     return listClaudeSkills(agent, { homeDir: this.options.homeDir });
   }
 
-  setPermissionMode(agent: Agent, mode: string): HarnessPermissionModeResult {
-    const defaults = agent.backendDefaults?.kind === 'claude'
-      ? agent.backendDefaults
+  setPermissionMode(agent: Agent, mode: string): ProviderPermissionModeResult {
+    const defaults = agent.providerDefaults?.kind === 'claude'
+      ? agent.providerDefaults
       : { kind: 'claude' as const };
     return {
-      backendDefaults: {
+      providerDefaults: {
         ...defaults,
         permissionMode: mode,
       },
@@ -91,15 +91,15 @@ export class ClaudeProviderCatalog {
     if (!models.length || sameModelCatalog(this.modelCatalog, models)) return;
     this.modelCatalog = models;
     this.options.emit({
-      backend: 'claude',
+      provider: 'claude',
       type: 'models.changed',
       payload: { models: this.modelCatalog.map((model) => ({ ...model })) },
     });
     this.options.emit({
-      backend: 'claude',
-      type: 'backend.statusChanged',
+      provider: 'claude',
+      type: 'provider.statusChanged',
       payload: {
-        backend: 'claude',
+        provider: 'claude',
         status: 'running',
         detail: this.options.statusText?.('running') ?? 'Claude connected',
         capabilities: this.getCapabilities(),
@@ -108,6 +108,6 @@ export class ClaudeProviderCatalog {
   }
 }
 
-function sameModelCatalog(left: readonly BackendModelOption[], right: readonly BackendModelOption[]): boolean {
+function sameModelCatalog(left: readonly ProviderModelOption[], right: readonly ProviderModelOption[]): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
 }

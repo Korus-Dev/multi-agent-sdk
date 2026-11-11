@@ -1,8 +1,8 @@
-import type { AgentBackend, ReasoningEffort } from './shared';
+import type { HarnessProvider, ReasoningEffort } from './shared';
 
 /** A complete execution choice. Null means the provider default, including Standard tier. */
 export type ExecutionSelection = Readonly<{
-  backend: AgentBackend;
+  provider: HarnessProvider;
   model: string | null;
   reasoningEffort: ReasoningEffort | null;
   serviceTier: string | null;

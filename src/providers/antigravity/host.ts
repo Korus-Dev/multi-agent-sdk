@@ -1,9 +1,9 @@
 import { validateMcpPolicy } from '../../mcp-policy';
-import type { HarnessContext, HarnessDriver, HarnessEvent, HarnessPromptScope, HarnessScopedPromptInput, HarnessScopedPromptResult } from '../../driver';
+import type { ProviderContext, ProviderDriver, ProviderEvent, HarnessPromptScope, ProviderScopedPromptInput, ProviderScopedPromptResult } from '../../driver';
 import type { HarnessTextGenerationInput } from '../../generation';
 import type { PromptPart } from '../../core/prompt-content';
 import { defaultRuntimeDirectory } from '../../runtime/paths';
-export type AntigravityHostOptions<Context extends HarnessContext = HarnessContext> = {
+export type AntigravityHostOptions<Context extends ProviderContext = ProviderContext> = {
   stateDirectory?: () => string;
   home?: () => string;
   resolveRuntime?: typeof resolveAcpRuntime;
@@ -22,12 +22,12 @@ import type { ExecutionObservation } from '../../contracts/usage';
 import { mkdir, realpath } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
-import type { AccountRateLimits, BackendConversationRef, BackendModelOption, BackendRuntimeStatus, BackendSession, ConversationListInput, ConversationSummary, ConversationResumeTarget, SendPromptOptions } from '../../contracts/index';
+import type { AccountRateLimits, ProviderConversationRef, ProviderModelOption, ProviderRuntimeStatus, ProviderSessionData, ConversationListInput, ConversationSummary, ConversationResumeTarget, SendPromptOptions } from '../../contracts/index';
 
 import { requestFromClientRequest, type AgentRequestResponse } from '../../conversations/agent-request';
 import type { ProviderAuthentication, ProviderAuthenticationAction } from '../../contracts/authentication';
 import type { AntigravityConversationEvent } from '../../contracts/antigravity-conversation';
-import { antigravityBackendCapabilities } from '../../capabilities';
+import { antigravityHarnessCapabilities } from '../../capabilities';
 
 
 
@@ -42,8 +42,8 @@ import { acpAttachments } from './attachments';
 import { AcpPromptJournal } from './prompt-journal';
 import { parseQuotaMessage } from './quota';
 
-export class AntigravityHost<Context extends HarnessContext = HarnessContext> implements HarnessDriver<Context, HarnessEvent> {
-  readonly backend = 'antigravity' as const;
+export class AntigravityHost<Context extends ProviderContext = ProviderContext> implements ProviderDriver<Context, ProviderEvent> {
+  readonly provider = 'antigravity' as const;
   private readonly sessions = new Map<string, AcpSession>();
   private readonly opening = new Map<string, Promise<AcpSession>>();
   private readonly generations = new Map<string, number>();
@@ -51,7 +51,7 @@ export class AntigravityHost<Context extends HarnessContext = HarnessContext> im
   private readonly executionScopes = new Map<string, HarnessPromptScope>();
   private readonly resuming = new Map<string, Promise<void>>();
   private readonly auxiliary = new Set<AcpSession>();
-  private readonly listeners = new Set<(event: HarnessEvent) => void>();
+  private readonly listeners = new Set<(event: ProviderEvent) => void>();
   private readonly usageListeners = new Set<(event: ExecutionObservation) => void>();
   onUsage(listener: (event: ExecutionObservation) => void) { this.usageListeners.add(listener); return () => { this.usageListeners.delete(listener); }; }
   private observeUsage(event: ExecutionObservation) { for (const listener of this.usageListeners) { try { listener(event); } catch { /* Observer isolation. */ } } }
@@ -62,11 +62,11 @@ export class AntigravityHost<Context extends HarnessContext = HarnessContext> im
   private closed = false;
   constructor(private readonly options: AntigravityHostOptions<Context> = {}) {}
 
-  getRuntimeStatus(): BackendRuntimeStatus {
-    return { backend: this.backend, status: !(this.options.resolveRuntime ? this.options.resolveRuntime() : resolveAcpRuntime(this.options.stateDirectory?.())) ? 'notConfigured' : this.sessions.size ? 'running' : 'starting' };
+  getRuntimeStatus(): ProviderRuntimeStatus {
+    return { provider: this.provider, status: !(this.options.resolveRuntime ? this.options.resolveRuntime() : resolveAcpRuntime(this.options.stateDirectory?.())) ? 'notConfigured' : this.sessions.size ? 'running' : 'starting' };
   }
-  getCapabilities() { return antigravityBackendCapabilities; }
-  onEvent(listener: (event: HarnessEvent) => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
+  getCapabilities() { return antigravityHarnessCapabilities; }
+  onEvent(listener: (event: ProviderEvent) => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
 
   async authenticate(request: ProviderAuthenticationAction): Promise<ProviderAuthentication> {
     if (request.action === 'cancel') {
@@ -116,7 +116,7 @@ export class AntigravityHost<Context extends HarnessContext = HarnessContext> im
 
   async sendPrompt(agent: Context, prompt: string, options?: SendPromptOptions) {
     const submitted = await this.submitPrompt(agent, prompt, options);
-    return { backendSession: submitted.backendSession, turnId: submitted.turnId };
+    return { providerSession: submitted.providerSession, turnId: submitted.turnId };
   }
   private async submitPrompt(agent: Context, prompt: string, options?: SendPromptOptions, scope?: HarnessPromptScope, admissionGuard?: () => void) {
     if (options?.selection?.reasoningEffort != null || options?.selection?.serviceTier != null) throw new Error('Antigravity does not support reasoning effort or service tiers.');
@@ -127,11 +127,11 @@ export class AntigravityHost<Context extends HarnessContext = HarnessContext> im
     const session = await this.ensure(agent, scope);
     admissionGuard?.();
     admissionGuard?.();
-    const model = options?.selection?.model ?? (agent.backendDefaults?.kind === this.backend ? agent.backendDefaults.model : undefined);
+    const model = options?.selection?.model ?? (agent.providerDefaults?.kind === this.provider ? agent.providerDefaults.model : undefined);
     if (model) await session.setModel(model);
     admissionGuard?.();
-    const permission = options?.backendOptions?.kind === this.backend ? options.backendOptions.permissionMode
-      : agent.backendDefaults?.kind === this.backend ? agent.backendDefaults.permissionMode : undefined;
+    const permission = options?.providerOptions?.kind === this.provider ? options.providerOptions.permissionMode
+      : agent.providerDefaults?.kind === this.provider ? agent.providerDefaults.permissionMode : undefined;
     if (permission) await session.setMode(permission);
     admissionGuard?.();
     const planning = options?.planMode === true || /^\/plan(?:\s|$)/.test(prompt);
@@ -147,15 +147,15 @@ export class AntigravityHost<Context extends HarnessContext = HarnessContext> im
       if (this.sessions.get(agent.id) !== session || session.snapshot.turns.find(turn => turn.id === turnId)?.status !== 'completed') return;
       const markdown = session.writtenPlan ?? session.snapshot.messages.filter(message => message.turnId === turnId && message.role === 'assistant')
         .flatMap(message => message.parts.flatMap(part => part.type === 'text' ? [part.text] : [])).join('\n');
-      if (markdown.trim()) this.emit({ type: 'plan.readyForReview', backend: this.backend, agentId: agent.id, conversationId: session.sessionId, turnId, payload: { markdown } });
+      if (markdown.trim()) this.emit({ type: 'plan.readyForReview', provider: this.provider, agentId: agent.id, conversationId: session.sessionId, turnId, payload: { markdown } });
     });
-    return { backendSession: this.reference(session), turnId, session, completion };
+    return { providerSession: this.reference(session), turnId, session, completion };
   }
 
-  async continueInterruptedTurn(agent: Context): Promise<import('../../driver').HarnessTurnActionResult> {
-    if (agent.backendSession?.kind !== 'antigravity') throw new Error('No Antigravity session to continue.');
+  async continueInterruptedTurn(agent: Context): Promise<import('../../driver').ProviderTurnActionResult> {
+    if (agent.providerSession?.kind !== 'antigravity') throw new Error('No Antigravity session to continue.');
     const result = await this.sendPrompt(agent, 'continue');
-    return { backendSession: result.backendSession, activeTurnId: result.turnId };
+    return { providerSession: result.providerSession, activeTurnId: result.turnId };
   }
 
   async interrupt(agent: Context, expectedTurnId?: string) {
@@ -163,7 +163,7 @@ export class AntigravityHost<Context extends HarnessContext = HarnessContext> im
     if (!session) throw new Error('Antigravity session is not running.');
     const turnId = session.snapshot.activeTurnId ?? undefined;
     await session.interrupt(expectedTurnId);
-    return { backendSession: this.reference(session), turnId };
+    return { providerSession: this.reference(session), turnId };
   }
 
   async cancelScopedPrompt(agent: Context): Promise<void> {
@@ -172,12 +172,12 @@ export class AntigravityHost<Context extends HarnessContext = HarnessContext> im
     finally { await this.releaseConversation(agent.id); }
   }
 
-  async executeScopedPrompt(agent: Context, input: HarnessScopedPromptInput): Promise<HarnessScopedPromptResult> {
+  async executeScopedPrompt(agent: Context, input: ProviderScopedPromptInput): Promise<ProviderScopedPromptResult> {
     input.signal?.throwIfAborted();
     validateMcpPolicy(input.scope.mcpServers ?? [], 'antigravity');
     input = { ...input, scope: structuredClone(input.scope) };
-    if (input.session && input.session.kind !== this.backend) throw new Error('Antigravity cannot continue another provider execution.');
-    const scopedContext = { ...agent, folder: input.cwd, backendSession: input.session };
+    if (input.session && input.session.kind !== this.provider) throw new Error('Antigravity cannot continue another provider execution.');
+    const scopedContext = { ...agent, folder: input.cwd, providerSession: input.session };
     const { session, turnId, completion } = await this.submitPrompt(scopedContext, input.prompt, input.options, input.scope, () => input.signal?.throwIfAborted());
     await completion;
     input.signal?.throwIfAborted();
@@ -239,8 +239,8 @@ export class AntigravityHost<Context extends HarnessContext = HarnessContext> im
     } finally { input.signal?.removeEventListener('abort', abort); this.auxiliary.delete(session); await session.close(); }
   }
 
-  async disposeScopedSession(agent: Context, scopedSession: BackendSession): Promise<void> {
-    if (scopedSession.kind !== this.backend) throw new Error('Antigravity cannot dispose another provider execution.');
+  async disposeScopedSession(agent: Context, scopedSession: ProviderSessionData): Promise<void> {
+    if (scopedSession.kind !== this.provider) throw new Error('Antigravity cannot dispose another provider execution.');
     const session = this.sessions.get(agent.id);
     if (session && session.sessionId !== scopedSession.sessionId) throw new Error('Antigravity execution session changed.');
     await this.releaseConversation(agent.id);
@@ -253,15 +253,15 @@ export class AntigravityHost<Context extends HarnessContext = HarnessContext> im
     session.respond(response);
   }
 
-  async loadConversation(agent: Context): Promise<BackendSession | null> {
-    if (!agent.backendSession && !this.sessions.has(agent.id)) return null;
+  async loadConversation(agent: Context): Promise<ProviderSessionData | null> {
+    if (!agent.providerSession && !this.sessions.has(agent.id)) return null;
     const session = await this.ensure(agent);
     this.publishSnapshot(agent.id, session);
     return this.reference(session);
   }
 
   async resumeConversation(agent: Context, target: ConversationResumeTarget) {
-    if (target.ref.backend !== this.backend || target.storageState !== 'active') throw new Error('Invalid Antigravity conversation target.');
+    if (target.ref.provider !== this.provider || target.storageState !== 'active') throw new Error('Invalid Antigravity conversation target.');
     if (target.ref.folder !== agent.folder) throw new Error('Antigravity conversation belongs to another workspace.');
     const existing = this.sessions.get(agent.id);
     if (existing?.snapshot.busy || this.opening.has(agent.id) || this.resuming.has(agent.id)) throw new Error('Finish the current Antigravity operation before resuming history.');
@@ -275,7 +275,7 @@ export class AntigravityHost<Context extends HarnessContext = HarnessContext> im
       await this.releaseConversation(agent.id);
       this.sessions.set(agent.id, next);
       this.publishSnapshot(agent.id, next);
-      return { backendSession: this.reference(next) };
+      return { providerSession: this.reference(next) };
     } finally { this.resuming.delete(agent.id); finishResume(); }
   }
 
@@ -298,13 +298,13 @@ export class AntigravityHost<Context extends HarnessContext = HarnessContext> im
         .slice(0, input?.limit ?? 100)
         .map(entry => ({ id: entry.sessionId, sessionId: entry.sessionId, title: entry.title,
           updatedAt: '', messageCount: 0, storageState: 'active',
-          ref: { backend: this.backend, folder: agent.folder, sessionId: entry.sessionId } }));
+          ref: { provider: this.provider, folder: agent.folder, sessionId: entry.sessionId } }));
     } catch (error) { if (error instanceof NativeLoginRequired) this.authState(false); throw error; }
     finally { await runtime.close(); }
   }
 
-  async readConversationMessages(ref: BackendConversationRef, agentId: string) {
-    if (ref.backend !== this.backend) throw new Error('Antigravity cannot read another provider conversation.');
+  async readConversationMessages(ref: ProviderConversationRef, agentId: string) {
+    if (ref.provider !== this.provider) throw new Error('Antigravity cannot read another provider conversation.');
     const current = this.sessions.get(agentId);
     if (current?.sessionId === ref.sessionId) {
       if (await realpath(current.cwd) !== await realpath(this.workingDirectory({ id: agentId, folder: ref.folder }))) throw new Error('Antigravity conversation belongs to another workspace.');
@@ -314,12 +314,12 @@ export class AntigravityHost<Context extends HarnessContext = HarnessContext> im
     try { return structuredClone(session.snapshot.messages); } finally { await session.close(); }
   }
 
-  async readConversationSummary(agent: Context, ref: BackendConversationRef): Promise<ConversationSummary | null> {
-    if (ref.backend !== this.backend || ref.folder !== agent.folder) return null;
+  async readConversationSummary(agent: Context, ref: ProviderConversationRef): Promise<ConversationSummary | null> {
+    if (ref.provider !== this.provider || ref.folder !== agent.folder) return null;
     return (await this.listConversations(agent)).find(entry => entry.sessionId === ref.sessionId) ?? null;
   }
 
-  async listModels(agent: Context): Promise<BackendModelOption[]> {
+  async listModels(agent: Context): Promise<ProviderModelOption[]> {
     const resuming = this.resuming.get(agent.id);
     if (resuming) await resuming;
     // Read the adopted session; a cancelled resume must not reopen the caller's old reference.
@@ -330,7 +330,7 @@ export class AntigravityHost<Context extends HarnessContext = HarnessContext> im
 
   async setPermissionMode(agent: Context, mode: string) {
     await (await this.ensure(agent)).setMode(mode);
-    return { backendDefaults: { ...(agent.backendDefaults?.kind === this.backend ? agent.backendDefaults : {}), kind: this.backend, permissionMode: mode } };
+    return { providerDefaults: { ...(agent.providerDefaults?.kind === this.provider ? agent.providerDefaults : {}), kind: this.provider, permissionMode: mode } };
   }
 
   async releaseConversation(agentId: string): Promise<void> {
@@ -360,7 +360,7 @@ export class AntigravityHost<Context extends HarnessContext = HarnessContext> im
     const pending = this.opening.get(agent.id);
     if (pending) return pending;
     const generation = this.generations.get(agent.id) ?? 0;
-    const sessionId = agent.backendSession?.kind === this.backend ? agent.backendSession.sessionId : current?.sessionId;
+    const sessionId = agent.providerSession?.kind === this.provider ? agent.providerSession.sessionId : current?.sessionId;
     if (scope) this.executionScopes.set(agent.id, scope);
     const work = this.open(agent, sessionId, scope).then(async session => {
       if (this.closed || generation !== (this.generations.get(agent.id) ?? 0)) { await session.close(); throw new Error('Antigravity session was released during startup.'); }
@@ -392,7 +392,7 @@ export class AntigravityHost<Context extends HarnessContext = HarnessContext> im
   }
 
   private conversationEvent(event: AntigravityConversationEvent): void {
-    const identity = { agentId: event.agentId, backend: this.backend, backendSessionId: event.sessionId, conversationId: event.sessionId, turnId: event.turnId };
+    const identity = { agentId: event.agentId, provider: this.provider, providerSessionId: event.sessionId, conversationId: event.sessionId, turnId: event.turnId };
     this.emit({ ...identity, type: 'antigravity.conversationEventReceived', payload: { revision: this.nextRevision(event.agentId), event } });
     if (event.type === 'request.created') this.emit({ ...identity, type: 'agentRequest.created', payload: { request: requestFromClientRequest(event.payload.request, { conversationId: event.sessionId, turnId: event.turnId }) } });
     else if (event.type === 'request.resolved') this.emit({ ...identity, type: 'agentRequest.resolved', payload: event.payload });
@@ -400,19 +400,19 @@ export class AntigravityHost<Context extends HarnessContext = HarnessContext> im
     else if (event.type === 'turn.completed') this.emit({ ...identity, type: 'agent.statusChanged', payload: event.payload.turn.status === 'failed' ? { type: 'error', message: event.payload.error ?? 'Antigravity turn failed.' } : { type: 'idle' } });
   }
   private publishSnapshot(agentId: string, session: AcpSession): void {
-    this.emit({ type: 'antigravity.conversationSnapshotChanged', agentId, backend: this.backend, backendSessionId: session.sessionId, conversationId: session.sessionId,
+    this.emit({ type: 'antigravity.conversationSnapshotChanged', agentId, provider: this.provider, providerSessionId: session.sessionId, conversationId: session.sessionId,
       payload: { revision: this.nextRevision(agentId), snapshot: session.snapshot } });
   }
-  private reference(session: AcpSession): BackendSession { return { kind: this.backend, sessionId: session.sessionId }; }
+  private reference(session: AcpSession): ProviderSessionData { return { kind: this.provider, sessionId: session.sessionId }; }
   private nextRevision(agentId: string): number { const revision = (this.revisions.get(agentId) ?? 0) + 1; this.revisions.set(agentId, revision); return revision; }
   private authState(connected: boolean): ProviderAuthentication {
-    const state: ProviderAuthentication = { kind: this.backend, connected, state: { loggedIn: connected, homePath: (this.options.home?.() ?? antigravityHome(this.options.stateDirectory?.())) } };
-    this.emit({ type: 'provider.authenticationChanged', backend: this.backend, payload: state }); return state;
+    const state: ProviderAuthentication = { kind: this.provider, connected, state: { loggedIn: connected, homePath: (this.options.home?.() ?? antigravityHome(this.options.stateDirectory?.())) } };
+    this.emit({ type: 'provider.authenticationChanged', provider: this.provider, payload: state }); return state;
   }
-  private emit(event: HarnessEvent): void { for (const listener of this.listeners) listener(event); }
+  private emit(event: ProviderEvent): void { for (const listener of this.listeners) listener(event); }
 }
 
-function antigravityModels(models: unknown): BackendModelOption[] {
+function antigravityModels(models: unknown): ProviderModelOption[] {
   if (!record(models) || !Array.isArray(models.availableModels)) return [];
   return models.availableModels.filter(record).filter(model => typeof model.modelId === 'string').map(model => ({
     id: model.modelId as string, model: model.modelId as string,

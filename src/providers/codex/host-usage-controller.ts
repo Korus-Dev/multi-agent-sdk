@@ -1,9 +1,8 @@
-import type {
-  CodexHostEvent, HostEventOrigin, TurnExecutionUsage, RequestUsage, TokenUsage,
-} from '../../core/codex-host';
+import type { EventOrigin, TurnExecutionUsage, RequestUsage, TokenUsage } from '../../core/codex-host';
+import type { CodexEvent } from '../../core/codex-conversation-types';
 
-type EventInput = CodexHostEvent extends infer Event
-  ? Event extends CodexHostEvent ? Omit<Event, 'seq' | 'occurredAt' | 'origin'> : never
+type EventInput = CodexEvent extends infer Event
+  ? Event extends CodexEvent ? Omit<Event, 'seq' | 'occurredAt' | 'origin'> : never
   : never;
 const unavailableRequestUsage: RequestUsage = {
   status: 'unavailable',
@@ -57,7 +56,7 @@ export class CodexHostUsageController {
     };
   }
 
-  observe(origin: HostEventOrigin, input: EventInput): EventInput {
+  observe(origin: EventOrigin, input: EventInput): EventInput {
     if (!('conversationId' in input)) return input;
     const id = input.conversationId;
     if ((input.type === 'conversation.historyReplaced' && input.payload.reason !== 'details' && input.payload.reason !== 'images') || input.type === 'conversation.summaryRemoved') {

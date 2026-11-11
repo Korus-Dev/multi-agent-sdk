@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import type { CodexHostAuthentication } from '../../src/index';
+import type { CodexAuthenticationState } from '../../src/internal';
 import {
   createThreadRuntime,
   initialHostSnapshot,
   runtimeProjection,
 } from '../../src/providers/codex/host-runtime';
 
-const authentication: CodexHostAuthentication = {
+const authentication: CodexAuthenticationState = {
   status: 'notLoaded',
   account: null,
   requiresOpenaiAuth: null,

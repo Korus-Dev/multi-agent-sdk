@@ -1,5 +1,7 @@
 /** Pure presentation helpers for browser and Electron renderers. */
 export * from './capabilities';
+export { harnessProviders, isHarnessProvider } from './contracts/shared';
+export { isProviderConversationRef } from './contracts/conversation';
 export * from './conversations/work-phases';
 export * from './conversations/presentation';
 export { createCodexConversationReplica, type CodexConversationReplica } from './core/conversation-replica';

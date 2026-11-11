@@ -16,7 +16,7 @@ export class MockCodexAppServer extends StrictMockCodexAppServer {
 
 export type StandardMutation = keyof typeof standardMutationHandlers;
 
-export function createHost(
+export function createHarness(
   ...mutations: StandardMutation[]
 ): { host: CodexHost; transport: MockCodexAppServer } {
   const transport = new MockCodexAppServer(selectStandardMutations(mutations));

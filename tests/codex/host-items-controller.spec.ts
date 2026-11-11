@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CodexHostSnapshot, ConversationMessage } from '../../src/index';
+import type { ConversationMessage } from '../../src/index';
+import type { CodexSnapshot } from '../../src/internal';
 import {
   CodexHostItemsController,
   type CodexHostItemsDependencies,
@@ -871,7 +872,7 @@ function itemController() {
       message.metadata?.turnId === turnId
       && message.parts.some((part) => part.type === 'tool' && part.id === itemId)
     )) ?? null),
-    patch: vi.fn((patch: Partial<CodexHostSnapshot>) => Object.assign(state, patch)),
+    patch: vi.fn((patch: Partial<CodexSnapshot>) => Object.assign(state, patch)),
     patchRuntime: vi.fn((_threadId, patch) => Object.assign(runtime, patch)),
     requireRuntime: () => runtime,
     sendNextQueuedPrompt: vi.fn(),

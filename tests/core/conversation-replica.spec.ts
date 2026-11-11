@@ -5,7 +5,7 @@ import {
 import type {
   CodexConversationEvent,
   CodexConversationSnapshot,
-  HostEventOrigin,
+  EventOrigin,
   ConversationMessage,
 } from '../../src/core/codex-host';
 import { describe, expect, it } from 'vitest';
@@ -554,7 +554,7 @@ function event<Type extends CodexConversationEvent['type']>(
   return {
     seq: nextSequence++,
     occurredAt: '2026-09-06T20:00:00.000Z',
-    origin: 'notification' as HostEventOrigin,
+    origin: 'notification' as EventOrigin,
     type,
     conversationId: 'conversation-1',
     ...(turnId ? { turnId } : {}),

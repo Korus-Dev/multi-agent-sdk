@@ -2,10 +2,10 @@ import { createHash } from 'node:crypto';
 import { open, stat } from 'node:fs/promises';
 import type { Stats } from 'node:fs';
 import type { ClaudeConversationTurn, Message, ThreadGoal } from '../../contracts/index';
-import type { HarnessEvent } from '../../driver';
+import type { ProviderEvent } from '../../driver';
 import type { ClaudeTaskPlan } from './claude-task-plan';
 
-export type ClaudeHistoryState = { taskPlan?: ClaudeTaskPlan; goal?: ThreadGoal | null; subagentEvents?: HarnessEvent[] };
+export type ClaudeHistoryState = { taskPlan?: ClaudeTaskPlan; goal?: ThreadGoal | null; subagentEvents?: ProviderEvent[] };
 
 export type ClaudeHistorySource = {
   readTurn(turnId: string): Promise<Message[]>;

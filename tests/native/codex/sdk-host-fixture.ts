@@ -1,9 +1,9 @@
 import { vi } from 'vitest';
 import type { Agent } from '../../../src/contracts/index';
-import type { NativeHarnessEvent as HarnessEvent } from '../../../src/index';
+import type { NativeHarnessEvent as HarnessEvent } from '../../../src/internal';
 import type { CodexConversation, CodexHost } from '../../../src/providers/codex';
-import type { CodexConversationEvent, CodexConversationSnapshot, CodexConversationSummary, CodexHostEvent } from '../../../src/index';
-import { CodexBackendDriver } from '../../../src/providers/codex/driver';
+import type { CodexConversationEvent, CodexConversationSnapshot, CodexConversationSummary, CodexEvent } from '../../../src/internal';
+import { CodexHostController } from '../../../src/providers/codex/host-controller';
 import { CodexHostAdapter, type CodexHostAdapterOptions } from '../../../src/providers/codex/host-adapter';
 
 export function sdkSnapshot(id = 'conversation-a', overrides: Partial<CodexConversationSnapshot> = {}): CodexConversationSnapshot {
@@ -24,8 +24,8 @@ export function sdkSnapshot(id = 'conversation-a', overrides: Partial<CodexConve
 
 export function sdkAgent(id = 'agent-a', conversationId = 'conversation-a'): Agent {
   return {
-    id, name: id, folder: '/repo', backend: 'codex',
-    backendSession: { kind: 'codex', threadId: conversationId },
+    id, name: id, folder: '/repo', provider: 'codex',
+    providerSession: { kind: 'codex', threadId: conversationId },
   };
 }
 
@@ -77,7 +77,7 @@ function conversationFixture(id: string) {
 
 export function codexSdkFixture(closeRuntime?: () => Promise<void>, options: CodexHostAdapterOptions = {}) {
   const conversations = new Map<string, ReturnType<typeof conversationFixture>>();
-  const listeners = new Set<(event: CodexHostEvent) => void>();
+  const listeners = new Set<(event: CodexEvent) => void>();
   const conversation = (id: string) => {
     if (!conversations.has(id)) conversations.set(id, conversationFixture(id));
     return conversations.get(id)!;
@@ -86,7 +86,7 @@ export function codexSdkFixture(closeRuntime?: () => Promise<void>, options: Cod
     connect: vi.fn<CodexHost['connect']>(),
     close: vi.fn<CodexHost['close']>(),
     getSnapshot: vi.fn<CodexHost['getSnapshot']>(() => sdkSnapshot()),
-    onEvent: vi.fn((listener: (event: CodexHostEvent) => void) => {
+    onEvent: vi.fn((listener: (event: CodexEvent) => void) => {
       listeners.add(listener);
       return () => { listeners.delete(listener); };
     }),
@@ -119,10 +119,10 @@ export function codexSdkFixture(closeRuntime?: () => Promise<void>, options: Cod
   } satisfies Partial<CodexHost>;
   // SDK classes have private members; each implemented public member is checked above.
   const adapter = new CodexHostAdapter(host as unknown as CodexHost, closeRuntime, options);
-  const driver = new CodexBackendDriver(adapter);
+  const driver = new CodexHostController(adapter);
   const events: HarnessEvent[] = [];
   driver.onEvent((event) => events.push(event));
   return { driver, adapter, host, conversation, events,
-    emit(event: CodexHostEvent) { for (const listener of listeners) listener(event); },
+    emit(event: CodexEvent) { for (const listener of listeners) listener(event); },
   };
 }

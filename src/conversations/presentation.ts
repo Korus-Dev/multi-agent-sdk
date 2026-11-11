@@ -1,5 +1,5 @@
-import type { CodexConversationSnapshot } from '../core/codex-host';
-import type { ClaudeConversationSnapshot, CursorConversationSnapshot, AntigravityConversationSnapshot, ThreadPlan, ThreadGoal, BackendSession } from '../contracts';
+import type { CodexConversationSnapshot } from '../core/codex-conversation-types';
+import type { ClaudeConversationSnapshot, CursorConversationSnapshot, AntigravityConversationSnapshot, ThreadPlan, ThreadGoal, ProviderSessionData } from '../contracts';
 import type { ClientRequest, Approval } from '../contracts/ui';
 import { claudePaneClientRequests } from './claude-pane-client-requests';
 import { providerPaneClientRequests } from './provider-pane-client-requests';
@@ -19,7 +19,7 @@ export type ConversationPresentation = Pick<NativeSnapshot,
 };
 type Project<S> = (snapshot: S | null | undefined) => ConversationPresentation | null;
 /** Settings evidence carried by native session identity, without caller defaults. */
-export function projectSessionSelection(session: BackendSession | null | undefined): ConversationPresentation['selection'] {
+export function projectSessionSelection(session: ProviderSessionData | null | undefined): ConversationPresentation['selection'] {
   return session?.kind === 'claude' && session.model
     ? { model: session.model, reasoningEffort: session.reasoningEffort ?? null }
     : undefined;

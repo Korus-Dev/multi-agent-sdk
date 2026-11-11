@@ -1,5 +1,5 @@
 import type { CodexAppServerClient, RealtimeVoice } from '@korus-dev/codex-sdk';
-import type { CodexConversationEvent, CodexRealtimeEvent, StartCodexRealtimeOptions } from '../../core/codex-host';
+import type { CodexConversationEvent, CodexRealtimeEvent, StartCodexRealtimeOptions } from '../../core/codex-conversation-types';
 import type { CodexRealtimeSession } from './host-contracts';
 import {
   normalizedOptionalRealtimeString,

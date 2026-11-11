@@ -8,39 +8,8 @@ import {
   type v2,
 } from '@korus-dev/codex-sdk';
 import { notifyListeners } from '@korus-dev/codex-sdk';
-import type {
-  CodexConversationSummary,
-  CodexConversationEvent,
-  CodexConversationHistory,
-  CodexConversationHistoryPage,
-  CodexConversationSnapshot,
-  ApprovalDecision,
-  ApprovalScope,
-  CodexChatGptDeviceCodeLogin,
-  CodexChatGptLogin,
-  ClientRequestResponse,
-  CodexHostEvent,
-  HostEventOrigin,
-  ModelDescriptor,
-  CodexRateLimits,
-  CodexAccountUsage,
-  ConsumeCodexRateLimitResetCreditOptions,
-  CodexRateLimitResetCreditResult,
-  ReadCodexRateLimitsOptions,
-  CodexHostSnapshot,
-  Skill,
-  CreateCodexConversationOptions,
-  ListCodexConversationsOptions,
-  ListCodexModelsOptions,
-  SendMessageOptions,
-  StartCodexRealtimeOptions,
-  StartCodexLiveChatOptions,
-  StartCodexReviewOptions,
-  ConversationMessage,
-  UpdateConversationSettings,
-  CodexHostStatePatch,
-  CodexVersionedHostSnapshot,
-} from '../../core/codex-host';
+import type { CodexConversationHistory, CodexConversationHistoryPage, ApprovalDecision, ApprovalScope, CodexChatGptDeviceCodeLogin, CodexChatGptLogin, ClientRequestResponse, EventOrigin, ModelDescriptor, CodexAccountUsage, ConsumeCodexRateLimitResetCreditOptions, CodexRateLimitResetCreditResult, ReadCodexRateLimitsOptions, Skill, CreateCodexConversationOptions, ListCodexConversationsOptions, ListCodexModelsOptions, SendMessageOptions, StartCodexLiveChatOptions, StartCodexReviewOptions, ConversationMessage, UpdateConversationSettings, CodexStatePatch, CodexVersionedSnapshot } from '../../core/codex-host';
+import type { CodexConversationSummary, CodexConversationEvent, CodexConversationSnapshot, CodexEvent, CodexRateLimits, CodexSnapshot, StartCodexRealtimeOptions } from '../../core/codex-conversation-types';
 import { diffCodexHostState } from '../../core/host-bridge';
 import {
   CodexAppServerStdioTransport,
@@ -140,13 +109,13 @@ export type {
   CodexMcpServerToolApprovalMode,
 } from './host-mcp';
 
-type StateListener = (snapshot: CodexHostSnapshot) => void;
-type StatePatchListener = (patch: CodexHostStatePatch) => void;
+type StateListener = (snapshot: CodexSnapshot) => void;
+type StatePatchListener = (patch: CodexStatePatch) => void;
 type ConversationStateListener = (snapshot: CodexConversationSnapshot) => void;
-type HostEventListener = (event: CodexHostEvent) => void;
+type HostEventListener = (event: CodexEvent) => void;
 type ConversationEventListener = (event: CodexConversationEvent) => void;
-type HostEventInput = CodexHostEvent extends infer Event
-  ? Event extends CodexHostEvent
+type HostEventInput = CodexEvent extends infer Event
+  ? Event extends CodexEvent
     ? Omit<Event, 'seq' | 'occurredAt' | 'origin'>
     : never
   : never;
@@ -188,7 +157,7 @@ export class CodexHost {
   private accountGeneration = 0;
   private readonly pendingMarkdownImageHydrations = new Set<string>();
   private closed = false;
-  private state: CodexHostSnapshot = initialHostSnapshot(initialAuthentication());
+  private state: CodexSnapshot = initialHostSnapshot(initialAuthentication());
 
   constructor(private readonly options: CodexHostOptions = {}) {
     this.extensions = new CodexHostExtensionsController(
@@ -521,7 +490,7 @@ export class CodexHost {
     });
   }
 
-  connect(): Promise<CodexHostSnapshot> {
+  connect(): Promise<CodexSnapshot> {
     return this.connection.connect();
   }
 
@@ -530,7 +499,7 @@ export class CodexHost {
     return this.textGeneration.generate(prompt, options);
   }
 
-  async refreshAccount(): Promise<CodexHostSnapshot> {
+  async refreshAccount(): Promise<CodexSnapshot> {
     this.accountGeneration += 1;
     return this.connection.refreshAccount();
   }
@@ -629,17 +598,17 @@ export class CodexHost {
     return this.connection.readConfigRequirements();
   }
 
-  async cancelLogin(loginId = this.state.authentication.login.loginId ?? ''): Promise<CodexHostSnapshot> {
+  async cancelLogin(loginId = this.state.authentication.login.loginId ?? ''): Promise<CodexSnapshot> {
     return this.connection.cancelLogin(loginId);
   }
 
-  async logout(): Promise<CodexHostSnapshot> {
+  async logout(): Promise<CodexSnapshot> {
     this.accountGeneration += 1;
     return this.connection.logout();
   }
 
 
-  async refreshConversations(): Promise<CodexHostSnapshot> {
+  async refreshConversations(): Promise<CodexSnapshot> {
     return this.conversations.refresh();
   }
 
@@ -658,15 +627,15 @@ export class CodexHost {
     return this.conversations.readSummary(conversationId);
   }
 
-  async archiveConversation(conversationId: string): Promise<CodexHostSnapshot> {
+  async archiveConversation(conversationId: string): Promise<CodexSnapshot> {
     return this.conversations.archive(conversationId);
   }
 
-  async deleteConversation(conversationId: string): Promise<CodexHostSnapshot> {
+  async deleteConversation(conversationId: string): Promise<CodexSnapshot> {
     return this.conversations.delete(conversationId);
   }
 
-  async unarchiveConversation(conversationId: string): Promise<CodexHostSnapshot> {
+  async unarchiveConversation(conversationId: string): Promise<CodexSnapshot> {
     return this.conversations.unarchive(conversationId);
   }
 
@@ -681,7 +650,7 @@ export class CodexHost {
   async createConversation(
     options: CreateCodexConversationOptions = {},
     hostOptions: CodexConversationHostOptions = {},
-  ): Promise<CodexHostSnapshot> {
+  ): Promise<CodexSnapshot> {
     return this.lifecycle.create(options, hostOptions);
   }
 
@@ -718,7 +687,7 @@ export class CodexHost {
     return this.conversationForkResult(conversationId);
   }
 
-  async selectConversation(conversationId: string): Promise<CodexHostSnapshot> {
+  async selectConversation(conversationId: string): Promise<CodexSnapshot> {
     return this.lifecycle.select(conversationId);
   }
 
@@ -802,85 +771,85 @@ export class CodexHost {
     return this.conversations.loadOlderHistory(normalizedConversationId(conversationId));
   }
 
-  async renameConversation(title: string): Promise<CodexHostSnapshot> {
+  async renameConversation(title: string): Promise<CodexSnapshot> {
     const threadId = this.state.activeConversationId;
     if (!threadId) throw new Error('There is no active conversation');
     await this.conversationSettings.rename(threadId, title);
     return this.getSnapshot();
   }
 
-  async updateConversationSettings(settings: UpdateConversationSettings): Promise<CodexHostSnapshot> {
+  async updateConversationSettings(settings: UpdateConversationSettings): Promise<CodexSnapshot> {
     return this.conversationSettings.update(settings);
   }
 
-  async setGoal(objective: string, tokenBudget?: number | null): Promise<CodexHostSnapshot> {
+  async setGoal(objective: string, tokenBudget?: number | null): Promise<CodexSnapshot> {
     return this.conversationSettings.setGoal(objective, tokenBudget);
   }
 
-  async clearGoal(): Promise<CodexHostSnapshot> {
+  async clearGoal(): Promise<CodexSnapshot> {
     return this.conversationSettings.clearGoal();
   }
 
-  async sendMessage(prompt: string, options: SendMessageOptions = {}): Promise<CodexHostSnapshot> {
+  async sendMessage(prompt: string, options: SendMessageOptions = {}): Promise<CodexSnapshot> {
     return this.messagesController.send(prompt, options);
   }
 
-  async continueInterruptedTurn(): Promise<CodexHostSnapshot> {
+  async continueInterruptedTurn(): Promise<CodexSnapshot> {
     return this.messagesController.continueInterruptedTurn();
   }
 
-  async compactConversation(): Promise<CodexHostSnapshot> {
+  async compactConversation(): Promise<CodexSnapshot> {
     return this.turnActions.compact();
   }
 
-  async startReview(options: StartCodexReviewOptions = {}): Promise<CodexHostSnapshot> {
+  async startReview(options: StartCodexReviewOptions = {}): Promise<CodexSnapshot> {
     return this.turnActions.startReview(options);
   }
 
   async steerMessage(
     prompt: string,
     options: SendMessageOptions = {},
-  ): Promise<CodexHostSnapshot> {
+  ): Promise<CodexSnapshot> {
     return this.messagesController.steer(prompt, options);
   }
 
-  async interrupt(): Promise<CodexHostSnapshot> {
+  async interrupt(): Promise<CodexSnapshot> {
     return this.turnActions.interrupt();
   }
 
-  async deleteTurn(turnId: string): Promise<CodexHostSnapshot> {
+  async deleteTurn(turnId: string): Promise<CodexSnapshot> {
     return this.turnActions.deleteTurn(turnId);
   }
 
-  async editTurn(turnId: string, content: string, options?: SendMessageOptions): Promise<CodexHostSnapshot> {
+  async editTurn(turnId: string, content: string, options?: SendMessageOptions): Promise<CodexSnapshot> {
     return this.turnActions.editTurn(turnId, content, options);
   }
 
-  async retryTurn(turnId: string): Promise<CodexHostSnapshot> {
+  async retryTurn(turnId: string): Promise<CodexSnapshot> {
     return this.turnActions.retryTurn(turnId);
   }
 
   /** Forks after an active-conversation turn and selects the new conversation. */
-  async forkTurn(turnId: string): Promise<CodexHostSnapshot> {
+  async forkTurn(turnId: string): Promise<CodexSnapshot> {
     const conversationId = this.state.activeConversationId;
     if (!conversationId) throw new Error('There is no active conversation');
     const result = await this.forkConversationAtTurn(conversationId, turnId);
     return result.conversation.select();
   }
 
-  async deleteQueuedPrompt(promptId: string): Promise<CodexHostSnapshot> {
+  async deleteQueuedPrompt(promptId: string): Promise<CodexSnapshot> {
     return this.messagesController.deleteQueuedPrompt(promptId);
   }
 
-  async updateQueuedPrompt(promptId: string, prompt: string, options?: SendMessageOptions): Promise<CodexHostSnapshot> {
+  async updateQueuedPrompt(promptId: string, prompt: string, options?: SendMessageOptions): Promise<CodexSnapshot> {
     return this.messagesController.updateQueuedPrompt(promptId, prompt, options);
   }
 
-  async steerQueuedPrompt(promptId: string, prompt?: string, options?: SendMessageOptions): Promise<CodexHostSnapshot> {
+  async steerQueuedPrompt(promptId: string, prompt?: string, options?: SendMessageOptions): Promise<CodexSnapshot> {
     return this.messagesController.steerQueuedPrompt(promptId, prompt, options);
   }
 
-  async respondToClientRequest(response: ClientRequestResponse): Promise<CodexHostSnapshot> {
+  async respondToClientRequest(response: ClientRequestResponse): Promise<CodexSnapshot> {
     await this.clientRequests.respond(undefined, response);
     return this.getSnapshot();
   }
@@ -889,7 +858,7 @@ export class CodexHost {
     approvalId: string,
     decision: ApprovalDecision,
     scope: ApprovalScope = 'once',
-  ): Promise<CodexHostSnapshot> {
+  ): Promise<CodexSnapshot> {
     await this.approvals.resolve(undefined, approvalId, decision, scope);
     return this.getSnapshot();
   }
@@ -1009,7 +978,7 @@ export class CodexHost {
     });
   }
 
-  getSnapshot(): CodexHostSnapshot {
+  getSnapshot(): CodexSnapshot {
     return structuredClone(this.state);
   }
 
@@ -1019,7 +988,7 @@ export class CodexHost {
   }
 
   /** Returns the current snapshot with the version that the next state patch continues from. */
-  getVersionedSnapshot(): CodexVersionedHostSnapshot {
+  getVersionedSnapshot(): CodexVersionedSnapshot {
     return { version: this.stateVersion, snapshot: this.getSnapshot() };
   }
 
@@ -1096,7 +1065,7 @@ export class CodexHost {
     return this.runtimeState.projection(runtime);
   }
 
-  private snapshotForRuntime(runtime: ThreadRuntimeState): CodexHostSnapshot {
+  private snapshotForRuntime(runtime: ThreadRuntimeState): CodexSnapshot {
     return this.runtimeState.snapshot(runtime);
   }
 
@@ -1155,38 +1124,38 @@ export class CodexHost {
     }
   }
 
-  private emitHostStatus(origin: HostEventOrigin): void {
+  private emitHostStatus(origin: EventOrigin): void {
     this.runtimeState.emitHostStatus(origin);
   }
 
   private emitSummaryUpserted(
     summary: CodexConversationSummary,
-    reason: Extract<CodexHostEvent, { type: 'conversation.summaryUpserted' }>['payload']['reason'],
-    origin: HostEventOrigin,
+    reason: Extract<CodexEvent, { type: 'conversation.summaryUpserted' }>['payload']['reason'],
+    origin: EventOrigin,
   ): void {
     this.runtimeState.emitSummaryUpserted(summary, reason, origin);
   }
 
-  private emitConversationActivity(threadId: string, origin: HostEventOrigin): void {
+  private emitConversationActivity(threadId: string, origin: EventOrigin): void {
     this.runtimeState.emitConversationActivity(threadId, origin);
   }
 
-  private emitConversationSettings(threadId: string, origin: HostEventOrigin): void {
+  private emitConversationSettings(threadId: string, origin: EventOrigin): void {
     this.runtimeState.emitConversationSettings(threadId, origin);
   }
 
-  private emitConversationSkills(threadId: string, origin: HostEventOrigin): void {
+  private emitConversationSkills(threadId: string, origin: EventOrigin): void {
     this.runtimeState.emitConversationSkills(threadId, origin);
   }
 
-  private emitConversationPermissions(threadId: string, origin: HostEventOrigin): void {
+  private emitConversationPermissions(threadId: string, origin: EventOrigin): void {
     this.runtimeState.emitConversationPermissions(threadId, origin);
   }
 
   private emitHistoryReplaced(
     threadId: string,
-    reason: Extract<CodexHostEvent, { type: 'conversation.historyReplaced' }>['payload']['reason'],
-    origin: HostEventOrigin,
+    reason: Extract<CodexEvent, { type: 'conversation.historyReplaced' }>['payload']['reason'],
+    origin: EventOrigin,
   ): void {
     this.runtimeState.emitHistoryReplaced(threadId, reason, origin);
   }
@@ -1194,7 +1163,7 @@ export class CodexHost {
   private emitHistoryPrepended(
     threadId: string,
     messages: readonly ConversationMessage[],
-    origin: HostEventOrigin,
+    origin: EventOrigin,
   ): void {
     this.runtimeState.emitHistoryPrepended(threadId, messages, origin);
   }
@@ -1221,7 +1190,7 @@ export class CodexHost {
   private patchConversationStatus(
     threadId: string,
     status: CodexConversationSummary['status'],
-    origin: HostEventOrigin = 'notification',
+    origin: EventOrigin = 'notification',
   ): void {
     this.runtimeState.patchConversationStatus(threadId, status, origin);
   }
@@ -1229,7 +1198,7 @@ export class CodexHost {
   private patchConversationTurnCount(
     threadId: string,
     turnCount: number,
-    origin: HostEventOrigin = 'notification',
+    origin: EventOrigin = 'notification',
   ): void {
     this.runtimeState.patchConversationTurnCount(threadId, turnCount, origin);
   }
@@ -1246,7 +1215,7 @@ export class CodexHost {
   private removeThread(
     threadId: string,
     reason: 'archived' | 'deleted',
-    origin: HostEventOrigin = 'notification',
+    origin: EventOrigin = 'notification',
   ): void {
     const known = this.state.conversations.some((conversation) => conversation.id === threadId)
       || this.runtimeState.get(threadId) !== undefined
@@ -1320,7 +1289,7 @@ export class CodexHost {
     return project(result);
   }
 
-  private emitEvent(origin: HostEventOrigin, input: HostEventInput, recovered = false): void {
+  private emitEvent(origin: EventOrigin, input: HostEventInput, recovered = false): void {
     if (input.type === 'conversation.historyReplaced' && input.payload.reason !== 'details' && input.payload.reason !== 'images') {
       this.originalUsage?.forget(input.conversationId);
     }
@@ -1350,7 +1319,7 @@ export class CodexHost {
       seq: ++this.eventSequence,
       occurredAt: new Date().toISOString(),
       origin,
-    } as CodexHostEvent;
+    } as CodexEvent;
     notifyListeners(this.eventListeners, event, this.options.onListenerError);
     if (!recovered && (input.type === 'conversation.executionUsageChanged' || input.type === 'turn.completed' || input.type === 'context.compactionCompleted')) {
       void this.refreshOriginalUsage(input.conversationId, input.turnId);
@@ -1385,7 +1354,7 @@ export class CodexHost {
     } finally { this.usageRefreshes.delete(key); }
   }
 
-  private patch(patch: Partial<CodexHostSnapshot>, conversationId?: string): void {
+  private patch(patch: Partial<CodexSnapshot>, conversationId?: string): void {
     const previous = this.state;
     this.state = { ...this.state, ...patch };
     const changes = diffCodexHostState(previous, this.state);

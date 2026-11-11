@@ -8,29 +8,29 @@ describe('Claude conversation replica', () => {
     const older = { ...live, id: 'older', status: 'complete' as const, parts: [{ type: 'text' as const, text: 'Older text' }] };
     const initial = { ...emptySnapshot(), sessionId: 'session', messages: [live], busy: true, activeTurnId: 'turn' };
     const replica = createClaudeConversationReplica(initial);
-    const page = event({ type: 'history.prepended', backendSessionId: 'session', payload: { messages: [older, older, { ...live, parts: [] }], hasOlder: false } });
-    replica.apply({ ...page, backendSessionId: 'other' });
+    const page = event({ type: 'history.prepended', providerSessionId: 'session', payload: { messages: [older, older, { ...live, parts: [] }], hasOlder: false } });
+    replica.apply({ ...page, providerSessionId: 'other' });
     expect(replica.getSnapshot()).toStrictEqual(initial);
     replica.apply(page); replica.apply(page);
     expect(replica.getSnapshot()).toStrictEqual({ ...initial, messages: [older, live], historyState: { hasOlder: false, loadingOlder: false } });
     const detail = { ...older, id: 'earlier-detail', turnId: 'past', parts: [{ type: 'text' as const, text: 'Hydrated earlier detail' }] };
-    const replacement = event({ type: 'message.replaced', backendSessionId: 'session', payload: { message: detail, beforeMessageId: older.id } });
-    replica.apply({ ...replacement, backendSessionId: 'other' });
+    const replacement = event({ type: 'message.replaced', providerSessionId: 'session', payload: { message: detail, beforeMessageId: older.id } });
+    replica.apply({ ...replacement, providerSessionId: 'other' });
     expect(replica.getSnapshot().messages).toStrictEqual([older, live]);
     replica.apply(replacement); replica.apply(replacement);
     expect(replica.getSnapshot().messages).toStrictEqual([detail, older, live]);
-    const update = event({ type: 'turn.historyUpdated', backendSessionId: 'session', payload: { turn: {
+    const update = event({ type: 'turn.historyUpdated', providerSessionId: 'session', payload: { turn: {
       id: 'past', status: 'completed', error: null, willRetry: false, startedAt: null, completedAt: null, durationMs: null,
       itemsView: 'full', detailsLoading: false, detailsError: null,
     } } });
-    replica.apply({ ...update, backendSessionId: 'other' });
+    replica.apply({ ...update, providerSessionId: 'other' });
     expect(replica.getSnapshot().turns).toStrictEqual([]);
     replica.apply(update);
     expect(replica.getSnapshot()).toMatchObject({ busy: true, activeTurnId: 'turn', turns: [update.payload.turn] });
   });
   it('keeps a steering message between the answers received before and after it', () => {
     const replica = createClaudeConversationReplica(emptySnapshot());
-    replica.apply(event({ type: 'turn.started', turnId: 'turn-1', payload: { turn: { id: 'turn-1', backend: 'claude' } } }));
+    replica.apply(event({ type: 'turn.started', turnId: 'turn-1', payload: { turn: { id: 'turn-1', provider: 'claude' } } }));
     replica.apply(event({ type: 'message.delta', turnId: 'turn-1', payload: { messageId: 'answer', delta: 'Before' } }));
     replica.apply(event({ type: 'message.userSubmitted', turnId: 'turn-1', payload: { message: { id: 'steer-1', agentId: 'agent-1', role: 'user', kind: 'steer', status: 'complete', turnId: 'turn-1', createdAt: '2026-10-04T00:00:00Z', parts: [{ type: 'text', text: 'Change it' }] } } }));
     replica.apply(event({ type: 'message.delta', turnId: 'turn-1', payload: { messageId: 'answer', delta: 'After' } }));
@@ -45,7 +45,7 @@ describe('Claude conversation replica', () => {
     replica.apply(event({
       type: 'turn.started',
       turnId: 'turn-1',
-      payload: { turn: { id: 'turn-1', backend: 'claude' } },
+      payload: { turn: { id: 'turn-1', provider: 'claude' } },
     }));
     const submitted = event({
       type: 'message.userSubmitted',
@@ -89,7 +89,7 @@ describe('Claude conversation replica', () => {
     const replica = createClaudeConversationReplica(emptySnapshot());
     replica.apply(event({
       type: 'turn.started', turnId: 'turn-1',
-      payload: { turn: { id: 'turn-1', backend: 'claude' } },
+      payload: { turn: { id: 'turn-1', provider: 'claude' } },
     }));
     replica.apply(event({
       type: 'item.started', turnId: 'turn-1',
@@ -155,7 +155,7 @@ describe('Claude conversation replica', () => {
     const replica = createClaudeConversationReplica(initial);
     const before = replica.getSnapshot();
     const afterStart = replica.apply(event({
-      type: 'turn.started', turnId: 'turn-1', payload: { turn: { id: 'turn-1', backend: 'claude' } },
+      type: 'turn.started', turnId: 'turn-1', payload: { turn: { id: 'turn-1', provider: 'claude' } },
     }));
     const afterDelta = replica.apply(event({
       type: 'message.delta', turnId: 'turn-1', payload: { delta: 'Hello' },
@@ -189,7 +189,7 @@ describe('Claude conversation replica', () => {
   it('tracks compaction, ask-user requests, and retryable versus terminal errors', () => {
     const replica = createClaudeConversationReplica(emptySnapshot());
     replica.apply(event({
-      type: 'turn.started', turnId: 'turn-1', payload: { turn: { id: 'turn-1', backend: 'claude' } },
+      type: 'turn.started', turnId: 'turn-1', payload: { turn: { id: 'turn-1', provider: 'claude' } },
     }));
     replica.apply(event({ type: 'context.compactionStarted', turnId: 'turn-1', payload: {} }));
     replica.apply(event({ type: 'context.compactionCompleted', turnId: 'turn-1', payload: { itemId: null } }));
@@ -225,7 +225,7 @@ describe('Claude conversation replica', () => {
     }];
     const replica = createClaudeConversationReplica(initial);
     replica.apply(event({
-      type: 'turn.started', turnId: 'turn-1', payload: { turn: { id: 'turn-1', backend: 'claude' } },
+      type: 'turn.started', turnId: 'turn-1', payload: { turn: { id: 'turn-1', provider: 'claude' } },
     }));
     replica.apply(event({
       type: 'turn.completed', turnId: 'turn-2', payload: { turn: { id: 'turn-2', status: 'interrupted' } },
@@ -263,7 +263,7 @@ function emptySnapshot(): ClaudeConversationSnapshot {
   };
 }
 
-function event<T extends Omit<ClaudeConversationEvent, 'seq' | 'occurredAt' | 'agentId' | 'backend'>>(
+function event<T extends Omit<ClaudeConversationEvent, 'seq' | 'occurredAt' | 'agentId' | 'provider'>>(
   value: T,
 ): Extract<ClaudeConversationEvent, { type: T['type'] }> {
   return {
@@ -271,6 +271,6 @@ function event<T extends Omit<ClaudeConversationEvent, 'seq' | 'occurredAt' | 'a
     seq: 1,
     occurredAt: createdAt,
     agentId: 'agent-1',
-    backend: 'claude',
+    provider: 'claude',
   } as unknown as Extract<ClaudeConversationEvent, { type: T['type'] }>;
 }

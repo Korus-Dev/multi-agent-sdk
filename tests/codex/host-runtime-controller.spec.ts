@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type {
-  CodexConversationSummary,
-  CodexHostSnapshot,
-  ConversationMessage,
-} from '../../src/index';
+import type { ConversationMessage } from '../../src/index';
+import type { CodexConversationSummary, CodexSnapshot } from '../../src/internal';
 import { CodexHostRuntimeController } from '../../src/providers/codex/host-runtime-controller';
 import { initialAuthentication } from '../../src/providers/codex/host-authentication';
 import { initialHostSnapshot } from '../../src/providers/codex/host-runtime';
@@ -340,7 +337,7 @@ function setupRuntimeController(approvals: unknown[] = [], requests: unknown[] =
     emitEvent: vi.fn(),
     getState: vi.fn(() => state),
     notifyConversationListeners: vi.fn(),
-    patch: vi.fn((patch: Partial<CodexHostSnapshot>) => Object.assign(state, patch)),
+    patch: vi.fn((patch: Partial<CodexSnapshot>) => Object.assign(state, patch)),
     schedulePluginRefresh: vi.fn(),
   };
   const controller = new CodexHostRuntimeController(

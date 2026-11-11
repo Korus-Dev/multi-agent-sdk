@@ -5,7 +5,7 @@ import { createClaudeHistorySource, type ClaudeHistorySource, type ClaudeTurnRan
 import { access, readFile, readdir, realpath, stat } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type { Agent, BackendSession, ClaudeConversationTurn, ConversationSummary, Message, MessagePart, ToolPart, ThreadGoal } from '../../contracts/index';
+import type { Agent, ProviderSessionData, ClaudeConversationTurn, ConversationSummary, Message, MessagePart, ToolPart, ThreadGoal } from '../../contracts/index';
 import { claudeWorkingDirectory } from './working-directory';
 import { claudeConfigDirectory } from './config-directory';
 import { claudeToolPart, completedClaudeToolPart, type ClaudeToolPartOptions } from './claude-tool-part-adapter';
@@ -15,14 +15,14 @@ import { claudeSubagentHistoryEvents } from './claude-subagents';
 import { ClaudeTaskPlan } from './claude-task-plan';
 
 export type ClaudeTranscriptHistory = {
-  backendSession: BackendSession;
+  providerSession: ProviderSessionData;
   messages: Message[];
   source?: ClaudeHistorySource;
   turns?: ClaudeConversationTurn[];
   turnBoundaries?: Record<string, string>;
   nativeMessageTurnIds?: Record<string, string>;
   goal?: ThreadGoal | null;
-  subagentEvents?: import('../../driver').HarnessEvent[];
+  subagentEvents?: import('../../driver').ProviderEvent[];
   taskPlan?: ClaudeTaskPlan;
 };
 
@@ -54,20 +54,20 @@ export async function loadClaudeTranscriptHistory(
   agent: Agent,
   options: ClaudeTranscriptHistoryOptions = {},
 ): Promise<ClaudeTranscriptHistory | null> {
-  if (agent.backendSession?.kind !== 'claude') {
+  if (agent.providerSession?.kind !== 'claude') {
     return null;
   }
 
-  const sessionId = agent.backendSession.transcriptSessionId ?? agent.backendSession.sessionId;
+  const sessionId = agent.providerSession.transcriptSessionId ?? agent.providerSession.sessionId;
   if (!isSafeSessionId(sessionId)) {
     return null;
   }
 
   const projectsRoot = options.projectsRoot ?? path.join(claudeConfigDirectory(), 'projects');
-  const transcriptPath = await findClaudeTranscriptPath(projectsRoot, agent.backendSession.transcriptFolder ?? claudeWorkingDirectory(agent), sessionId);
+  const transcriptPath = await findClaudeTranscriptPath(projectsRoot, agent.providerSession.transcriptFolder ?? claudeWorkingDirectory(agent), sessionId);
   if (!transcriptPath) {
     return {
-      backendSession: agent.backendSession,
+      providerSession: agent.providerSession,
       messages: [],
     };
   }
@@ -76,11 +76,11 @@ export async function loadClaudeTranscriptHistory(
     if (typeof options.subagentId !== 'string' || !isSafeSessionId(options.subagentId)) throw new Error('Invalid Claude subagent reference.');
     const directory = path.join(path.dirname(transcriptPath), sessionId, 'subagents');
     const childPath = path.join(directory, `agent-${options.subagentId}.jsonl`);
-    if (!await fileExists(childPath)) return { backendSession: agent.backendSession, messages: [] };
+    if (!await fileExists(childPath)) return { providerSession: agent.providerSession, messages: [] };
     const [project, child] = await Promise.all([realpath(path.dirname(transcriptPath)), realpath(childPath)]);
     if (!isPathInside(path.join(project, sessionId, 'subagents'), child)) throw new Error('Claude subagent transcript is outside its session.');
     const content = await readFile(child, 'utf8');
-    return { backendSession: agent.backendSession,
+    return { providerSession: agent.providerSession,
       messages: claudeTranscriptToMessages(content, agent.id, `${sessionId}-${options.subagentId}`, undefined, undefined, true, undefined, undefined, undefined, options.toolOptions),
     };
   }
@@ -92,7 +92,7 @@ export async function loadClaudeTranscriptHistory(
     const recent = canReadSdk ? await (async () => {
       try {
         const messages = await (options.readSessionMessages ?? getSessionMessages)(sessionId, {
-          dir: agent.backendSession!.kind === 'claude' ? agent.backendSession!.transcriptFolder ?? claudeWorkingDirectory(agent) : agent.folder ?? undefined,
+          dir: agent.providerSession!.kind === 'claude' ? agent.providerSession!.transcriptFolder ?? claudeWorkingDirectory(agent) : agent.folder ?? undefined,
           includeSystemMessages: true,
         });
         if (messages.some(message => message.session_id !== sessionId)) return null;
@@ -121,13 +121,13 @@ export async function loadClaudeTranscriptHistory(
 }
 
 async function decodeClaudeHistory(agent: Agent, sessionId: string, transcriptPath: string, content: string, snapshot?: ClaudeTranscriptSlice, toolOptions?: ClaudeToolPartOptions): Promise<ClaudeTranscriptHistory> {
-  if (agent.backendSession?.kind !== 'claude') throw new Error('Claude session is unavailable.');
+  if (agent.providerSession?.kind !== 'claude') throw new Error('Claude session is unavailable.');
   const settings = claudeTranscriptSettings(content);
-  const { model: _model, reasoningEffort: _reasoningEffort, ...session } = agent.backendSession;
+  const { model: _model, reasoningEffort: _reasoningEffort, ...session } = agent.providerSession;
   const turnBoundaries: Record<string, string> = {};
   const nativeMessageTurnIds: Record<string, string> = {};
-  const goal = claudeTranscriptGoal(content, agent.backendSession.sessionId);
-  const subagentEvents = claudeSubagentHistoryEvents(content, agent.id, agent.backendSession.sessionId);
+  const goal = claudeTranscriptGoal(content, agent.providerSession.sessionId);
+  const subagentEvents = claudeSubagentHistoryEvents(content, agent.id, agent.providerSession.sessionId);
   const taskPlan = new ClaudeTaskPlan();
   const turns: ClaudeConversationTurn[] = [];
   const ranges = new Map<string, ClaudeTurnRange>();
@@ -135,7 +135,7 @@ async function decodeClaudeHistory(agent: Agent, sessionId: string, transcriptPa
   const source = await createClaudeHistorySource(transcriptPath, content, ranges,
     text => claudeTranscriptToMessages(text, agent.id, sessionId, undefined, undefined, undefined, undefined, undefined, undefined, toolOptions), snapshot);
   return {
-    backendSession: {
+    providerSession: {
       ...session,
       transcriptSessionId: sessionId,
       ...settings,
@@ -268,7 +268,7 @@ export async function listClaudeTranscriptSummaries(
       messageCount: transcriptSummary.messageCount,
       storageState: 'active',
       ref: {
-        backend: 'claude',
+        provider: 'claude',
         folder,
         sessionId: file.sessionId,
       },

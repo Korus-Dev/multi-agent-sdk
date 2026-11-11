@@ -1,12 +1,12 @@
 import { expect, it } from 'vitest';
-import { createHarnessDriver } from '../../src/backend';
-import type { HarnessContext } from '../../src/driver';
+import { createProviderDriver } from '../../src/provider-factory';
+import type { ProviderContext } from '../../src/driver';
 
-it.each(['codex', 'claude', 'cursor', 'antigravity'] as const)('creates the %s adapter through one backend entry point without starting execution', async backend => {
-  const driver = createHarnessDriver(backend, { client: { name: 'cpa-workbench', title: 'CPA workbench' } });
-  const context: HarnessContext = { id: 'tax-assistant', folder: null, backend };
+it.each(['codex', 'claude', 'cursor', 'antigravity'] as const)('creates the %s adapter through one provider entry point without starting execution', async provider => {
+  const driver = createProviderDriver(provider, { client: { name: 'cpa-workbench', title: 'CPA workbench' } });
+  const context: ProviderContext = { id: 'tax-assistant', folder: null, provider };
   try {
-    expect(driver.backend).toBe(backend);
+    expect(driver.provider).toBe(provider);
     expect(driver.getCapabilities(context).interrupt).toBe(true);
     expect(driver.getCapabilities(context)).not.toHaveProperty('codeReview');
     expect(driver.sendPrompt).toBeTypeOf('function');

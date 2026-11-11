@@ -34,7 +34,7 @@ export function isNumber(value: unknown): boolean {
   return typeof value === 'number';
 }
 
-export function isAgentBackend(value: unknown): boolean {
+export function isHarnessProvider(value: unknown): boolean {
   return value === 'codex' || value === 'claude' || (value === 'antigravity' || value === 'cursor');
 }
 

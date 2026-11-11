@@ -1,24 +1,20 @@
-import { createHarnessDriver as createNativeHarnessDriver, type HarnessOptions as NativeOptions } from './backend';
-import type { HarnessDriver as NativeDriver } from './driver';
-import type { HarnessContext as NativeContext } from './context';
-import type { BackendConversationRef, BackendDefaults, BackendSession } from './contracts';
-import type { HarnessEvent as NativeEvent } from './contracts/events';
-import type { Admission, ConversationRef, HarnessCapabilities, HarnessContext, HarnessDriver, HarnessEvent, HarnessProvider, Session, SessionState } from './consumer-types';
+import { consumerContext } from './options-map';
+import type { ProviderDriver as NativeDriver } from './driver';
+import type { ProviderContext as NativeContext } from './context';
+import type { ProviderConversationRef, ProviderDefaults, ProviderSessionData } from './contracts';
+import type { ProviderEvent as NativeEvent } from './contracts/events';
+import type { Admission, ConversationRef, HarnessCapabilities, HarnessContext, Harness, HarnessEvent, HarnessProvider, Session, SessionState } from './consumer-types';
 import { createConsumerProjection } from './consumer-projection';
-/** Shared consumer hooks receive input context only; native options are explicit escape hatches. */
-export type HarnessOptions = Omit<NativeOptions, 'instructions' | 'mcpServers'> & {
-  instructions?: (context: HarnessContext) => string | undefined;
-  mcpServers?: (context: HarnessContext) => readonly import('./generation').HarnessMcpEndpoint[];
-};
+import { HarnessUnsupportedError } from './errors';
 
 const emptyState = (): SessionState => ({ messages: [], busy: false, activeTurnId: null, turns: [], requests: [], error: null, title: null, goal: null, contextUsage: null, plan: null });
-type Binding = { kind: 'main' | 'scope'; parent?: Session; operation?: 'executing' | 'disposing' | 'releasing' | 'hydrating'; nativeDisposed?: boolean; context: NativeContext; state: SessionState; project: ReturnType<typeof createConsumerProjection>; recovery?: boolean };
+type Binding = { stored?: { providerSession?: unknown }; kind: 'main' | 'scope'; parent?: Session; operation?: 'executing' | 'disposing' | 'releasing' | 'hydrating'; nativeDisposed?: boolean; context: NativeContext; state: SessionState; project: ReturnType<typeof createConsumerProjection>; recovery?: boolean };
 
 /** Adapts native lifecycle operations without changing admission or completion semantics. */
-export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriver<NativeContext, NativeEvent>): HarnessDriver {
+export function adaptHarness(provider: HarnessProvider, native: NativeDriver<NativeContext, NativeEvent>): Harness {
   const bindings = new Map<Session, Binding>();
   const byId = new Map<string, Session>();
-  const refs = new WeakMap<ConversationRef, BackendConversationRef>();
+  const refs = new WeakMap<ConversationRef, ProviderConversationRef>();
   const listeners = new Set<(event: HarnessEvent) => void>();
   const emit = (event: HarnessEvent) => { for (const listener of listeners) { try { listener(event); } catch (error) { process.emitWarning(error instanceof Error ? error : String(error)); } } };
   const get = (session: Session) => { const b = bindings.get(session); if (!b) throw new Error('Session does not belong to this driver.'); return b; };
@@ -33,10 +29,10 @@ export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriv
     return binding;
   };
   const changed = (session: Session) => emit({ type: 'session.changed', session, state: structuredClone(get(session).state) });
-  const adoptSession = (session: Session, data: BackendSession, preserveRuntimeSelection = false) => {
+  const adoptSession = (session: Session, data: ProviderSessionData, preserveRuntimeSelection = false) => {
     const binding = get(session);
-    const previousSession = binding.context.backendSession;
-    binding.context.backendSession = structuredClone(data);
+    const previousSession = binding.context.providerSession;
+    binding.context.providerSession = structuredClone(data);
     if (data.kind === 'claude') {
       const runtime = preserveRuntimeSelection && previousSession?.kind === 'claude' && previousSession.sessionId === data.sessionId
         ? binding.state.selection : undefined;
@@ -51,6 +47,7 @@ export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriv
   };
   const unsubscribe = native.onEvent(event => {
     const session = event.agentId ? byId.get(event.agentId) : undefined;
+    emit({ type: 'provider.event', session, event });
     if (!session) return;
     const b = get(session);
     const snapshotFrame = event.type.endsWith('.conversationSnapshotChanged');
@@ -104,13 +101,14 @@ export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriv
   });
   const offUsage = native.onUsage?.(observation => emit({ type: 'usage.observed', observation }));
   const offRequests = native.onRequestUsage?.(observation => emit({ type: 'requestUsage.observed', observation }));
-  const admitted = (session: Session, result: import('./driver').HarnessSendResult): Admission => {
-    adoptSession(session, result.backendSession, true);
+  const admitted = (session: Session, result: import('./driver').ProviderSendResult): Admission => {
+    adoptSession(session, result.providerSession, true);
     return { session, ...(result.turnId ? { turnId: result.turnId } : {}), ...(result.messageId ? { messageId: result.messageId } : {}) };
   };
-  const capabilities = (session: Session): HarnessCapabilities => {
-    const { approvalPresets, permissionModes, ...caps } = native.getCapabilities(interactive(session).context);
-    return { ...caps, remoteControl: false, permissions: [...(approvalPresets ?? []).map(id => ({ id, ...(id === 'full-access' ? { dangerous: true } : {}) })), ...(permissionModes ?? []).map(({ id, dangerous }) => ({ id, ...(dangerous ? { dangerous } : {}) }))] };
+  const capabilities = (session: Session): HarnessCapabilities => normalizedCapabilities(interactive(session).context);
+  const normalizedCapabilities = (context?: NativeContext): HarnessCapabilities => {
+    const { approvalPresets, permissionModes, login, realtime, remoteControl, accountUsage, ...caps } = native.getCapabilities(context);
+    return { ...caps, login: [...(login ?? [])], realtime: Boolean(realtime), accountUsage: Boolean(accountUsage && native.getAccountRateLimits), remoteControl: Boolean(remoteControl && native.getRemoteControlStatus), permissions: [...(approvalPresets ?? []).map(id => ({ id, ...(id === 'full-access' ? { dangerous: true } : {}) })), ...(permissionModes ?? []).map(({ id, dangerous }) => ({ id, ...(dangerous ? { dangerous } : {}) }))] };
   };
   const permission = async (session: Session, id: string) => {
     const b = main(session); const caps = native.getCapabilities(b.context);
@@ -118,13 +116,13 @@ export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriv
     if (caps.approvalPresets?.includes(id as never)) {
       if (!native.setApprovalPreset) throw new Error('Permission updates are unavailable.');
       const result = await native.setApprovalPreset(b.context, id as import('./contracts').ApprovalPreset);
-      b.context.backendSession = result.backendSession;
-      b.context.backendDefaults = { ...b.context.backendDefaults, kind: 'codex', approvalPreset: result.approvalPreset };
+      b.context.providerSession = result.providerSession;
+      b.context.providerDefaults = { ...b.context.providerDefaults, kind: 'codex', approvalPreset: result.approvalPreset };
       b.state.permission = result.approvalPreset;
     } else {
       if (!native.setPermissionMode) throw new Error('Permission updates are unavailable.');
-      b.context.backendDefaults = (await native.setPermissionMode(b.context, id)).backendDefaults;
-      b.state.permission = 'permissionMode' in b.context.backendDefaults ? b.context.backendDefaults.permissionMode : undefined;
+      b.context.providerDefaults = (await native.setPermissionMode(b.context, id)).providerDefaults;
+      b.state.permission = 'permissionMode' in b.context.providerDefaults ? b.context.providerDefaults.permissionMode : undefined;
     }
     changed(session);
   };
@@ -136,8 +134,8 @@ export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriv
     try { return await action(binding); }
     finally { if (scoped) binding.operation = undefined; }
   };
-  const unavailable = (operation: string): never => { throw new Error(`${operation} is unavailable for this harness.`); };
-  const turnAction = (session: Session, result: import('./driver').HarnessTurnActionResult) => {
+  const unavailable = (operation: string): never => { throw new HarnessUnsupportedError(operation); };
+  const turnAction = (session: Session, result: import('./driver').ProviderTurnActionResult) => {
     admitted(session, result); return { session, activeTurnId: result.activeTurnId };
   };
   const open = (input: HarnessContext): Session => {
@@ -145,8 +143,8 @@ export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriv
     const session = Object.freeze({}) as Session;
     const { defaults, ...context } = input;
     const { permission: mode, ...selection } = defaults ?? {};
-    const backendDefaults = { kind: provider, ...selection, ...(mode ? provider === 'codex' ? { approvalPreset: mode } : { permissionMode: mode } : {}) } as BackendDefaults;
-    bindings.set(session, { kind: 'main', context: { ...context, backend: provider, backendDefaults }, state: emptyState(), project: createConsumerProjection() }); byId.set(input.id, session);
+    const providerDefaults = { kind: provider, ...selection, ...(mode ? provider === 'codex' ? { approvalPreset: mode } : { permissionMode: mode } : {}) } as ProviderDefaults;
+    bindings.set(session, { kind: 'main', context: { ...context, provider: provider, providerDefaults }, state: emptyState(), project: createConsumerProjection() }); byId.set(input.id, session);
     if (mode && !capabilities(session).permissions.some(p => p.id === mode)) { bindings.delete(session); byId.delete(input.id); throw new Error('Unsupported permission option.'); }
     return session;
   };
@@ -154,16 +152,34 @@ export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriv
     if (!value || typeof value !== 'object' || value.provider !== provider || !value.data || typeof value.data !== 'object') throw new Error('Invalid persisted harness handle.');
     const data = value.data as Record<string, unknown>;
     const identity = provider === 'codex' ? data.threadId : data.sessionId;
-    if (typeof identity !== 'string' || !identity || (type === 'session' ? data.kind : data.backend) !== provider) throw new Error('Invalid persisted harness identity.');
+    if (typeof identity !== 'string' || !identity || (type === 'session' ? data.kind : data.provider) !== provider) throw new Error('Invalid persisted harness identity.');
     if (type === 'session' && provider === 'claude' && !['stdio', 'websocket'].includes(String(data.transport))) throw new Error('Invalid Claude transport.');
     if (type === 'ref' && provider !== 'codex' && data.folder !== null && typeof data.folder !== 'string') throw new Error('Invalid persisted folder.');
     return data;
   };
-  const reference = (data: BackendConversationRef): ConversationRef => { const ref = Object.freeze({}) as ConversationRef; refs.set(ref, structuredClone(data)); return ref; };
+  const reference = (data: ProviderConversationRef): ConversationRef => { const ref = Object.freeze({}) as ConversationRef; refs.set(ref, structuredClone(data)); return ref; };
+  const mergeDefaults = (current: ProviderDefaults, defaults: Partial<import('./consumer-types').HarnessDefaults>): ProviderDefaults => {
+    const { permission: mode, ...selection } = defaults;
+    return { ...current, ...Object.fromEntries(Object.entries(selection).filter(([, value]) => value !== undefined)),
+      ...(mode ? provider === 'codex' ? { approvalPreset: mode } : { permissionMode: mode } : {}) } as ProviderDefaults;
+  };
+  const applyDefaults = (session: Session, defaults: Partial<import('./consumer-types').HarnessDefaults>) => {
+    const b = get(session);
+    b.context.providerDefaults = mergeDefaults(b.context.providerDefaults ?? { kind: provider } as ProviderDefaults, defaults);
+  };
   return {
     getRuntimeStatus() { const { detail, capabilities: _capabilities, ...status } = native.getRuntimeStatus(); return { ...status, ...(typeof detail === 'string' ? { detail } : {}) }; },
-    async authenticate(action) { const state = await (native.authenticate?.(action) ?? unavailable('Authentication')); return { connected: state.connected, native: state }; },
+    async authenticate(action) { const state = await (native.authenticate?.(action) ?? unavailable('Authentication')); return { connected: state.connected, ...(state.login ? { login: state.login } : {}), native: state }; },
+    getBankedResets: async () => native.getBankedResets?.() ?? unavailable('Banked resets'),
+    useBankedReset: async input => native.useBankedReset?.(input) ?? unavailable('Banked resets'),
     getAccountRateLimits: () => native.getAccountRateLimits?.() ?? Promise.resolve(null),
+    startRealtime: async (session, options) => native.startRealtime?.(main(session).context, options) ?? unavailable('Realtime'),
+    getRemoteControl: async () => native.getRemoteControlStatus?.() ?? unavailable('Remote control'),
+    setRemoteControl: async enabled => (enabled ? native.enableRemoteControl?.() : native.disableRemoteControl?.()) ?? unavailable('Remote control'),
+    startDevicePairing: async () => native.startDevicePairing?.() ?? unavailable('Device pairing'),
+    checkDevicePairing: async pairing => native.checkDevicePairing?.(pairing) ?? unavailable('Device pairing'),
+    listPairedDevices: async environmentId => native.listPairedDevices?.(environmentId) ?? unavailable('Paired devices'),
+    revokePairedDevice: async (environmentId, clientId) => native.revokePairedDevice?.(environmentId, clientId) ?? unavailable('Paired devices'),
     listModels: session => native.listModels?.(main(session).context) ?? unavailable('Model catalog'),
     listSkills: (session, forceReload) => native.listSkills?.(main(session).context, forceReload) ?? unavailable('Skill catalog'),
     listPlugins: session => native.listPlugins?.(main(session).context) ?? unavailable('Plugin catalog'),
@@ -182,26 +198,49 @@ export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriv
       if (result.cleared === true) { get(session).state.goal = null; changed(session); }
       return { ...admission, ...(result.cleared === undefined ? {} : { cleared: result.cleared }) };
     },
-    async steerPrompt(session, prompt, options) { return admitted(session, await (native.steerPrompt?.(main(session).context, prompt, options) ?? unavailable('Steering'))); },
+    async steerPrompt(session, prompt, options) { return admitted(session, await (native.steerPrompt?.(interactive(session).context, prompt, options) ?? unavailable('Steering'))); },
     async deleteTurn(session, turnId) { return turnAction(session, await (native.deleteTurn?.(main(session).context, turnId) ?? unavailable('Turn deletion'))); },
     async editTurn(session, turnId, content, options) { return turnAction(session, await (native.editTurn?.(main(session).context, turnId, content, options) ?? unavailable('Turn editing'))); },
     async retryTurn(session, turnId) { return turnAction(session, await (native.retryTurn?.(main(session).context, turnId) ?? unavailable('Turn retry'))); },
+    async assertHandoffReady(session) { await (native.assertHandoffReady?.(main(session).context) ?? unavailable('Hand-off readiness checks')); },
+    async forkWorktreeConversation(session, target) {
+      const result = await (native.forkWorktreeConversation?.(main(session).context, main(target).context) ?? unavailable('Worktree conversation fork'));
+      return result ? admitted(target, result) : null;
+    },
+    handlePromptCommand(session, prompt) {
+      const handled = native.tryHandlePromptCommand?.(main(session).context, prompt);
+      return handled ? handled.then(result => admitted(session, result)) : null;
+    },
+    preparePromptOptions: (session, options) => native.preparePromptOptions ? native.preparePromptOptions(main(session).context, options) : options,
+    async continueInterruptedTurn(session, safetyReview) { return turnAction(session, await (native.continueInterruptedTurn?.(main(session).context, safetyReview) ?? unavailable('Interrupted turn continuation'))); },
+    async reconcileConversations(sessions) { await native.reconcileConversations?.(sessions.map(session => main(session).context)); },
     async forkConversation(session, target, turnId) { return admitted(target, await (native.forkConversation?.(main(session).context, main(target).context, turnId) ?? unavailable('Conversation fork'))); },
     async replaceConversationWithSummary(session) { return admitted(session, await (native.replaceConversationWithSummary?.(main(session).context) ?? unavailable('Conversation summary replacement'))); },
     archiveConversation: session => native.archiveAgentConversation?.(main(session).context) ?? unavailable('Conversation archive'),
     deleteConversation: session => native.deleteAgentConversation?.(main(session).context) ?? unavailable('Conversation deletion'),
-    readConversationMessages(session, ref) {
+    readConversationMessages(session, ref, options) {
       const value = refs.get(ref); if (!value) throw new Error('Unknown conversation reference.');
-      return native.readConversationMessages?.(value, interactive(session).context.id) ?? unavailable('Conversation messages');
+      return native.readConversationMessages?.(value, interactive(session).context.id, options) ?? unavailable('Conversation messages');
+    },
+    async setConversationStorage(ref, state) {
+      const value = refs.get(ref); if (!value) throw new Error('Unknown conversation reference.');
+      await (native.setConversationStorage?.(value, state) ?? unavailable('Conversation storage'));
+    },
+    async readConversationSummary(session, ref) {
+      const value = refs.get(ref); if (!value) throw new Error('Unknown conversation reference.');
+      const found = await (native.readConversationSummary?.(interactive(session).context, value) ?? unavailable('Conversation summary'));
+      if (!found) return null;
+      const { ref: nativeRef, ...rest } = found; const handle = Object.freeze({}) as ConversationRef; refs.set(handle, nativeRef);
+      return { ...rest, ref: handle };
     },
     readConversationContent(session, input) {
-      const context = interactive(session).context; const binding = context.backendSession;
+      const context = interactive(session).context; const binding = context.providerSession;
       if (!binding) throw new Error('Session has not been admitted.');
       const sessionId = binding.kind === 'codex' ? binding.threadId : binding.sessionId;
       return native.readConversationContent?.(context, { ...input, sessionId }) ?? unavailable('Conversation content');
     },
     getSessionData(session) {
-      const binding = get(session); const data = binding.context.backendSession;
+      const binding = get(session); const data = (binding.stored ? binding.stored.providerSession : binding.context.providerSession) as ProviderSessionData | undefined;
       if (!data) throw new Error('Session has not been admitted.');
       if (binding.nativeDisposed || binding.operation === 'disposing' || binding.operation === 'releasing') throw new Error('Scope disposal has already started.');
       const parentId = binding.parent ? get(binding.parent).context.id : undefined;
@@ -214,27 +253,49 @@ export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriv
       if (saved.role === 'scope' && (!parent || get(parent).kind !== 'main')) throw new Error('Restore the main scope parent first.');
       if (parent) main(parent);
       const session = open({ ...context, defaults: context.defaults ?? saved.defaults });
-      const binding = get(session); binding.context.backendSession = data as BackendSession;
+      const binding = get(session); binding.context.providerSession = data as ProviderSessionData;
       if (parent) { binding.kind = 'scope'; binding.parent = parent; }
       return session;
     },
     getRefData(ref) { const data = refs.get(ref); if (!data) throw new Error('Unknown conversation reference.'); return structuredClone({ provider, data }); },
-    restoreRef(saved) { return reference(validate(saved, 'ref') as BackendConversationRef); },
+    restoreRef(saved) { return reference(validate(saved, 'ref') as ProviderConversationRef); },
     getConversationRef(session) {
-      const context = interactive(session).context; const data = context.backendSession;
+      const context = interactive(session).context; const data = context.providerSession;
       if (!data) return null;
-      return reference(data.kind === 'codex' ? { backend: 'codex', threadId: data.threadId }
-        : { backend: data.kind, sessionId: data.sessionId, folder: context.folder });
+      return reference(data.kind === 'codex' ? { provider: 'codex', threadId: data.threadId }
+        : { provider: data.kind, sessionId: data.sessionId, folder: context.folder });
     },
-    open, getCapabilities: capabilities, readSession: session => structuredClone(get(session).state),
+    open, getCapabilities: capabilities, getProviderCapabilities: () => normalizedCapabilities(), readSession: session => structuredClone(get(session).state),
     async sendPrompt(session, prompt, options) { return admitted(session, await native.sendPrompt(main(session).context, prompt, options)); },
     async interrupt(session, expectedTurnId) { return admitted(session, await native.interrupt(interactive(session).context, expectedTurnId)); },
     async respondToRequest(session, response) {
       const b = interactive(session);
-      if (!b.state.requests.some(r => r.id === response.id)) throw new Error('Request does not belong to this session.');
+      if (!b.state.requests.some(r => r.id === response.id)) throw new Error('Request does not belong to this session or is no longer pending.');
       await native.respondToAgentRequest({ ...response, agentId: b.context.id });
     },
     setPermission: permission,
+    bindSession(session, source) {
+      const context = get(session).context as unknown as Record<string, unknown>;
+      const binding = get(session);
+      const stored = { providerSession: context.providerSession, folder: context.folder, name: context.name, providerDefaults: context.providerDefaults };
+      const defaultsOf = () => { const live = source().defaults; if (live === undefined) return stored.providerDefaults; return mergeDefaults({ kind: provider } as ProviderDefaults, live); };
+      binding.stored = stored;
+      Object.defineProperties(context, {
+        providerSession: { enumerable: true, configurable: true, get: () => { const v = source().data; return v === undefined ? stored.providerSession : (v ?? undefined); }, set: (value: unknown) => { stored.providerSession = value; } },
+        folder: { enumerable: true, configurable: true, get: () => { const v = source().folder; return v === undefined ? stored.folder : v; }, set: (value: unknown) => { stored.folder = value; } },
+        name: { enumerable: true, configurable: true, get: () => { const v = source().name; return v === undefined ? stored.name : v; }, set: (value: unknown) => { stored.name = value; } },
+        providerDefaults: { enumerable: true, configurable: true, get: defaultsOf, set: (value: unknown) => { stored.providerDefaults = value as ProviderDefaults | undefined; } },
+      });
+    },
+    syncSession(session, state) {
+      const b = get(session);
+      if (state.data) validate({ provider, data: state.data }, 'session');
+      if (state.data !== undefined) b.context.providerSession = state.data ?? undefined;
+      if (state.folder !== undefined) b.context.folder = state.folder;
+      if (state.name !== undefined) b.context.name = state.name;
+      if (state.defaults !== undefined) { b.context.providerDefaults = { kind: provider } as ProviderDefaults; applyDefaults(session, state.defaults); }
+    },
+    updateDefaults: applyDefaults,
     loadConversation(session) {
       if (!native.loadConversation) throw new Error('Conversation loading is unavailable.');
       return hydrate(session, async binding => {
@@ -257,7 +318,16 @@ export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriv
     async resumeConversation(session, target) {
       const ref = refs.get(target.ref); if (!ref) throw new Error('Conversation reference does not belong to this driver.');
       if (!native.resumeConversation) throw new Error('Conversation resume is unavailable.');
-      const result = await native.resumeConversation(main(session).context, { ...target, ref }); adoptSession(session, result.backendSession);
+      const result = await native.resumeConversation(main(session).context, { ...target, ref }); adoptSession(session, result.providerSession);
+    },
+    openScope(parent, input) {
+      const p = main(parent);
+      const defaults = consumerContext(p.context).defaults;
+      const scoped = open({ id: `${p.context.id}:scope:${crypto.randomUUID()}`, folder: input.cwd, ...(defaults ? { defaults } : {}) });
+      const binding = get(scoped);
+      binding.kind = 'scope'; binding.parent = parent;
+      binding.context.providerDefaults = structuredClone(p.context.providerDefaults);
+      return scoped;
     },
     async executeScopedPrompt(session, input) {
       const parent = main(session);
@@ -265,7 +335,7 @@ export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriv
       input.signal?.throwIfAborted();
       if (!native.executeScopedPrompt) throw new Error('Scoped execution is unavailable.');
       if (input.signal && !native.cancelScopedPrompt) throw new Error('Scoped cancellation is unavailable.');
-      const scoped = input.session ?? open({ id: `${parent.context.id}:scope:${crypto.randomUUID()}`, folder: input.cwd });
+      const scoped = input.session ?? open({ id: `${parent.context.id}:scope:${crypto.randomUUID()}`, folder: input.cwd, ...(consumerContext(parent.context).defaults ? { defaults: consumerContext(parent.context).defaults } : {}) });
       const binding = get(scoped);
       if (input.session) {
         if (binding.kind !== 'scope') throw new Error('Only a scoped session can continue scoped execution.');
@@ -273,7 +343,7 @@ export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriv
         if (binding.context.folder !== input.cwd) throw new Error('Scope belongs to another workspace.');
       } else {
         binding.kind = 'scope'; binding.parent = session;
-        binding.context.backendDefaults = structuredClone(parent.context.backendDefaults);
+        binding.context.providerDefaults = structuredClone(parent.context.providerDefaults);
       }
       if (binding.operation || binding.state.busy || binding.state.activeTurnId) throw new Error('Scope is busy.');
       if (binding.nativeDisposed) throw new Error('Scope disposal has already started.');
@@ -289,9 +359,9 @@ export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriv
       input.signal?.addEventListener('abort', cancel, { once: true });
       try {
         input.signal?.throwIfAborted();
-        const result = await native.executeScopedPrompt(binding.context, { ...input, session: binding.context.backendSession });
+        const result = await native.executeScopedPrompt(binding.context, { ...input, session: binding.context.providerSession });
         input.signal?.throwIfAborted();
-        binding.context.backendSession = result.session; return { text: result.text, session: scoped };
+        binding.context.providerSession = result.session; return { text: result.text, session: scoped };
       } catch (error) {
         try { await cancellation; }
         finally {
@@ -312,11 +382,11 @@ export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriv
       const b = get(session);
       if (b.kind !== 'scope') throw new Error('Only scoped sessions can be disposed as scopes.');
       if (b.operation || b.state.busy || b.state.activeTurnId) throw new Error('Scope is busy.');
-      if (!native.disposeScopedSession || !native.releaseConversation || !b.context.backendSession) throw new Error('Scoped disposal is unavailable.');
+      if (!native.disposeScopedSession || !native.releaseConversation || !b.context.providerSession) throw new Error('Scoped disposal is unavailable.');
       b.operation = 'disposing';
       try {
         if (!b.nativeDisposed) {
-          await native.disposeScopedSession(b.context, b.context.backendSession);
+          await native.disposeScopedSession(b.context, b.context.providerSession);
           b.nativeDisposed = true;
         }
         await native.releaseConversation(b.context.id);
@@ -334,21 +404,5 @@ export function adaptHarnessDriver(provider: HarnessProvider, native: NativeDriv
     },
     onEvent(listener) { listeners.add(listener); return () => { listeners.delete(listener); }; },
     async close() { try { await native.close(); } finally { unsubscribe(); offUsage?.(); offRequests?.(); listeners.clear(); bindings.clear(); byId.clear(); } },
-  };
-}
-
-/** No provider turn is started until a consumer explicitly sends a prompt. */
-export function createHarnessDriver(provider: HarnessProvider, options: HarnessOptions): HarnessDriver {
-  return adaptHarnessDriver(provider, createNativeHarnessDriver(provider, { ...options,
-    instructions: options.instructions ? context => options.instructions!(consumerContext(context)) : undefined,
-    mcpServers: options.mcpServers ? context => options.mcpServers!(consumerContext(context)) : undefined,
-  }));
-}
-
-function consumerContext(context: NativeContext): HarnessContext {
-  const d = context.backendDefaults;
-  return { id: context.id, folder: context.folder, ...(context.name === undefined ? {} : { name: context.name }),
-    ...(d ? { defaults: { model: d.model ?? undefined, reasoningEffort: d.reasoningEffort ?? undefined, serviceTier: d.serviceTier,
-      permission: d.kind === 'codex' ? d.approvalPreset : d.permissionMode } } : {}),
   };
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ModelDescriptor, CodexHostSnapshot } from '../../src/index';
+import type { ModelDescriptor } from '../../src/index';
+import type { CodexSnapshot } from '../../src/internal';
 import { initialAuthentication } from '../../src/providers/codex/host-authentication';
 import { CodexHostNotificationsController } from '../../src/providers/codex/host-notifications-controller';
 import {
@@ -622,7 +623,7 @@ describe('CodexHostNotificationsController', () => {
 
 type SetupOptions = {
   activeTurnId?: string | null;
-  approvalPreset?: CodexHostSnapshot['approvalPreset'];
+  approvalPreset?: CodexSnapshot['approvalPreset'];
   busy?: boolean;
   goal?: ThreadRuntimeState['goal'];
   models?: ModelDescriptor[];
@@ -675,7 +676,7 @@ function createController(options: SetupOptions = {}) {
       target.activeTurnId = turnId;
       if (!target.turnIds.includes(turnId)) target.turnIds.push(turnId);
     }),
-    patch: vi.fn((patch: Partial<CodexHostSnapshot>) => Object.assign(state, patch)),
+    patch: vi.fn((patch: Partial<CodexSnapshot>) => Object.assign(state, patch)),
     patchConversationStatus: vi.fn((threadId: string, status: 'active' | 'error' | 'idle') => {
       state.conversations = state.conversations.map((candidate) => (
         candidate.id === threadId ? { ...candidate, status } : candidate

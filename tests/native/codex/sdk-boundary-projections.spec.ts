@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { CodexConversationSnapshot } from '../../../src/index';
+import type { CodexConversationSnapshot } from '../../../src/internal';
 
 import { codexSdkFixture, sdkAgent } from './sdk-host-fixture';
 

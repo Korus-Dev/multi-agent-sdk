@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CodexAppServerClient } from '@korus-dev/codex-sdk';
-import type { CodexHostSnapshot } from '../../src/index';
+import type { CodexSnapshot } from '../../src/internal';
 import {
   CodexHostCatalogController,
   type CodexHostCatalogDependencies,
@@ -664,7 +664,7 @@ function setupCatalog(request: ReturnType<typeof vi.fn>, options: {
     ensureConnected: vi.fn(async () => undefined),
     getState: () => state,
     isClosed: () => controls.closed,
-    patch: vi.fn((patch: Partial<CodexHostSnapshot>) => Object.assign(state, patch)),
+    patch: vi.fn((patch: Partial<CodexSnapshot>) => Object.assign(state, patch)),
     patchRuntime: vi.fn((_threadId, patch) => Object.assign(runtime, patch)),
     preferredApprovalPreset: () => options.preferredApprovalPreset === undefined
       ? 'ask-for-approval'

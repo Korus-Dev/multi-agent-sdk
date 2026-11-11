@@ -1,13 +1,13 @@
-import type { AgentBackend, AgentContextUsage, BackendDefaults, BackendSession, ThreadPlan } from './contracts';
+import type { HarnessProvider, AgentContextUsage, ProviderDefaults, ProviderSessionData, ThreadPlan } from './contracts';
 
 /** A caller-owned conversation binding; contains no application roster or workflow state. */
-export type HarnessContext = {
+export type ProviderContext = {
   id: string;
-  backend: AgentBackend;
+  provider: HarnessProvider;
   folder: string | null;
   name?: string | null;
-  backendSession?: BackendSession;
-  backendDefaults?: BackendDefaults;
+  providerSession?: ProviderSessionData;
+  providerDefaults?: ProviderDefaults;
   conversationTitle?: string;
   contextUsage?: AgentContextUsage;
   plan?: ThreadPlan;

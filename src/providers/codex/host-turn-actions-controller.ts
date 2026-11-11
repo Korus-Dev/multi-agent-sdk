@@ -1,12 +1,7 @@
 import { normalizePromptContent } from '../../core/prompt-content';
 import type { CodexAppServerClient } from '@korus-dev/codex-sdk';
-import type {
-  CodexConversationSummary,
-  CodexHostSnapshot,
-  SendMessageOptions,
-  StartCodexReviewOptions,
-  ConversationMessage,
-} from '../../core/codex-host';
+import type { SendMessageOptions, StartCodexReviewOptions, ConversationMessage } from '../../core/codex-host';
+import type { CodexConversationSummary, CodexSnapshot } from '../../core/codex-conversation-types';
 import { codexTurnToConversationMessages } from './codex-conversation-history';
 import {
   messageTurnIdOrNull,
@@ -31,10 +26,10 @@ export type CodexHostTurnActionsDependencies = {
   emitSummaryUpserted(summary: CodexConversationSummary, reason: 'updated', origin: 'action'): void;
   ensureThreadReady(threadId: string): Promise<ThreadRuntimeState>;
   loadTurnHistory?(threadId: string, turnId: string): Promise<void>;
-  getSnapshot(): CodexHostSnapshot;
-  getState(): CodexHostSnapshot;
+  getSnapshot(): CodexSnapshot;
+  getState(): CodexSnapshot;
   hydrateCompleteHistory(threadId: string, options?: { initialPageLoaded?: boolean; cursor?: string | null }): Promise<void>;
-  patch(patch: Partial<CodexHostSnapshot>): void;
+  patch(patch: Partial<CodexSnapshot>): void;
   patchConversationStatus(threadId: string, status: CodexConversationSummary['status'], origin: 'action'): void;
   patchConversationTurnCount(threadId: string, turnCount: number, origin: 'action'): void;
   patchRuntime(threadId: string, patch: ThreadRuntimePatch): void;
@@ -47,7 +42,7 @@ export class CodexHostTurnActionsController {
     private readonly host: CodexHostTurnActionsDependencies,
   ) {}
 
-  async compact(): Promise<CodexHostSnapshot> {
+  async compact(): Promise<CodexSnapshot> {
     const threadId = this.host.getState().activeConversationId;
     if (!threadId) return this.host.getSnapshot();
     await this.compactForThread(threadId);
@@ -60,7 +55,7 @@ export class CodexHostTurnActionsController {
     await this.client.request('thread/compact/start', { threadId });
   }
 
-  async startReview(options: StartCodexReviewOptions = {}): Promise<CodexHostSnapshot> {
+  async startReview(options: StartCodexReviewOptions = {}): Promise<CodexSnapshot> {
     if (!this.host.getState().activeConversationId) await this.host.createConversation();
     const threadId = this.host.getState().activeConversationId;
     if (!threadId) throw new Error('Codex did not create a conversation');
@@ -137,7 +132,7 @@ export class CodexHostTurnActionsController {
     }
   }
 
-  async interrupt(): Promise<CodexHostSnapshot> {
+  async interrupt(): Promise<CodexSnapshot> {
     const threadId = this.host.getState().activeConversationId;
     if (!threadId) return this.host.getSnapshot();
     await this.interruptThread(threadId);
@@ -150,7 +145,7 @@ export class CodexHostTurnActionsController {
     await this.client.request('turn/interrupt', { threadId, turnId: runtime.activeTurnId });
   }
 
-  async deleteTurn(turnId: string): Promise<CodexHostSnapshot> {
+  async deleteTurn(turnId: string): Promise<CodexSnapshot> {
     const threadId = this.requiredActiveConversation();
     await this.deleteTurnForThread(threadId, turnId);
     return this.host.getSnapshot();
@@ -160,7 +155,7 @@ export class CodexHostTurnActionsController {
     await this.rollbackToTurn(threadId, turnId);
   }
 
-  async editTurn(turnId: string, content: string, options?: SendMessageOptions): Promise<CodexHostSnapshot> {
+  async editTurn(turnId: string, content: string, options?: SendMessageOptions): Promise<CodexSnapshot> {
     const threadId = this.requiredActiveConversation();
     await this.editTurnForThread(threadId, turnId, content, options);
     return this.host.getSnapshot();
@@ -182,7 +177,7 @@ export class CodexHostTurnActionsController {
     await this.host.sendMessageToThread(threadId, text, { ...options, ...(attachments.length > 0 ? { attachments } : {}) });
   }
 
-  async retryTurn(turnId: string): Promise<CodexHostSnapshot> {
+  async retryTurn(turnId: string): Promise<CodexSnapshot> {
     const threadId = this.requiredActiveConversation();
     await this.retryTurnForThread(threadId, turnId);
     return this.host.getSnapshot();

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CodexAppServerClient, type ServerRequest } from '@korus-dev/codex-sdk';
-import type { CodexHostSnapshot } from '../../src/index';
+import type { CodexSnapshot } from '../../src/internal';
 import {
   CodexHostApprovalsController,
   type CodexHostApprovalsDependencies,
@@ -261,7 +261,7 @@ function approvals() {
       target.busy = true;
     }),
     maybeClearWaitingBusy: vi.fn(),
-    patch: vi.fn((patch: Partial<CodexHostSnapshot>) => Object.assign(state, patch)),
+    patch: vi.fn((patch: Partial<CodexSnapshot>) => Object.assign(state, patch)),
     patchConversationStatus: vi.fn(),
     patchRuntime: vi.fn((threadId, patch) => Object.assign(runtimeFor(threadId), patch)),
   };

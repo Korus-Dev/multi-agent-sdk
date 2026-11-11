@@ -4,50 +4,32 @@
 
 | Import | Contract |
 | --- | --- |
-| `@korus-dev/multi-agent-sdk` | Neutral factory, `TypedEventBus` and `TtlCache`; consumer/UI/native host types, generation types, diagnostic types, and distinct `NativeHarnessEvent` / `NativeHarnessDriver` / `NativeHarnessContext` types. |
+| `@korus-dev/multi-agent-sdk` | `createHarness`, `HarnessUnsupportedError`, `TypedEventBus`, `TtlCache` and the public types |
 | `/prompt` | Pure prompt authoring helpers for browser consumers. |
-| `/renderer` | Browser-safe capability constants, work-phase helpers, Codex conversation replica, and provider presentation projections. |
-| `/host-bridge` | Codex bridge operations and snapshot subscription helpers. |
-| `/native` | `createNativeHarnessDriver`, Claude/Cursor/Antigravity hosts and native helpers, `sessionMcpServer`, and provider-native integration contracts. |
-| `/codex` | Native Codex host/backend and runtime compatibility. |
+| `/runtime` | Node helpers that find a provider's executable and build the search path it runs with. |
+| `/testing` | Harnesses over scripted providers, for testing an application without a real provider. |
+| `/renderer` | Browser-safe capability constants, work-phase helpers, the Codex conversation replica, conversation projections and provider guards. |
 
-Paths in this table are appended to `@korus-dev/multi-agent-sdk`. An explicit exports map resolves the root and extensionless subpaths directly into the published build. `main` and `types` remain root fallbacks. Use root `import type` declarations for public types. Import optional values from the named modules to preserve browser/Node separation. Package metadata is available through `/package.json`.
+Paths in this table are appended to `@korus-dev/multi-agent-sdk`. An explicit exports map resolves the root and extensionless subpaths directly into the published build. Use root `import type` declarations for public types.
 
 ```ts
-import { createHarnessDriver } from '@korus-dev/multi-agent-sdk';
-import type { CodexConversationSnapshot, HarnessEvent, NativeHarnessEvent } from '@korus-dev/multi-agent-sdk';
+import { createHarness } from '@korus-dev/multi-agent-sdk';
+import type { HarnessEvent } from '@korus-dev/multi-agent-sdk';
 import { normalizePromptContent } from '@korus-dev/multi-agent-sdk/prompt';
 ```
 
-`HarnessEvent` is the neutral session event contract. `NativeHarnessEvent` retains provider-specific event envelopes; they are intentionally distinct types.
-
 Renderer integrations import `createCodexConversationReplica`, `projectSessionSelection`,
-the four `project*Conversation` helpers, capability constants and
-`withInferredWorkPhases` / `withInferredTurnWorkPhases` from `/renderer`.
-Its `CodexConversationReplica`, `ConversationPresentation` and `WorkPhasePart`
-types are also available there. This entry loads no native hosts or Node modules.
+the four `project*Conversation` helpers, capability constants, `isHarnessProvider`,
+`isProviderConversationRef` and `withInferredWorkPhases` / `withInferredTurnWorkPhases` from `/renderer`.
+This entry loads no provider code or Node modules.
 
-Node integrations use `/native` for `ClaudeHost`,
-`ClaudeAgentSdkTransport`, `CursorHost`, `AntigravityHost`, `AcpRuntime`, `AcpSession`,
-`installAcpRuntime` and `sessionMcpServer`. Claude skills, transcript, launch and
-local authentication helpers are exported there with their option types.
-The ACP wire helpers `AcpConnection`, `AcpError` and `record` are available there too.
+## Shared contracts
 
-## Provider hosts and shared contracts
-
-| Provider | Native host | Import |
-| --- | --- | --- |
-| Codex | `CodexHost` / `createCodexHost` | `/codex` |
-| Claude | `ClaudeHost` | `/native` |
-| Cursor | `CursorHost` | `/native` |
-| Antigravity | `AntigravityHost` | `/native` |
-
-The common application API is `HarnessDriver`, created by `createHarnessDriver`.
+The common application API is `Harness`, created by `createHarness`. Every provider (Codex, Claude, Cursor, Antigravity) is reached through it.
 Shared presentation contracts include `ConversationMessage`, `ConversationMessagePart`,
 `Approval`, `ClientAttachment`, `Turn`, `PromptPart` and `ModelDescriptor`.
 `Message` remains the agent-bound SDK message type; `ConversationMessage` describes
-the presentation transcript. Provider-specific snapshots, authentication and native
-operations retain their provider names.
+the presentation transcript.
 
 `TtlCache` and its `TtlCacheOptions`, `TtlCacheRecord`, `TtlCacheScheduler`,
 `TtlCacheTimer` and `TtlCacheEvictionContext` types are available from the root.
@@ -55,7 +37,7 @@ The caller supplies cache identity, eviction policy and cleanup callbacks.
 
 ## Factory
 
-`createHarnessDriver(provider, options): HarnessDriver`
+`createHarness(provider, options): Harness`
 
 Providers are `codex`, `claude`, `cursor`, and `antigravity`. `options.client.name` is required. Optional fields include `home`, `stateDirectory`, context-dependent `instructions` and `mcpServers`, `formatPrompt`, and named provider options. Native provider configuration remains in those named options rather than becoming generic policy.
 

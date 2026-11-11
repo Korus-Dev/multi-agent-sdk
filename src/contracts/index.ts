@@ -1,5 +1,5 @@
 export * from './shared';
-export * from './backend';
+export * from './provider';
 export * from './conversation';
 export * from './execution';
 export * from './claude-conversation';
@@ -15,4 +15,4 @@ export * from './status';
 export * from './remote-control';
 export * from './turn-diff';
 export * from './conversation-settings';
-export type { HarnessContext as Agent } from '../context';
+export type { ProviderContext as Agent } from '../context';

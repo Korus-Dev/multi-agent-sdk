@@ -1,6 +1,7 @@
 const product = { name: 'CPA workbench' };
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { CodexConversationEvent, ConversationMessage } from '../../../src/index';
+import type { ConversationMessage } from '../../../src/index';
+import type { CodexConversationEvent } from '../../../src/internal';
 import { codexSdkFixture, sdkAgent, sdkSummary } from './sdk-host-fixture';
 
 const metadata = { seq: 1, origin: 'notification' as const, occurredAt: '2026-09-16T00:00:00Z', conversationId: 'conversation-a', turnId: 'turn' };
@@ -46,7 +47,7 @@ describe(`Codex SDK → ${product.name} subagent ownership`, () => {
     conversation('conversation-a').emit(spawn);
     emit(completed);
     conversation('child').setSnapshot({ messages: [message('first'), message('second')] });
-    const live = await driver.readConversationMessages({ backend: 'codex', threadId: 'child' }, 'agent-a');
+    const live = await driver.readConversationMessages({ provider: 'codex', threadId: 'child' }, 'agent-a');
     expect(live.map((item) => item.parts)).toStrictEqual([[{ type: 'text', text: 'first' }], [{ type: 'text', text: 'second' }]]);
     expect(conversation('child').handle.readHistory).not.toHaveBeenCalled();
     conversation('cold').handle.readHistory.mockResolvedValue({ conversationId: 'cold', messages: [message('inherited'), message('final')], threadStatus: { type: 'idle' } });

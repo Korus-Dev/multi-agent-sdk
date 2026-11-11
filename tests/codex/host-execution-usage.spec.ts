@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CodexAppServerClient, type v2 } from '@korus-dev/codex-sdk';
 import { CodexHost } from '../../src/providers/codex';
 import { createCodexConversationReplica } from '../../src/core/conversation-replica';
-import type { CodexHostEvent } from '../../src/index';
+import type { CodexEvent } from '../../src/internal';
 import { MockCodexAppServer, resumeResponse, thread, turn } from './helpers/host-fixture';
 
 const requestUsage = {
@@ -47,7 +47,7 @@ async function setup(notifyStarted = false, priorUsage?: v2.TokenUsageBreakdown)
     'turn/start': () => ({ turn: turn(`turn-${++nextTurn}`, 'inProgress', []) }),
   });
   const host = new CodexHost({ client: new CodexAppServerClient(transport) });
-  const events: CodexHostEvent[] = [];
+  const events: CodexEvent[] = [];
   host.onEvent(event => events.push(event));
   await host.connect();
   return { host, events, transport };

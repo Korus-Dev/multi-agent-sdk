@@ -1,29 +1,10 @@
+import type { CodexRealtimeSession } from './realtime-types';
+export type { CodexRealtimeSession } from './realtime-types';
 export type { HarnessTextGenerationResult } from '../../generation';
-import type { ContinueCodexSafetyReviewOptions } from '../../core/codex-host';
+import type { ContinueCodexSafetyReviewOptions } from '../../core/codex-conversation-types';
 import type { CodexAppServerClient, v2 } from '@korus-dev/codex-sdk';
-import type {
-  CodexConversationEvent,
-  CodexConversationHistory,
-  CodexConversationHistoryPage,
-  CodexConversationPromptHistory,
-  CodexConversationLoadingStrategy,
-  CodexConversationSnapshot,
-  CodexRealtimeEvent,
-  CodexRealtimeInputAudioChunk,
-  ApprovalDecision,
-  CodexApprovalMode,
-  ApprovalPreset,
-  ApprovalScope,
-  Attachment,
-  ClientRequestResponse,
-  JsonValue,
-  CodexPermissionMode,
-  CreateCodexConversationOptions,
-  SendMessageOptions,
-  StartCodexRealtimeOptions,
-  StartCodexReviewOptions,
-  UpdateConversationSettings,
-} from '../../core/codex-host';
+import type { CodexConversationHistory, CodexConversationHistoryPage, CodexConversationPromptHistory, ApprovalDecision, CodexApprovalMode, ApprovalPreset, ApprovalScope, Attachment, ClientRequestResponse, JsonValue, CodexPermissionMode, CreateCodexConversationOptions, SendMessageOptions, StartCodexReviewOptions, UpdateConversationSettings } from '../../core/codex-host';
+import type { CodexConversationEvent, CodexConversationLoadingStrategy, CodexConversationSnapshot, StartCodexRealtimeOptions } from '../../core/codex-conversation-types';
 import type { CodexMcpServerDefinition } from './host-mcp';
 import type { CodexAppServerStdioTransportOptions } from '@korus-dev/codex-sdk';
 import type { CodexAppServerUnixSocketTransportOptions } from '@korus-dev/codex-sdk';
@@ -188,17 +169,6 @@ export type CodexConversation = {
   getSnapshot(): CodexConversationSnapshot;
   onStateChange(listener: (snapshot: CodexConversationSnapshot) => void): () => void;
   onEvent(listener: (event: CodexConversationEvent) => void): () => void;
-};
-
-export type CodexRealtimeSession = {
-  readonly conversationId: string;
-  readonly transport: 'websocket' | 'webrtc';
-  readonly remoteSdp: string | null;
-  appendAudio(audio: CodexRealtimeInputAudioChunk): Promise<void>;
-  appendText(text: string, role?: 'user' | 'developer' | 'assistant'): Promise<void>;
-  appendSpeech(text: string): Promise<void>;
-  stop(): Promise<void>;
-  onEvent(listener: (event: CodexRealtimeEvent) => void): () => void;
 };
 
 export type CodexAppServerTransportOptions =

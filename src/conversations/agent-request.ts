@@ -1,8 +1,8 @@
-import type { AskUserRequest,BackendApprovalRequest,ClientRequest,ConfirmToolRequest,ClientRequestResponse } from '../contracts';
+import type { AskUserRequest,ProviderApprovalRequest,ClientRequest,ConfirmToolRequest,ClientRequestResponse } from '../contracts';
 
 type RequestIdentity = { id: string; conversationId: string; turnId?: string; itemId?: string };
 export type AgentRequest = RequestIdentity & (
-  | { kind: 'approval'; approval: BackendApprovalRequest }
+  | { kind: 'approval'; approval: ProviderApprovalRequest }
   | { kind: 'question'; question: AskUserRequest & { delivery: 'tool' | 'async'; blocking: boolean } }
   | { kind: 'toolConfirmation'; confirmation: ConfirmToolRequest }
 );
@@ -25,9 +25,9 @@ export function isAgentRequestResponse(value: unknown): value is AgentRequestRes
     && Object.values(outcome.answers).every((answer) => answer && Array.isArray(answer.answers) && answer.answers.every((text: unknown) => typeof text === 'string')));
 }
 
-export function approvalAgentRequest(approval: Omit<BackendApprovalRequest, 'requestedPermissions' | 'allowedScopes'> & {
-  requestedPermissions?: readonly import('../contracts/index').BackendRequestedPermission[];
-  allowedScopes?: readonly import('../contracts/index').BackendApprovalScope[];
+export function approvalAgentRequest(approval: Omit<ProviderApprovalRequest, 'requestedPermissions' | 'allowedScopes'> & {
+  requestedPermissions?: readonly import('../contracts/index').ProviderRequestedPermission[];
+  allowedScopes?: readonly import('../contracts/index').ProviderApprovalScope[];
 }): AgentRequest {
   const { requestedPermissions, allowedScopes, ...fields } = approval;
   return { id: approval.id, conversationId: approval.conversationId, turnId: approval.turnId, itemId: approval.itemId, kind: 'approval', approval: {

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CodexHostEvent } from '../../src/index';
+import type { CodexEvent } from '../../src/internal';
 import { CodexAppServerClient, type v2 } from '@korus-dev/codex-sdk';
 import { CodexHost } from '../../src/providers/codex';
 import {
@@ -71,7 +71,7 @@ describe('CodexHost local Markdown images', () => {
       client: new CodexAppServerClient(transport),
       cwd: '/tmp/project',
     });
-    const events: CodexHostEvent[] = [];
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
 
     await host.connect();
@@ -316,7 +316,7 @@ describe('CodexHost local Markdown images', () => {
       'fs/readFile': () => { throw new Error('unreadable'); },
     });
     const host = new CodexHost({ client: new CodexAppServerClient(transport) });
-    const events: CodexHostEvent[] = [];
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
     await host.connect();
     transport.emitNotification('turn/started', { threadId: 'thread-existing', turn: turn('turn-unreadable-image', 'inProgress', []) });
@@ -419,7 +419,7 @@ describe('CodexHost local Markdown images', () => {
       'fs/readFile': () => ({ dataBase64: generatedPngBase64 }),
     });
     const host = new CodexHost({ client: new CodexAppServerClient(transport) });
-    const events: CodexHostEvent[] = [];
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
     await host.connect();
     await host.selectConversation('thread-existing');
@@ -457,7 +457,7 @@ describe('CodexHost local Markdown images', () => {
       'fs/readFile': () => ({ dataBase64: generatedPngBase64 }),
     });
     const host = new CodexHost({ client: new CodexAppServerClient(transport) });
-    const events: CodexHostEvent[] = [];
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
     await host.connect();
     await host.selectConversation('thread-existing');
@@ -506,7 +506,7 @@ describe('CodexHost local Markdown images', () => {
       'fs/readFile': () => ({ dataBase64: generatedPngBase64 }),
     });
     const host = new CodexHost({ client: new CodexAppServerClient(transport) });
-    const events: CodexHostEvent[] = [];
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
     await host.connect();
     await host.selectConversation('thread-existing');
@@ -555,7 +555,7 @@ describe('CodexHost local Markdown images', () => {
       'fs/readFile': () => ({ dataBase64: generatedPngBase64 }),
     });
     const host = new CodexHost({ client: new CodexAppServerClient(transport) });
-    const events: CodexHostEvent[] = [];
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
     await host.connect();
     vi.useFakeTimers();

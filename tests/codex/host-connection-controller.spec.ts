@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CodexHostSnapshot } from '../../src/index';
+import type { CodexSnapshot } from '../../src/internal';
 import { RpcRemoteError } from '@korus-dev/codex-sdk';
 import {
   CodexHostConnectionController,
@@ -356,7 +356,7 @@ function setupConnection(options: Record<string, unknown> = {}) {
     emitHostStatus: vi.fn(),
     getSnapshot: vi.fn(() => state),
     getState: vi.fn(() => state),
-    patch: vi.fn((patch: Partial<CodexHostSnapshot>) => Object.assign(state, patch)),
+    patch: vi.fn((patch: Partial<CodexSnapshot>) => Object.assign(state, patch)),
   };
   const client = {
     initialize: vi.fn<() => Promise<unknown>>(async () => ({})),

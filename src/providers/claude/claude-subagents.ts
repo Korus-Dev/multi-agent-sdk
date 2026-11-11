@@ -1,4 +1,4 @@
-import type { HarnessEvent } from '../../driver';
+import type { ProviderEvent } from '../../driver';
 import type { SubagentStatus } from '../../contracts/index';
 import { claudeMessageContentBlocks, parseClaudeSdkMessage, type ClaudeSdkMessage } from './protocol';
 
@@ -21,7 +21,7 @@ export class ClaudeSubagents {
     children: Map<string, Child>;
   }>();
 
-  constructor(private readonly emit: (event: HarnessEvent) => void) {}
+  constructor(private readonly emit: (event: ProviderEvent) => void) {}
 
   observe(agentId: string, rootId: string, message: ClaudeSdkMessage, occurredAt = new Date().toISOString()): boolean {
     let session = this.sessions.get(agentId);
@@ -58,7 +58,7 @@ export class ClaudeSubagents {
         const status = raw.status === 'completed' ? 'completed' : raw.status === 'failed' ? 'errored' : raw.status === 'stopped' ? 'interrupted' : null;
         if (status) this.update(agentId, rootId, child, taskId, status, occurredAt);
       } else if (child?.status === 'running' && message.subtype === 'task_progress') {
-        this.emit({ agentId, backend: 'claude', backendSessionId: rootId, conversationId: rootId, occurredAt,
+        this.emit({ agentId, provider: 'claude', providerSessionId: rootId, conversationId: rootId, occurredAt,
           type: 'subagent.statusChanged', payload: { rootConversationId: rootId, conversationId: taskId, status: 'running' } });
       }
     }
@@ -94,7 +94,7 @@ export class ClaudeSubagents {
     child.status = status;
     this.sessions.get(agentId)!.children.set(id, child);
     const running = status === 'running';
-    this.emit({ agentId, backend: 'claude', backendSessionId: rootId, conversationId: rootId, occurredAt,
+    this.emit({ agentId, provider: 'claude', providerSessionId: rootId, conversationId: rootId, occurredAt,
       type: 'subagent.operationChanged', payload: {
         rootConversationId: rootId,
         operation: { id: child.toolId, kind: 'spawnAgent', lifecycle: running ? 'started' : 'completed',
@@ -104,15 +104,15 @@ export class ClaudeSubagents {
         },
         agentStates: { [id]: { status } },
       } });
-    this.emit({ agentId, backend: 'claude', backendSessionId: rootId, conversationId: rootId, occurredAt,
+    this.emit({ agentId, provider: 'claude', providerSessionId: rootId, conversationId: rootId, occurredAt,
       type: 'subagent.identityChanged', payload: { rootConversationId: rootId, conversationId: id,
         ...(child.name ? { agentNickname: child.name } : {}), ...(child.role ? { agentRole: child.role } : {}),
       } });
   }
 }
 
-export function claudeSubagentHistoryEvents(content: string, agentId: string, rootId: string): HarnessEvent[] {
-  const events: HarnessEvent[] = [];
+export function claudeSubagentHistoryEvents(content: string, agentId: string, rootId: string): ProviderEvent[] {
+  const events: ProviderEvent[] = [];
   const subagents = new ClaudeSubagents(event => events.push(event));
   let lastAt = new Date(0).toISOString();
   for (const line of content.split(/\r?\n/)) {

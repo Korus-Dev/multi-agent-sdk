@@ -2,13 +2,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { createCodexConversationReplica } from '../../src/core/conversation-replica';
 import { CodexAppServerClient, type v2 } from '@korus-dev/codex-sdk';
 import { CodexHost } from '../../src/providers/codex';
-import type { CodexHostEvent } from '../../src/index';
-import { deferred, generatedPngBase64, MockCodexAppServer, createHost, lastRequest, requestsFor, resumeResponse, thread, turn } from './helpers/host-fixture';
+import type { CodexEvent } from '../../src/internal';
+import { deferred, generatedPngBase64, MockCodexAppServer, createHarness, lastRequest, requestsFor, resumeResponse, thread, turn } from './helpers/host-fixture';
 
 describe('CodexHost', () => {
   it.each(['completed', 'interrupted', 'failed', 'error'] as const)('waits for authoritative %s after idle', async (status) => {
-    const { host, transport } = createHost('turn/interrupt');
-    const events: CodexHostEvent[] = [];
+    const { host, transport } = createHarness('turn/interrupt');
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
     await host.connect();
     try {
@@ -96,7 +96,7 @@ describe('CodexHost', () => {
     const next = deferred<v2.TurnStartResponse>();
     const transport = new MockCodexAppServer({ 'turn/start': () => next.promise });
     const host = new CodexHost({ client: new CodexAppServerClient(transport) });
-    const events: CodexHostEvent[] = [];
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
     await host.connect();
     const replica = createCodexConversationReplica(host.getConversationSnapshot('thread-existing'));
@@ -156,7 +156,7 @@ describe('CodexHost', () => {
       'turn/start': () => ({ turn: turn('turn-continuation', 'inProgress', []) }),
     });
     const host = new CodexHost({ client: new CodexAppServerClient(transport), cwd: '/tmp/project' });
-    const events: CodexHostEvent[] = [];
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
     await host.connect();
     const userMessageCount = host.getSnapshot().messages.filter((message) => message.role === 'user').length;
@@ -201,7 +201,7 @@ describe('CodexHost', () => {
     await expect(completedHost.continueInterruptedTurn()).rejects.toThrow('latest turn is not interrupted');
     expect(lastRequest(completedTransport, 'turn/start')).toBeUndefined();
 
-    const { host: activeHost, transport: activeTransport } = createHost('turn/start');
+    const { host: activeHost, transport: activeTransport } = createHarness('turn/start');
     await activeHost.connect();
     await activeHost.sendMessage('Begin');
     const activeTurnStart = lastRequest(activeTransport, 'turn/start');
@@ -235,17 +235,17 @@ describe('CodexHost', () => {
   });
 
   it('publishes the authoritative turn identity for an optimistic user prompt', async () => {
-    const { host } = createHost('turn/start');
-    const events: CodexHostEvent[] = [];
+    const { host } = createHarness('turn/start');
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
 
     await host.connect();
     await host.sendMessage('Begin');
 
-    const appended = events.find((event): event is Extract<CodexHostEvent, { type: 'message.appended' }> => (
+    const appended = events.find((event): event is Extract<CodexEvent, { type: 'message.appended' }> => (
       event.type === 'message.appended' && event.payload.message.role === 'user'
     ));
-    const updated = events.find((event): event is Extract<CodexHostEvent, { type: 'message.updated' }> => (
+    const updated = events.find((event): event is Extract<CodexEvent, { type: 'message.updated' }> => (
       event.type === 'message.updated' && event.payload.message.role === 'user'
     ));
     expect(appended).toMatchObject({
@@ -264,7 +264,7 @@ describe('CodexHost', () => {
       'turn/start': () => new Promise((resolve) => { resolveStart = resolve; }),
     });
     const host = new CodexHost({ client: new CodexAppServerClient(transport), cwd: '/tmp/project' });
-    const events: CodexHostEvent[] = [];
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
     await host.connect();
 
@@ -328,7 +328,7 @@ describe('CodexHost', () => {
   });
 
   it('includes attachments in steering input and the optimistic steer message', async () => {
-    const { host, transport } = createHost('turn/start', 'turn/steer');
+    const { host, transport } = createHarness('turn/start', 'turn/steer');
     await host.connect();
     await host.sendMessage('Begin');
     await host.steerMessage('Inspect these', {
@@ -379,7 +379,7 @@ describe('CodexHost', () => {
   });
 
   it('tracks names, completed tool items, errors, and lifecycle cleanup', async () => {
-    const { host, transport } = createHost();
+    const { host, transport } = createHarness();
     const lifecycleEvents: unknown[] = [];
     host.onEvent((event) => lifecycleEvents.push(event));
     await host.connect();
@@ -444,8 +444,8 @@ describe('CodexHost', () => {
   });
 
   it('emits file activity events for read and file changes as paths become known', async () => {
-    const { host, transport } = createHost();
-    const events: CodexHostEvent[] = [];
+    const { host, transport } = createHarness();
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
     await host.connect();
 
@@ -491,8 +491,8 @@ describe('CodexHost', () => {
   });
 
   it('projects live generated images once while preserving technical tool events', async () => {
-    const { host, transport } = createHost();
-    const events: CodexHostEvent[] = [];
+    const { host, transport } = createHarness();
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
     await host.connect();
 
@@ -572,7 +572,7 @@ describe('CodexHost', () => {
   });
 
   it('reduces started, replaced, ignored, and failed lifecycle variants', async () => {
-    const { host, transport } = createHost();
+    const { host, transport } = createHarness();
     await host.connect();
     await host.selectConversation('thread-existing');
     const startedThread = thread('thread-started', false);

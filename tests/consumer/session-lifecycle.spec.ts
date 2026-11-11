@@ -1,29 +1,29 @@
 import { expect, it, vi } from 'vitest';
-import { adaptHarnessDriver } from '../../src/consumer';
-import type { HarnessContext } from '../../src/context';
-import type { HarnessDriver, HarnessEvent } from '../../src/driver';
+import { adaptHarness } from '../../src/consumer';
+import type { ProviderContext } from '../../src/context';
+import type { ProviderDriver, ProviderEvent } from '../../src/driver';
 import { emptyAntigravitySnapshot } from '../../src/conversations/antigravity-conversation-replica';
 import { emptyCursorSnapshot } from '../../src/conversations/cursor-conversation-replica';
 import { sdkSnapshot } from '../native/codex/sdk-host-fixture';
 import { approvalAgentRequest, requestFromClientRequest } from '../../src/conversations/agent-request';
 
 function fixture(provider: 'cursor' | 'antigravity' | 'codex' | 'claude' = 'cursor') {
-  let deliver!: (event: HarnessEvent) => void;
+  let deliver!: (event: ProviderEvent) => void;
   const log: string[] = [];
   const native = {
     onEvent: (listener: typeof deliver) => { deliver = listener; return () => {}; },
     getCapabilities: () => ({ permissionModes: [{ id: 'selected' }], approvalPresets: [] }),
-    executeScopedPrompt: vi.fn(async (context: HarnessContext) => { log.push(`execute:${context.id}`); return { text: 'Done', session: provider === 'codex' ? { kind: 'codex' as const, threadId: context.id } : provider === 'claude' ? { kind: 'claude' as const, sessionId: context.id, transport: 'stdio' as const } : { kind: 'cursor' as const, sessionId: context.id } }; }),
-    sendPrompt: vi.fn(async (context: HarnessContext) => ({ backendSession: { kind: 'cursor' as const, sessionId: context.id } })),
-    interrupt: vi.fn(async (context: HarnessContext) => ({ backendSession: { kind: 'cursor' as const, sessionId: context.id } })),
-    loadConversation: vi.fn(async (context: HarnessContext) => context.backendSession ?? null),
+    executeScopedPrompt: vi.fn(async (context: ProviderContext) => { log.push(`execute:${context.id}`); return { text: 'Done', session: provider === 'codex' ? { kind: 'codex' as const, threadId: context.id } : provider === 'claude' ? { kind: 'claude' as const, sessionId: context.id, transport: 'stdio' as const } : { kind: 'cursor' as const, sessionId: context.id } }; }),
+    sendPrompt: vi.fn(async (context: ProviderContext) => ({ providerSession: { kind: 'cursor' as const, sessionId: context.id } })),
+    interrupt: vi.fn(async (context: ProviderContext) => ({ providerSession: { kind: 'cursor' as const, sessionId: context.id } })),
+    loadConversation: vi.fn(async (context: ProviderContext) => context.providerSession ?? null),
     readConversationContent: vi.fn(async () => ({ text: '', nextOffset: null })),
-    disposeScopedSession: vi.fn(async (context: HarnessContext) => { log.push(`dispose:${context.id}`); }),
+    disposeScopedSession: vi.fn(async (context: ProviderContext) => { log.push(`dispose:${context.id}`); }),
     releaseConversation: vi.fn(async (id: string) => { log.push(`release:${id}`); }),
     respondToAgentRequest: vi.fn(async () => {}), close: vi.fn(async () => {}),
   };
-  const driver = adaptHarnessDriver(provider, native as unknown as HarnessDriver<HarnessContext, HarnessEvent>);
-  return { driver, native, log, deliver: (event: HarnessEvent) => deliver(event) };
+  const driver = adaptHarness(provider, native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
+  return { driver, native, log, deliver: (event: ProviderEvent) => deliver(event) };
 }
 const question = { id: 'question', kind: 'ask_user' as const, payload: { request: { itemId: 'item', questions: [{ id: 'choice', header: 'Choose', question: 'Continue?', isOther: false, isSecret: false, options: null }] } } };
 const confirmation = { id: 'confirmation', kind: 'confirm_tool' as const, payload: { confirmation: { integrationId: 'ledger', integrationName: 'Ledger', toolName: 'write', summary: 'Write ledger?', argumentsPreview: '{}' } } };
@@ -33,11 +33,11 @@ it.each(['cursor', 'antigravity'] as const)('%s restores missing requests and re
   const { driver, deliver, native } = fixture(provider);
   const session = driver.open({ id: 'main', folder: '/ledger' });
   const snapshot = { ...(provider === 'cursor' ? emptyCursorSnapshot('main', 'native') : emptyAntigravitySnapshot('main', 'native')), activeTurnId: 'turn', clientRequests: [question, confirmation] };
-  deliver({ type: `${provider}.conversationSnapshotChanged`, backend: provider, agentId: 'main', payload: { revision: 1, snapshot } } as HarnessEvent);
+  deliver({ type: `${provider}.conversationSnapshotChanged`, provider: provider, agentId: 'main', payload: { revision: 1, snapshot } } as ProviderEvent);
   expect(driver.readSession(session).requests).toEqual([question, confirmation].map(request => requestFromClientRequest(request, { conversationId: 'native', turnId: 'turn' })));
   await driver.respondToRequest(session, { id: 'question', outcome: { kind: 'cancelled' } });
   expect(native.respondToAgentRequest).toHaveBeenCalledWith({ agentId: 'main', id: 'question', outcome: { kind: 'cancelled' } });
-  deliver({ type: `${provider}.conversationSnapshotChanged`, backend: provider, agentId: 'main', payload: { revision: 2, snapshot: { ...snapshot, clientRequests: [] } } } as HarnessEvent);
+  deliver({ type: `${provider}.conversationSnapshotChanged`, provider: provider, agentId: 'main', payload: { revision: 2, snapshot: { ...snapshot, clientRequests: [] } } } as ProviderEvent);
   expect(driver.readSession(session).requests).toEqual([]);
   await expect(driver.respondToRequest(session, { id: 'question', outcome: { kind: 'cancelled' } })).rejects.toThrow('does not belong');
   await driver.close();
@@ -47,12 +47,12 @@ it('recovers Codex approvals/questions/confirmations and drops ones resolved wit
   const approval = { id: 'approval', kind: 'command' as const, conversationId: 'native', itemId: 'cmd', title: 'Run?', requiresHumanApproval: true };
   const clients = [{ ...question, conversationId: 'native', turnId: 'turn', itemId: 'item', payload: { request: { ...question.payload.request, delivery: 'tool' as const, blocking: true } } }, { ...confirmation, conversationId: 'native', turnId: 'turn', itemId: 'confirm' }];
   const snapshot = sdkSnapshot('native', { approvals: [approval], clientRequests: clients });
-  deliver({ type: 'codex.conversationSnapshotChanged', backend: 'codex', agentId: 'main', threadId: 'native', payload: { revision: 1, snapshot } });
+  deliver({ type: 'codex.conversationSnapshotChanged', provider: 'codex', agentId: 'main', threadId: 'native', payload: { revision: 1, snapshot } });
   expect(driver.readSession(session).requests).toEqual([approvalAgentRequest(approval), ...clients.map(request => requestFromClientRequest(request, { conversationId: 'native', turnId: 'turn' }))]);
   for (const id of ['approval', 'confirmation']) await driver.respondToRequest(session, { id, outcome: { kind: 'decision', decision: 'deny' } });
   expect(native.respondToAgentRequest).toHaveBeenCalledWith({ agentId: 'main', id: 'approval', outcome: { kind: 'decision', decision: 'deny' } });
   expect(native.respondToAgentRequest).toHaveBeenCalledWith({ agentId: 'main', id: 'confirmation', outcome: { kind: 'decision', decision: 'deny' } });
-  deliver({ type: 'codex.conversationSnapshotChanged', backend: 'codex', agentId: 'main', threadId: 'native', payload: { revision: 2, snapshot: { ...snapshot, approvals: [], clientRequests: [] } } });
+  deliver({ type: 'codex.conversationSnapshotChanged', provider: 'codex', agentId: 'main', threadId: 'native', payload: { revision: 2, snapshot: { ...snapshot, approvals: [], clientRequests: [] } } });
   expect(driver.readSession(session).requests).toEqual([]); await driver.close();
 });
 it('clones parent defaults and never treats a main or foreign-parent handle as a reusable scope', async () => {
@@ -62,10 +62,10 @@ it('clones parent defaults and never treats a main or foreign-parent handle as a
   const scope = await driver.executeScopedPrompt(main, { ...input, options: { selection: { model: 'override' } } });
   expect(native.executeScopedPrompt).toHaveBeenNthCalledWith(1, expect.anything(), expect.objectContaining({ options: { selection: { model: 'override' } } }));
   const context = native.executeScopedPrompt.mock.calls[0]![0];
-  expect(context.backendDefaults).toEqual({ kind: 'cursor', model: 'selected-model', reasoningEffort: 'high', serviceTier: 'fast', permissionMode: 'selected' });
-  context.backendDefaults!.model = 'mutated';
+  expect(context.providerDefaults).toEqual({ kind: 'cursor', model: 'selected-model', reasoningEffort: 'high', serviceTier: 'fast', permissionMode: 'selected' });
+  context.providerDefaults!.model = 'mutated';
   const second = await driver.executeScopedPrompt(main, input);
-  expect(native.executeScopedPrompt.mock.calls[1]![0].backendDefaults?.model).toBe('selected-model');
+  expect(native.executeScopedPrompt.mock.calls[1]![0].providerDefaults?.model).toBe('selected-model');
   const before = native.executeScopedPrompt.mock.calls.length;
   await expect(driver.executeScopedPrompt(main, { ...input, session: main })).rejects.toThrow(/scope/i);
   await expect(driver.executeScopedPrompt(other, { ...input, session: scope.session })).rejects.toThrow(/parent/i);
@@ -148,15 +148,15 @@ it('Claude preserves unknown pending requests and prunes only explicit native an
   const { driver, deliver } = fixture('claude'); const session = driver.open({ id: 'main', folder: '/ledger' });
   const q = requestFromClientRequest(question, { conversationId: 'native' });
   const c = requestFromClientRequest(confirmation, { conversationId: 'native' });
-  for (const request of [q, c]) deliver({ type: 'agentRequest.created', backend: 'claude', agentId: 'main', payload: { request } });
+  for (const request of [q, c]) deliver({ type: 'agentRequest.created', provider: 'claude', agentId: 'main', payload: { request } });
   const snapshot = { agentId: 'main', sessionId: 'native', activeTurnId: null, turnIds: [], turns: [], messages: [], answeredClientRequestIds: [], busy: false, historyLoading: false, historyState: { hasOlder: false, loadingOlder: false }, contextUsage: null, plan: null, error: null };
-  deliver({ type: 'claude.conversationSnapshotChanged', backend: 'claude', agentId: 'main', payload: { revision: 1, snapshot } });
+  deliver({ type: 'claude.conversationSnapshotChanged', provider: 'claude', agentId: 'main', payload: { revision: 1, snapshot } });
   expect(driver.readSession(session).requests).toEqual([q, c]);
-  deliver({ type: 'claude.conversationSnapshotChanged', backend: 'claude', agentId: 'main', payload: { revision: 2, snapshot: { ...snapshot, answeredClientRequestIds: ['question'] } } });
+  deliver({ type: 'claude.conversationSnapshotChanged', provider: 'claude', agentId: 'main', payload: { revision: 2, snapshot: { ...snapshot, answeredClientRequestIds: ['question'] } } });
   expect(driver.readSession(session).requests).toEqual([c]);
-  deliver({ type: 'agentRequest.created', backend: 'claude', agentId: 'main', payload: { request: q } });
+  deliver({ type: 'agentRequest.created', provider: 'claude', agentId: 'main', payload: { request: q } });
   expect(driver.readSession(session).requests).toEqual([c]);
-  deliver({ type: 'agentRequest.resolved', backend: 'claude', agentId: 'main', payload: { id: c.id, outcome: { kind: 'cancelled' } } });
+  deliver({ type: 'agentRequest.resolved', provider: 'claude', agentId: 'main', payload: { id: c.id, outcome: { kind: 'cancelled' } } });
   expect(driver.readSession(session).requests).toEqual([]); await driver.close();
 });
 it('rejects restoring a saved child while main release is pending', async () => {

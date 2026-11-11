@@ -65,7 +65,7 @@ describe(`Codex SDK → ${product.name} session policy`, () => {
     const { driver, conversation } = setup();
     const session = conversation('conversation-a');
     session.handle.loadOlderHistory.mockResolvedValue({ conversationId: 'conversation-a', messages: [], hasOlder: true });
-    const agent = { ...sdkAgent(), backendDefaults: { kind: 'codex' as const, serviceTier: 'fast' } };
+    const agent = { ...sdkAgent(), providerDefaults: { kind: 'codex' as const, serviceTier: 'fast' } };
     await driver.loadConversation(agent);
     expect(session.handle.updateSettings).toHaveBeenCalledWith({ serviceTier: 'fast' });
     await expect(driver.loadOlderHistory(agent)).resolves.toStrictEqual({ hasOlder: true });
@@ -92,7 +92,7 @@ describe(`Codex SDK → ${product.name} session policy`, () => {
     });
     const agent = {
       ...sdkAgent(),
-      backendDefaults: { kind: 'codex' as const, model, reasoningEffort: 'high', serviceTier: null, userSelectedModel: true },
+      providerDefaults: { kind: 'codex' as const, model, reasoningEffort: 'high', serviceTier: null, userSelectedModel: true },
     };
 
     await driver.loadConversation(agent);
@@ -106,7 +106,7 @@ describe(`Codex SDK → ${product.name} session policy`, () => {
   it.each([false, true])('rolls over via a bounded handoff and archives only after replacement acceptance (failure=%s)', async (fail) => {
     const { driver, host, conversation, events } = setup();
     const session = conversation('conversation-a');
-    const agent = { ...sdkAgent(), backendDefaults: { kind: 'codex' as const, model: 'original', reasoningEffort: 'high', serviceTier: 'fast' } };
+    const agent = { ...sdkAgent(), providerDefaults: { kind: 'codex' as const, model: 'original', reasoningEffort: 'high', serviceTier: 'fast' } };
     await driver.loadConversation(agent);
     events.length = 0;
     session.handle.sendMessage.mockImplementationOnce(async () => {
@@ -127,7 +127,7 @@ describe(`Codex SDK → ${product.name} session policy`, () => {
       expect(order).toStrictEqual(['replacement-acceptance', 'archive:replacement']);
       expect(session.listenerCount()).toBe(1);
     } else {
-      await expect(driver.replaceConversationWithSummary(agent)).resolves.toStrictEqual({ backendSession: { kind: 'codex', threadId: 'replacement' } });
+      await expect(driver.replaceConversationWithSummary(agent)).resolves.toStrictEqual({ providerSession: { kind: 'codex', threadId: 'replacement' } });
       expect(order).toStrictEqual(['replacement-acceptance', 'archive:conversation-a']);
       expect(session.listenerCount()).toBe(0);
     }
@@ -135,6 +135,6 @@ describe(`Codex SDK → ${product.name} session policy`, () => {
     expect(host.createConversation).toHaveBeenCalledWith({ cwd: '/repo', threadSource: 'user', model: 'original', reasoningEffort: 'high', serviceTier: 'fast' }, { extensionContext: agent });
     expect(conversation('replacement').handle.sendMessage).toHaveBeenCalledWith(expect.stringContaining('Carry this context forward.'));
     expect(events.filter((event) => event.type === 'codex.conversationEventReceived')).toStrictEqual([]);
-    expect(agent.backendDefaults.model).toBe('original');
+    expect(agent.providerDefaults.model).toBe('original');
   });
 });

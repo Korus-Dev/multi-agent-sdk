@@ -106,7 +106,7 @@ describe(`Codex SDK → ${product.name} backend controls`, () => {
     expect(handle.deleteTurn).toHaveBeenCalledWith('turn');
     handle.forkTurn.mockResolvedValue({ conversationId: 'fork', conversation: host.conversation('fork'), snapshot: sdkSnapshot('fork') });
     const target = sdkAgent('fork-agent', 'fork');
-    await expect(driver.forkConversation(sdkAgent(), target, 'turn')).resolves.toMatchObject({ backendSession: { kind: 'codex', threadId: 'fork' } });
+    await expect(driver.forkConversation(sdkAgent(), target, 'turn')).resolves.toMatchObject({ providerSession: { kind: 'codex', threadId: 'fork' } });
     expect(handle.forkTurn).toHaveBeenCalledWith('turn', { cwd: '/repo' }, { extensionContext: target });
     expect(conversation('fork').listenerCount()).toBe(1);
     handle.fork.mockResolvedValue({ conversationId: 'whole-fork', conversation: host.conversation('whole-fork'), snapshot: sdkSnapshot('whole-fork') });
@@ -147,8 +147,8 @@ describe(`Codex SDK → ${product.name} backend controls`, () => {
       await new Promise<void>(resolve => setImmediate(resolve));
       release();
       const [receipt, ownerReceipt] = await Promise.all([guestSending, ownerSending]);
-      expect(receipt).toStrictEqual({ backendSession: { kind: 'codex', threadId: 'conversation-a' }, turnId: 'turn', messageId: guest.id });
-      if (operation === 'steer') expect(ownerReceipt).toStrictEqual({ backendSession: { kind: 'codex', threadId: 'conversation-a' }, turnId: 'turn', messageId: owner.id });
+      expect(receipt).toStrictEqual({ providerSession: { kind: 'codex', threadId: 'conversation-a' }, turnId: 'turn', messageId: guest.id });
+      if (operation === 'steer') expect(ownerReceipt).toStrictEqual({ providerSession: { kind: 'codex', threadId: 'conversation-a' }, turnId: 'turn', messageId: owner.id });
       else expect(session.handle.respondToClientRequest).toHaveBeenCalledExactlyOnceWith({ id: request.id, payload: { answers: {} } });
     } finally { release(); await guestSending; }
   });
@@ -161,15 +161,15 @@ describe(`Codex SDK → ${product.name} backend controls`, () => {
       turnIds: ['discussion', 'delegating'],
       turns: [{ id: 'discussion', status: 'completed', error: null, willRetry: false, startedAt: null, completedAt: null, durationMs: null }, { id: 'delegating', status: 'inProgress', error: null, willRetry: false, startedAt: null, completedAt: null, durationMs: null }],
     });
-    const target = { ...sdkAgent('worker', 'unused'), folder: '/repo-worktree', backendSession: undefined,
-      backendDefaults: { kind: 'codex' as const, model: 'worker-model', reasoningEffort: 'high', serviceTier: null } };
+    const target = { ...sdkAgent('worker', 'unused'), folder: '/repo-worktree', providerSession: undefined,
+      providerDefaults: { kind: 'codex' as const, model: 'worker-model', reasoningEffort: 'high', serviceTier: null } };
     const handle = conversation('conversation-a').handle;
     handle.forkTurn.mockResolvedValue({ conversationId: 'worker-thread', conversation: host.conversation('worker-thread'), snapshot: sdkSnapshot('worker-thread') });
-    await expect(driver.forkWorktreeConversation(source, target)).resolves.toMatchObject({ backendSession: { kind: 'codex', threadId: 'worker-thread' } });
+    await expect(driver.forkWorktreeConversation(source, target)).resolves.toMatchObject({ providerSession: { kind: 'codex', threadId: 'worker-thread' } });
     expect(handle.forkTurn).toHaveBeenCalledWith('discussion', expect.objectContaining({ cwd: '/repo-worktree', model: 'worker-model', reasoningEffort: 'high', serviceTier: null }), { extensionContext: target });
     expect(handle.fork).not.toHaveBeenCalled();
     expect(source).toStrictEqual(original);
-    await driver.sendPrompt({ ...target, backendSession: { kind: 'codex', threadId: 'worker-thread' } }, 'Implement the agreed task');
+    await driver.sendPrompt({ ...target, providerSession: { kind: 'codex', threadId: 'worker-thread' } }, 'Implement the agreed task');
     expect(conversation('worker-thread').handle.sendMessage).toHaveBeenCalled();
     expect(handle.sendMessage).not.toHaveBeenCalled();
   });
@@ -185,8 +185,8 @@ describe(`Codex SDK → ${product.name} backend controls`, () => {
   it('forks an idle worker with its permission policy and directory', async () => {
     const { driver, conversation, host } = setup();
     host.getSnapshot.mockReturnValue(sdkSnapshot('conversation-a', { approvalPresets: ['ask-for-approval', 'full-access'] }));
-    const target = { ...sdkAgent('worker'), folder: '/worker', backendSession: undefined,
-      backendDefaults: { kind: 'codex' as const, approvalPreset: 'ask-for-approval' as const } };
+    const target = { ...sdkAgent('worker'), folder: '/worker', providerSession: undefined,
+      providerDefaults: { kind: 'codex' as const, approvalPreset: 'ask-for-approval' as const } };
     conversation('conversation-a').handle.fork.mockResolvedValue({ conversationId: 'child', conversation: host.conversation('child'), snapshot: sdkSnapshot('child') });
     await driver.forkWorktreeConversation(sdkAgent(), target);
     expect(conversation('conversation-a').handle.fork).toHaveBeenCalledExactlyOnceWith({ cwd: '/worker', approvalPreset: 'ask-for-approval' }, { extensionContext: target });

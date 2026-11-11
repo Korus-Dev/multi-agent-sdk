@@ -1,9 +1,9 @@
 import { describe, expect, it, onTestFinished, vi } from 'vitest';
-import type { CodexHostEvent } from '../../src/index';
+import type { CodexEvent } from '../../src/internal';
 import { createCodexConversationReplica } from '../../src/core/index';
 import { CodexAppServerClient, type v2 } from '@korus-dev/codex-sdk';
 import { CodexHost } from '../../src/providers/codex';
-import { MockCodexAppServer, createHost, deferred, lastRequest, resumeResponse, testGoal, thread, turn } from './helpers/host-fixture';
+import { MockCodexAppServer, createHarness, deferred, lastRequest, resumeResponse, testGoal, thread, turn } from './helpers/host-fixture';
 
 describe('CodexHost', () => {
   it('retains authored mentions and visible text when provider history replays an enriched prompt', async () => {
@@ -39,7 +39,7 @@ describe('CodexHost', () => {
   });
 
   it('retains selected parts through queue edits and clears them when replaced by plain text', async () => {
-    const { host, transport } = createHost('turn/start', 'turn/steer');
+    const { host, transport } = createHarness('turn/start', 'turn/steer');
     try {
       await host.connect();
       await host.sendMessage('Start');
@@ -111,7 +111,7 @@ describe('CodexHost', () => {
   );
 
   it('delivers an attachment-only file as model-visible text and restores its chip from history', async () => {
-    const { host, transport } = createHost('turn/start');
+    const { host, transport } = createHarness('turn/start');
     await host.connect();
     try {
       await host.sendMessage('(no user instructions)', {
@@ -196,7 +196,7 @@ describe('CodexHost', () => {
   });
 
   it('clears stale execution on authoritative idle even when turn/completed was missed', async () => {
-    const { host, transport } = createHost('turn/start');
+    const { host, transport } = createHarness('turn/start');
     await host.connect();
     const replica = createCodexConversationReplica(host.getConversationSnapshot('thread-existing'));
     host.onConversationEvent('thread-existing', (event) => replica.apply(event));
@@ -219,7 +219,7 @@ describe('CodexHost', () => {
   });
 
   it('discards prior async questions at the next turn without reviving them on replay', async () => {
-    const { host, transport } = createHost('turn/start');
+    const { host, transport } = createHarness('turn/start');
     onTestFinished(() => host.close());
     await host.connect();
     const replica = createCodexConversationReplica(host.getConversationSnapshot('thread-existing'));
@@ -252,7 +252,7 @@ describe('CodexHost', () => {
   });
 
   it('keeps an async Skip resolved across replay and history reload without persistent host state', async () => {
-    const { host, transport } = createHost('turn/start');
+    const { host, transport } = createHarness('turn/start');
     onTestFinished(() => host.close());
     await host.connect();
     const question = {
@@ -274,8 +274,8 @@ describe('CodexHost', () => {
   });
 
   it('projects asynchronous agent questions as answerable host requests', async () => {
-    const { host, transport } = createHost('turn/start');
-    const events: CodexHostEvent[] = [];
+    const { host, transport } = createHarness('turn/start');
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
     await host.connect();
     transport.emitNotification('item/agentMessage/delta', {
@@ -396,7 +396,7 @@ describe('CodexHost', () => {
       },
     });
     const host = new CodexHost({ client: new CodexAppServerClient(transport) });
-    const events: CodexHostEvent[] = [];
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
 
     const snapshot = await host.refreshConversations();
@@ -417,8 +417,8 @@ describe('CodexHost', () => {
   });
 
   it('publishes the complete semantic state when creating a conversation', async () => {
-    const { host } = createHost('thread/start', 'thread/settings/update');
-    const events: CodexHostEvent[] = [];
+    const { host } = createHarness('thread/start', 'thread/settings/update');
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
     await host.connect();
     events.length = 0;
@@ -482,7 +482,7 @@ describe('CodexHost', () => {
       }),
     });
     const host = new CodexHost({ client: new CodexAppServerClient(transport) });
-    const events: CodexHostEvent[] = [];
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
 
     await host.startReview();
@@ -535,7 +535,7 @@ describe('CodexHost', () => {
     const review = deferred<v2.ReviewStartResponse>();
     const transport = new MockCodexAppServer({ 'review/start': () => review.promise });
     const host = new CodexHost({ client: new CodexAppServerClient(transport) });
-    const events: CodexHostEvent[] = [];
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
     await host.connect();
     events.length = 0;
@@ -594,7 +594,7 @@ describe('CodexHost', () => {
       'thread/revert': () => ({ thread: thread('thread-existing', false), turnsBackwardsCursor: null, itemsBackwardsCursor: null }),
     });
     const host = new CodexHost({ client: new CodexAppServerClient(transport), cwd: '/tmp/project' });
-    const events: CodexHostEvent[] = [];
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
     await host.connect();
 
@@ -688,7 +688,7 @@ describe('CodexHost', () => {
   });
 
   it('preserves structured attachments when retrying and editing user messages', async () => {
-    const { host, transport } = createHost('turn/start', 'thread/revert');
+    const { host, transport } = createHarness('turn/start', 'thread/revert');
     await host.connect();
     const attachments = [
       {
@@ -873,7 +873,7 @@ describe('CodexHost', () => {
       'thread/name/set': () => ({}),
     });
     const host = new CodexHost({ client: new CodexAppServerClient(transport) });
-    const events: CodexHostEvent[] = [];
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
     await host.connect();
     expect((await host.sendMessage('/goal')).goal).toMatchObject({ objective: 'Existing goal' });
@@ -1114,7 +1114,7 @@ describe('CodexHost', () => {
     await host.connect();
     await vi.waitFor(() => expect(host.getSnapshot().pluginCatalogStatus).toBe('loaded'));
     const snapshotBefore = host.getSnapshot();
-    const events: CodexHostEvent[] = [];
+    const events: CodexEvent[] = [];
     const unsubscribe = host.onEvent((event) => events.push(event));
 
     const summary = await host.readConversationSummary('thread-child');

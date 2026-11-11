@@ -2,14 +2,8 @@ import { notifyListeners } from '@korus-dev/codex-sdk';
 import { readTurnItems } from './host-conversations-controller';
 import type { CodexOriginalHistoryImages } from './codex-original-history-images';
 import type { CodexAppServerClient, v2 } from '@korus-dev/codex-sdk';
-import type {
-  CodexConversationHistory,
-  CodexConversationSummary,
-  CodexHostEvent,
-  HostEventOrigin,
-  CodexHostSnapshot,
-  CreateCodexConversationOptions,
-} from '../../core/codex-host';
+import type { CodexConversationHistory, EventOrigin, CreateCodexConversationOptions } from '../../core/codex-host';
+import type { CodexConversationSummary, CodexEvent, CodexSnapshot } from '../../core/codex-conversation-types';
 import {
   codexTurnToConversationMessages,
   preserveHistoricalMessagePresentation,
@@ -46,34 +40,34 @@ import {
 const CONVERSATION_HISTORY_PAGE_SIZE = 5;
 
 type HistoryReason = Extract<
-  CodexHostEvent,
+  CodexEvent,
   { type: 'conversation.historyReplaced' }
 >['payload']['reason'];
 
 export interface CodexHostLifecycleDependencies {
   activateRuntime(runtime: ThreadRuntimeState): void;
   createRuntime(threadId: string, patch?: ThreadRuntimePatch): ThreadRuntimeState;
-  emitConversationActivity(threadId: string, origin: HostEventOrigin): void;
-  emitConversationPermissions(threadId: string, origin: HostEventOrigin): void;
-  emitConversationSettings(threadId: string, origin: HostEventOrigin): void;
-  emitConversationSkills(threadId: string, origin: HostEventOrigin): void;
-  emitHistoryReplaced(threadId: string, reason: HistoryReason, origin: HostEventOrigin): void;
+  emitConversationActivity(threadId: string, origin: EventOrigin): void;
+  emitConversationPermissions(threadId: string, origin: EventOrigin): void;
+  emitConversationSettings(threadId: string, origin: EventOrigin): void;
+  emitConversationSkills(threadId: string, origin: EventOrigin): void;
+  emitHistoryReplaced(threadId: string, reason: HistoryReason, origin: EventOrigin): void;
   emitSelected(conversationId: string): void;
   emitSummaryUpserted(
     summary: CodexConversationSummary,
     reason: 'created' | 'resumed' | 'updated',
-    origin: HostEventOrigin,
+    origin: EventOrigin,
   ): void;
   ensureConnected(): Promise<void>;
-  getSnapshot(): CodexHostSnapshot;
-  getState(): CodexHostSnapshot;
+  getSnapshot(): CodexSnapshot;
+  getState(): CodexSnapshot;
   observeEmptyConversation(threadId: string): void;
-  patch(patch: Partial<CodexHostSnapshot>): void;
+  patch(patch: Partial<CodexSnapshot>): void;
   patchRuntime(threadId: string, patch: ThreadRuntimePatch): void;
   requireRuntime(threadId: string): ThreadRuntimeState;
   runtime(threadId: string): ThreadRuntimeState | undefined;
-  runtimeProjection(runtime: ThreadRuntimeState): Partial<CodexHostSnapshot>;
-  snapshotForRuntime(runtime: ThreadRuntimeState): CodexHostSnapshot;
+  runtimeProjection(runtime: ThreadRuntimeState): Partial<CodexSnapshot>;
+  snapshotForRuntime(runtime: ThreadRuntimeState): CodexSnapshot;
 }
 
 export class CodexHostLifecycleController {
@@ -116,7 +110,7 @@ export class CodexHostLifecycleController {
   async create(
     options: CreateCodexConversationOptions = {},
     hostOptions: CodexConversationHostOptions = {},
-  ): Promise<CodexHostSnapshot> {
+  ): Promise<CodexSnapshot> {
     await this.host.ensureConnected();
     options = { ...this.options.conversationDefaults, ...options };
     const cwd = options.cwd ?? this.options.cwd;
@@ -220,7 +214,7 @@ export class CodexHostLifecycleController {
     return this.host.getSnapshot();
   }
 
-  async select(conversationId: string): Promise<CodexHostSnapshot> {
+  async select(conversationId: string): Promise<CodexSnapshot> {
     await this.host.ensureConnected();
     const runtime = this.host.runtime(conversationId);
     if (runtime?.hydrated && (runtime.busy || runtime.activeTurnId !== null)) {
@@ -230,7 +224,7 @@ export class CodexHostLifecycleController {
     return this.resume(conversationId);
   }
 
-  resumeDuringBootstrap(conversationId: string): Promise<CodexHostSnapshot> {
+  resumeDuringBootstrap(conversationId: string): Promise<CodexSnapshot> {
     return this.resume(conversationId);
   }
 
@@ -317,7 +311,7 @@ export class CodexHostLifecycleController {
     activate = true,
     loadOptions: CodexConversationLoadOptions = {},
     historyReason: 'load' | 'resume' = 'resume',
-  ): Promise<CodexHostSnapshot> {
+  ): Promise<CodexSnapshot> {
     const requestedHostOptions = { ...this.hostOptionsByThread.get(conversationId), ...loadOptions };
     const timingStarted = performance.now();
     let timingPrevious = timingStarted;

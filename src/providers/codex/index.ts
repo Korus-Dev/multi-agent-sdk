@@ -48,18 +48,15 @@ export {
   type ListCodexSkillsOptions,
 } from './host';
 export { CodexOriginalHistoryUsage, type CodexHistoricalExecutionUsage } from './codex-original-history-usage';
-export type {
-  CodexConversationHistoryPage,
-  CodexConversationLoadingStrategy,
-  ConversationRenderStrategy,
-} from '../../core/codex-host';
+export type { CodexConversationHistoryPage, ConversationRenderStrategy } from '../../core/codex-host';
+export type { CodexConversationLoadingStrategy } from '../../core/codex-conversation-types';
 export {
-  CodexAppBackend,
-  createCodexAppBackend,
-  type CodexAppBackendModule,
-  type CodexAppBackendModuleContext,
-  type CodexAppBackendOptions,
-} from './codex-app-backend';
+  CodexAppHost,
+  createCodexAppHost,
+  type CodexAppHostModule,
+  type CodexAppHostModuleContext,
+  type CodexAppHostOptions,
+} from './app-host';
 export {
   codexItemToMediaPart,
   codexItemToConversationMessage,
@@ -73,6 +70,6 @@ export {
 
 export { ConversationContentTransport } from "./conversation-content-transport";
 export { CodexHostAdapter, type CodexHostAdapterOptions } from './host-adapter';
-export { CodexBackendDriver } from './driver';
+export { CodexHostController } from './host-controller';
 export { codexExecutionConsumption } from './execution-usage';
 export { statusFromSnapshot, safetyReviewFromSnapshot } from './status';

@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- `createHarness` is the only way to reach a provider. The `/native`, `/codex` and `/host-bridge` entries are removed; provider hosts, transports and the Codex engine are internal.
+- `Harness` covers login, remote control, realtime, conversation summaries and storage, interrupted-turn continuation, conversation reconciliation, session syncing and provider-level capabilities. Operations a provider lacks reject with `HarnessUnsupportedError`.
+- `harness.onEvent` forwards provider events, including those without a session, as `provider.event`.
+- Persisted and wire names use `provider` instead of `backend`.
+- `/testing` provides `createScriptedHarness`, `createScriptedCodexHarness` and `createScriptedClaudeHarness`: Harnesses whose provider is scripted by the test.
+- `/runtime` finds provider executables and builds their search path.
+- `/renderer` exports `harnessProviders`, `isHarnessProvider` and `isProviderConversationRef`.
+- `npm run check:package` fails when the public types reach a provider engine, so provider engines cannot leak back in.
+
 ## 0.26.0 (2026-11-10)
 
 - Public subpaths use extensionless imports such as `@korus-dev/multi-agent-sdk/codex`, resolved through an explicit exports map. Replace previous `.js` subpath imports; root forwarding files are removed.

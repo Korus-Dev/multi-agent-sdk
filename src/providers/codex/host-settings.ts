@@ -1,14 +1,9 @@
 import type { v2 } from '@korus-dev/codex-sdk';
-import type {
-  ApprovalPreset,
-  ModelDescriptor,
-  CodexHostSnapshot,
-  SendMessageOptions,
-  UpdateConversationSettings,
-} from '../../core/codex-host';
+import type { ApprovalPreset, ModelDescriptor, SendMessageOptions, UpdateConversationSettings } from '../../core/codex-host';
+import type { CodexSnapshot } from '../../core/codex-conversation-types';
 
 export type HostSelection = Pick<
-  CodexHostSnapshot,
+  CodexSnapshot,
   'approvalPreset' | 'planMode' | 'selectedModelId' | 'selectedReasoningEffort'
   | 'selectedServiceTier'
 >;
@@ -65,7 +60,7 @@ export function validateServiceTier(
 }
 
 export function approvalPresetsForProfiles(
-  profiles: CodexHostSnapshot['permissionProfiles'],
+  profiles: CodexSnapshot['permissionProfiles'],
   requirements: v2.ConfigRequirements | null,
 ): ApprovalPreset[] {
   const allowed = new Set(profiles.filter((profile) => profile.allowed).map((profile) => profile.id));
@@ -145,7 +140,7 @@ export function approvalPresetFromSettings(
 export function sessionSelection(
   response: v2.ThreadForkResponse | v2.ThreadResumeResponse | v2.ThreadStartResponse,
   models: ModelDescriptor[],
-  current: CodexHostSnapshot,
+  current: CodexSnapshot,
 ): HostSelection {
   const model = selectedModel(models, response.model);
   return {
@@ -167,7 +162,7 @@ export function sessionSelection(
 export function threadSettingsSelection(
   settings: v2.ThreadSettings,
   models: ModelDescriptor[],
-  current: CodexHostSnapshot,
+  current: CodexSnapshot,
 ): HostSelection {
   const model = selectedModel(models, settings.model);
   return {
@@ -187,7 +182,7 @@ export function threadSettingsSelection(
 }
 
 export function nextSelection(
-  current: CodexHostSnapshot,
+  current: CodexSnapshot,
   settings: UpdateConversationSettings,
 ): HostSelection {
   let model = selectedModel(current.models, current.selectedModelId);
@@ -238,7 +233,7 @@ export function collaborationMode(
 }
 
 export function turnSettings(
-  state: CodexHostSnapshot,
+  state: CodexSnapshot,
   options: SendMessageOptions,
 ): Pick<v2.TurnStartParams, 'collaborationMode' | 'effort' | 'model' | 'serviceTier'> {
   const selected = selectedModel(state.models, state.selectedModelId);

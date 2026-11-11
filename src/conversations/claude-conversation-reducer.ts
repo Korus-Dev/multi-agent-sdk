@@ -35,7 +35,7 @@ export function applyClaudeConversationEvent(
   }
 
   if (event.type === 'history.prepended') {
-    if (event.backendSessionId !== snapshot.sessionId) return;
+    if (event.providerSessionId !== snapshot.sessionId) return;
     const known = new Set(snapshot.messages.map((message) => message.id));
     const older = event.payload.messages.filter((message) => {
       if (message.agentId !== snapshot.agentId || known.has(message.id)) return false;
@@ -56,7 +56,7 @@ export function applyClaudeConversationEvent(
   }
   if (event.type === 'message.replaced') {
     const message = event.payload.message;
-    if (message.agentId !== snapshot.agentId || event.backendSessionId !== snapshot.sessionId) return;
+    if (message.agentId !== snapshot.agentId || event.providerSessionId !== snapshot.sessionId) return;
     const index = snapshot.messages.findIndex((candidate) => candidate.id === message.id);
     if (index < 0) {
       const before = snapshot.messages.findIndex(candidate => candidate.id === event.payload.beforeMessageId);

@@ -2,22 +2,22 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { expect, it, vi } from 'vitest';
-import { createHarnessDriver } from '../../../src/backend';
+import { createProviderDriver } from '../../../src/provider-factory';
 import { ClaudeAgentSdkTransport } from '../../../src/providers/claude/agent-sdk-transport';
-import type { HarnessContext, HarnessDriver, HarnessEvent } from '../../../src/driver';
+import type { ProviderContext, ProviderDriver, ProviderEvent } from '../../../src/driver';
 import { createQueryHarness } from './sdk-query-fixture';
 
 it('keeps CPA instructions and MCP scopes caller-owned through the unified Claude host', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'harness-claude-cpa-'));
   const harness = createQueryHarness();
   const transport = new ClaudeAgentSdkTransport({ createQuery: harness.createQuery, client: { name: 'CPA workbench' } });
-  const host: HarnessDriver<HarnessContext, HarnessEvent> = createHarnessDriver('claude', {
+  const host: ProviderDriver<ProviderContext, ProviderEvent> = createProviderDriver('claude', {
     client: { name: 'CPA workbench' }, instructions: () => 'Use the supplied accounting rules.',
     mcpServers: () => [{ name: 'tax_rules', url: 'http://127.0.0.1:1234/tax', enabledTools: ['lookup'] }],
     claude: { transport, host: { homeDir: root } },
   });
-  const context: HarnessContext = { id: 'tax-assistant', backend: 'claude', folder: root, name: 'Tax assistant' };
-  const events: HarnessEvent[] = [];
+  const context: ProviderContext = { id: 'tax-assistant', provider: 'claude', folder: root, name: 'Tax assistant' };
+  const events: ProviderEvent[] = [];
   host.onEvent(event => events.push(event));
   const complete = (text: string, index?: number) => {
     harness.emit({ type: 'system', subtype: 'init', session_id: 'cpa-session' }, index);
@@ -29,9 +29,9 @@ it('keeps CPA instructions and MCP scopes caller-owned through the unified Claud
     await vi.waitFor(() => expect(harness.inputs).toHaveLength(1));
     expect(harness.options[0]).toMatchObject({ mcpServers: { tax_rules: { type: 'http', url: 'http://127.0.0.1:1234/tax' } }, systemPrompt: { append: 'Use the supplied accounting rules.' } });
     complete('Invoice reconciled.');
-    context.backendSession = (await sending).backendSession;
+    context.providerSession = (await sending).providerSession;
     await vi.waitFor(() => expect(events.some(event => event.type === 'agent.statusChanged' && event.payload.type === 'idle')).toBe(true));
-    const scoped = host.executeScopedPrompt!(context, { cwd: root, prompt: 'Verify ledger totals', session: context.backendSession,
+    const scoped = host.executeScopedPrompt!(context, { cwd: root, prompt: 'Verify ledger totals', session: context.providerSession,
       scope: { id: 'ledger-verification', mcpServers: [{ name: 'ledger', url: 'http://127.0.0.1:1234/ledger', approval: 'auto', enabledTools: ['lookup'] }] },
     });
     await vi.waitFor(() => expect(harness.inputs).toHaveLength(2));

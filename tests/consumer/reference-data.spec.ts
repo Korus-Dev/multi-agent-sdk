@@ -1,16 +1,16 @@
 import { expect, it, vi } from 'vitest';
-import { adaptHarnessDriver } from '../../src/consumer';
-import type { HarnessDriver as NativeDriver } from '../../src/driver';
+import { adaptHarness } from '../../src/consumer';
+import type { ProviderDriver as NativeDriver } from '../../src/driver';
 
 it('exposes new-chat references and restoration data without owning serialization or storage', async () => {
   const native = {
     onEvent: () => () => {}, close: vi.fn(), releaseConversation: vi.fn(),
     getCapabilities: () => ({ permissionModes: [] }),
-    sendPrompt: vi.fn(async () => ({ backendSession: { kind: 'codex', threadId: 'created-chat' }, turnId: 'turn' })),
-    resumeConversation: vi.fn(async () => ({ backendSession: { kind: 'codex', threadId: 'created-chat' } })),
+    sendPrompt: vi.fn(async () => ({ providerSession: { kind: 'codex', threadId: 'created-chat' }, turnId: 'turn' })),
+    resumeConversation: vi.fn(async () => ({ providerSession: { kind: 'codex', threadId: 'created-chat' } })),
     readConversationMessages: vi.fn(async () => []),
-  } as unknown as NativeDriver<import('../../src/context').HarnessContext, import('../../src/driver').HarnessEvent>;
-  const driver = adaptHarnessDriver('codex', native);
+  } as unknown as NativeDriver<import('../../src/context').ProviderContext, import('../../src/driver').ProviderEvent>;
+  const driver = adaptHarness('codex', native);
   const session = driver.open({ id: 'chat', folder: '/workspace', defaults: { model: 'chosen' } });
   try {
     expect(driver.getConversationRef(session)).toBeNull();
@@ -27,7 +27,7 @@ it('exposes new-chat references and restoration data without owning serializatio
     const next = driver.restoreSession({ id: 'chat', folder: '/workspace' }, restored.exported);
     await driver.resumeConversation(next, { ref: driver.restoreRef(restored.refData), storageState: 'active' });
     expect(native.resumeConversation).toHaveBeenCalledWith(expect.objectContaining({ id: 'chat' }), {
-      ref: { backend: 'codex', threadId: 'created-chat' }, storageState: 'active',
+      ref: { provider: 'codex', threadId: 'created-chat' }, storageState: 'active',
     });
   } finally { await driver.close(); }
 });

@@ -4,7 +4,7 @@ import { ClaudeHost as ClaudeBackendDriver } from '../../../src/providers/claude
 import type { ClaudeSdkMessage } from '../../../src/providers/claude/protocol';
 import type { ClaudeTurnHandle, ClaudeTurnParams, ClaudeTurnTransport } from '../../../src/providers/claude/transport';
 import type { Agent } from '../../../src/contracts/index';
-import type { NativeHarnessEvent as HarnessEvent } from '../../../src/index';
+import type { NativeHarnessEvent as HarnessEvent } from '../../../src/internal';
 import { createClaudeConversationReplica, type ClaudeConversationReplica } from '../../../src/conversations/claude-conversation-replica';
 import { claudeTranscriptToRendererMessages } from '../../../src/providers/claude/transcript-history-adapter';
 
@@ -12,8 +12,8 @@ const agent: Agent = {
   id: 'agent-claude',
   name: 'Claude Pal',
   folder: '/Users/nbonamy/src/agent-workspace',
-  backend: 'claude',
-  backendDefaults: { kind: 'claude' },
+  provider: 'claude',
+  providerDefaults: { kind: 'claude' },
 };
 
 function unwrapClaudeConversationEvent(event: HarnessEvent) {
@@ -43,7 +43,7 @@ describe('ClaudeBackendDriver', () => {
     const forkWorktreeSession = vi.fn();
     const driver = new ClaudeBackendDriver({ ...transport, forkWorktreeSession });
     try {
-      const parent = { ...agent, backendSession: { kind: 'claude' as const, sessionId: 'source', transport: 'stdio' as const } };
+      const parent = { ...agent, providerSession: { kind: 'claude' as const, sessionId: 'source', transport: 'stdio' as const } };
       const running = driver.sendPrompt(parent, 'First task');
       transport.emit(parent.id, { type: 'system', subtype: 'init', session_id: 'source' });
       await running;
@@ -56,7 +56,7 @@ describe('ClaudeBackendDriver', () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);
     const settled = vi.fn();
-    const clearing = driver.clearGoal({ ...agent, backendSession: { kind: 'claude', sessionId: 'session', transport: 'stdio' } });
+    const clearing = driver.clearGoal({ ...agent, providerSession: { kind: 'claude', sessionId: 'session', transport: 'stdio' } });
     const observed = clearing.then(settled, (error) => { settled(error); });
     await Promise.resolve();
     expect(settled).not.toHaveBeenCalled();
@@ -73,8 +73,8 @@ describe('ClaudeBackendDriver', () => {
     const transport = createFakeTransport();
     const completedGoal = { threadId: 'goal-session', objective: 'Ship it', status: 'complete', tokenBudget: null, tokensUsed: 55, timeUsedSeconds: 1.8, createdAt: Date.now() / 1000 + 1, updatedAt: Date.now() / 1000 + 2 };
     const history = vi.fn()
-      .mockResolvedValueOnce({ backendSession: { kind: 'claude', sessionId: 'goal-session', transport: 'stdio' }, messages: [], goal: { ...completedGoal, status: 'active' } })
-      .mockResolvedValue({ backendSession: { kind: 'claude', sessionId: 'goal-session', transport: 'stdio' }, messages: [], goal: completedGoal });
+      .mockResolvedValueOnce({ providerSession: { kind: 'claude', sessionId: 'goal-session', transport: 'stdio' }, messages: [], goal: { ...completedGoal, status: 'active' } })
+      .mockResolvedValue({ providerSession: { kind: 'claude', sessionId: 'goal-session', transport: 'stdio' }, messages: [], goal: completedGoal });
     const driver = new ClaudeBackendDriver(transport, history);
     const events: HarnessEvent[] = [];
     driver.onEvent((event) => events.push(event));
@@ -94,18 +94,18 @@ describe('ClaudeBackendDriver', () => {
     const transport = createFakeTransport();
     const forkSession = vi.fn().mockResolvedValue('child-session');
     const history = vi.fn().mockResolvedValue({
-      backendSession: { kind: 'claude', sessionId: 'parent-session', transport: 'stdio' },
+      providerSession: { kind: 'claude', sessionId: 'parent-session', transport: 'stdio' },
       messages: [], turnBoundaries: { 'claude-user-1': 'native-answer-1' },
     });
     const driver = new ClaudeBackendDriver({ ...transport, forkSession }, history);
-    const parent: Agent = { ...agent, backendSession: { kind: 'claude', sessionId: 'parent-session', transport: 'stdio' } };
+    const parent: Agent = { ...agent, providerSession: { kind: 'claude', sessionId: 'parent-session', transport: 'stdio' } };
     const child: Agent = { ...agent, id: 'child' };
     await expect(driver.forkConversation(parent, child, 'unknown')).rejects.toThrow('boundary');
     expect(forkSession).not.toHaveBeenCalled();
     const result = await driver.forkConversation(parent, child, 'claude-user-1');
     expect(forkSession).toHaveBeenCalledExactlyOnceWith('parent-session', agent.folder, 'native-answer-1');
-    expect(result.backendSession).toMatchObject({ kind: 'claude', sessionId: 'child-session' });
-    expect(parent.backendSession?.kind === 'claude' && parent.backendSession.sessionId).toBe('parent-session');
+    expect(result.providerSession).toMatchObject({ kind: 'claude', sessionId: 'child-session' });
+    expect(parent.providerSession?.kind === 'claude' && parent.providerSession.sessionId).toBe('parent-session');
     await expect(driver.forkConversation(parent, { ...child, folder: '/other' })).rejects.toThrow('folder');
     await driver.close();
   });
@@ -121,7 +121,7 @@ describe('ClaudeBackendDriver', () => {
     transport.emit({ type: 'assistant', session_id: 'handoff-session', message: { content: [{ type: 'text', text: 'Continue the fix.' }] } });
     transport.emit({ type: 'result', subtype: 'success', session_id: 'handoff-session', is_error: false });
     await expect(driver.assertHandoffReady(agent)).resolves.toBeUndefined();
-    const messages = await driver.readConversationMessages({ backend: 'claude', sessionId: 'handoff-session', folder: agent.folder }, agent.id);
+    const messages = await driver.readConversationMessages({ provider: 'claude', sessionId: 'handoff-session', folder: agent.folder }, agent.id);
     expect(messages).toContainEqual(expect.objectContaining({ turnId: result.turnId, role: 'assistant', status: 'complete', parts: expect.arrayContaining([expect.objectContaining({ type: 'text', text: 'Continue the fix.' })]) }));
     expect(historyLoader).not.toHaveBeenCalled();
     let finishClose!: () => void;
@@ -148,7 +148,7 @@ describe('ClaudeBackendDriver', () => {
     }), expect.any(Function), expect.any(Function), expect.any(Function), expect.any(Function));
     transport.emit({ type: 'system', subtype: 'init', session_id: 'quick-chat-session' });
     await expect(started).resolves.toEqual(expect.objectContaining({
-      backendSession: expect.objectContaining({ kind: 'claude', sessionId: 'quick-chat-session' }),
+      providerSession: expect.objectContaining({ kind: 'claude', sessionId: 'quick-chat-session' }),
     }));
     expect(quickChat.folder).toBeNull();
     transport.resolveDone();
@@ -160,7 +160,7 @@ describe('ClaudeBackendDriver', () => {
     const driver = new ClaudeBackendDriver(transport);
     const configuredAgent: Agent = {
       ...agent,
-      backendDefaults: { kind: 'claude', model: 'sonnet', reasoningEffort: 'high' },
+      providerDefaults: { kind: 'claude', model: 'sonnet', reasoningEffort: 'high' },
     };
 
     expect(driver.getCapabilities(configuredAgent).permissionModes).toStrictEqual([
@@ -174,7 +174,7 @@ describe('ClaudeBackendDriver', () => {
       expect(mode).not.toHaveProperty('label'); expect(mode).not.toHaveProperty('description');
     }
     await expect(driver.setPermissionMode(configuredAgent, 'acceptEdits')).resolves.toStrictEqual({
-      backendDefaults: {
+      providerDefaults: {
         kind: 'claude',
         model: 'sonnet',
         reasoningEffort: 'high',
@@ -195,7 +195,7 @@ describe('ClaudeBackendDriver', () => {
       name: 'Claude Second',
       folder: '/Users/nbonamy/src/second',
     };
-    const events: Array<{ agentId?: string; backendSessionId?: string; type: string; payload: unknown }> = [];
+    const events: Array<{ agentId?: string; providerSessionId?: string; type: string; payload: unknown }> = [];
     driver.onEvent((event) => events.push(unwrapClaudeConversationEvent(event)));
 
     const firstSend = driver.sendPrompt(agent, 'first prompt');
@@ -219,12 +219,12 @@ describe('ClaudeBackendDriver', () => {
     expect(events.filter((event) => event.type === 'message.delta')).toStrictEqual([
       expect.objectContaining({
         agentId: agent.id,
-        backendSessionId: 'session-first',
+        providerSessionId: 'session-first',
         payload: { delta: 'first answer' },
       }),
       expect.objectContaining({
         agentId: secondAgent.id,
-        backendSessionId: 'session-second',
+        providerSessionId: 'session-second',
         payload: { delta: 'second answer' },
       }),
     ]);
@@ -311,7 +311,7 @@ describe('ClaudeBackendDriver', () => {
   ])('continues with provider-restored selection or explicit overrides: $model / $effort', async ({ selection, model, effort }) => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);
-    const restored: Agent = { ...agent, backendSession: { kind: 'claude', sessionId: 'claude-session-existing', transport: 'stdio', model: 'opus', reasoningEffort: 'high' } };
+    const restored: Agent = { ...agent, providerSession: { kind: 'claude', sessionId: 'claude-session-existing', transport: 'stdio', model: 'opus', reasoningEffort: 'high' } };
     try {
       await driver.sendPrompt(restored, 'Continue', { selection });
       expect(transport.startTurn.mock.calls[0]?.[0]).toMatchObject({ model, effort });
@@ -326,14 +326,14 @@ describe('ClaudeBackendDriver', () => {
     driver.onEvent((event) => events.push(unwrapClaudeConversationEvent(event)));
     const persistedAgent: Agent = {
       ...agent,
-      backendSession: { kind: 'claude', sessionId: 'claude-session-existing', transport: 'stdio' },
+      providerSession: { kind: 'claude', sessionId: 'claude-session-existing', transport: 'stdio' },
     };
 
     const sendResult = await driver.sendPrompt(persistedAgent, 'continue');
     expect(transport.startTurn.mock.calls[0]?.[0]).toMatchObject({
       sessionId: 'claude-session-existing',
     });
-    expect(sendResult.backendSession).toStrictEqual({ kind: 'claude', sessionId: 'claude-session-existing', transport: 'stdio' });
+    expect(sendResult.providerSession).toStrictEqual({ kind: 'claude', sessionId: 'claude-session-existing', transport: 'stdio' });
     transport.emitPermissionRequest({
       kind: 'confirm_tool',
       id: 'request-interrupted',
@@ -344,7 +344,7 @@ describe('ClaudeBackendDriver', () => {
     });
 
     await expect(driver.interrupt(persistedAgent)).resolves.toStrictEqual({
-      backendSession: { kind: 'claude', sessionId: 'claude-session-existing', transport: 'stdio' },
+      providerSession: { kind: 'claude', sessionId: 'claude-session-existing', transport: 'stdio' },
       turnId: sendResult.turnId,
     });
     expect(transport.lastHandle.interrupt).toHaveBeenCalled();
@@ -366,7 +366,7 @@ describe('ClaudeBackendDriver', () => {
     const driver = new ClaudeBackendDriver(transport);
     const configuredAgent: Agent = {
       ...agent,
-      backendDefaults: {
+      providerDefaults: {
         kind: 'claude',
         model: 'haiku',
         reasoningEffort: 'low',
@@ -381,7 +381,7 @@ describe('ClaudeBackendDriver', () => {
 
     transport.emit({ type: 'system', subtype: 'init', session_id: 'claude-session-defaults' });
     await expect(sendResult).resolves.toStrictEqual({
-      backendSession: {
+      providerSession: {
         kind: 'claude',
         sessionId: 'claude-session-defaults',
         transport: 'stdio',
@@ -518,7 +518,7 @@ describe('ClaudeBackendDriver', () => {
     unsubscribe();
     const persistedAgent: Agent = {
       ...agent,
-      backendSession: { kind: 'claude', sessionId: 'claude-session-existing', transport: 'stdio' },
+      providerSession: { kind: 'claude', sessionId: 'claude-session-existing', transport: 'stdio' },
     };
 
     await driver.sendPrompt(persistedAgent, 'keep working');
@@ -538,15 +538,15 @@ describe('ClaudeBackendDriver', () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);
     const chat = {
-      id: 'agent-chat', name: null, folder: null, backend: 'claude',
-      backendSession: { kind: 'claude', sessionId: 'session-chat', transport: 'stdio' },
+      id: 'agent-chat', name: null, folder: null, provider: 'claude',
+      providerSession: { kind: 'claude', sessionId: 'session-chat', transport: 'stdio' },
       status: { type: 'idle' }, createdAt: 'now', updatedAt: 'now',
     } as unknown as Agent;
 
     await driver.deleteAgentConversation(chat);
     expect(transport.deleteSession).toHaveBeenCalledExactlyOnceWith('session-chat', homedir());
 
-    await driver.deleteAgentConversation({ ...chat, backendSession: undefined });
+    await driver.deleteAgentConversation({ ...chat, providerSession: undefined });
     expect(transport.deleteSession).toHaveBeenCalledOnce();
   });
 
@@ -599,7 +599,7 @@ describe('ClaudeBackendDriver', () => {
     expect(transport.respondToPermissionRequest).toHaveBeenCalledWith('tool-edit-1', { decision: 'allow_conversation' }, agent.id);
     expect(events).toContainEqual(expect.objectContaining({
       agentId: 'agent-claude',
-      backendSessionId: 'claude-session-approval',
+      providerSessionId: 'claude-session-approval',
       type: 'clientRequest.resolved',
       turnId,
       payload: { id: 'tool-edit-1' },
@@ -663,15 +663,15 @@ describe('ClaudeBackendDriver', () => {
   it.each(['before', 'during'] as const)('keeps live tool calls and answer together when history loading starts %s the turn', async (loadTiming) => {
     const transport = createFakeTransport();
     const session = { kind: 'claude' as const, sessionId: 'claude-session-existing', transport: 'stdio' as const };
-    const persistedAgent = { ...agent, backendSession: session };
+    const persistedAgent = { ...agent, providerSession: session };
     const tool = { type: 'tool_use' as const, id: 'git-log', name: 'Bash', input: { command: 'git log -10' } };
     const messages = claudeTranscriptToRendererMessages([
       { type: 'user', uuid: 'prompt-history', message: { content: 'Summarize commits' } },
       { type: 'assistant', message: { content: [tool] } },
       { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: tool.id, content: '10 commits' }] } },
     ].map((message) => JSON.stringify(message)).join('\n'), agent.id, session.sessionId);
-    let resolveHistory!: (history: { backendSession: typeof session; messages: typeof messages }) => void;
-    const history = new Promise<{ backendSession: typeof session; messages: typeof messages }>((resolve) => { resolveHistory = resolve; });
+    let resolveHistory!: (history: { providerSession: typeof session; messages: typeof messages }) => void;
+    const history = new Promise<{ providerSession: typeof session; messages: typeof messages }>((resolve) => { resolveHistory = resolve; });
     const driver = new ClaudeBackendDriver(transport, () => history);
     let replica: ClaudeConversationReplica | undefined;
     driver.onEvent((event) => {
@@ -685,7 +685,7 @@ describe('ClaudeBackendDriver', () => {
       transport.emit({ type: 'assistant', session_id: session.sessionId, message: { content: [tool] } });
       transport.emit({ type: 'user', session_id: session.sessionId, message: { content: [{ type: 'tool_result', tool_use_id: tool.id, content: '10 commits' }] } });
       loading ??= driver.loadConversation(persistedAgent);
-      resolveHistory({ backendSession: session, messages });
+      resolveHistory({ providerSession: session, messages });
       await loading;
 
       transport.emit({ type: 'stream_event', session_id: session.sessionId, event: {
@@ -717,7 +717,7 @@ describe('ClaudeBackendDriver', () => {
       percentage: 16.56,
     });
     const driver = new ClaudeBackendDriver(transport, async () => ({
-      backendSession: { kind: 'claude', sessionId: 'claude-session-existing', transcriptSessionId: 'claude-session-existing', transport: 'stdio' },
+      providerSession: { kind: 'claude', sessionId: 'claude-session-existing', transcriptSessionId: 'claude-session-existing', transport: 'stdio' },
       messages: [
         {
           id: 'user-claude-session-existing-user-1',
@@ -734,7 +734,7 @@ describe('ClaudeBackendDriver', () => {
     driver.onEvent((event) => events.push(unwrapClaudeConversationEvent(event)));
     const persistedAgent: Agent = {
       ...agent,
-      backendSession: { kind: 'claude', sessionId: 'claude-session-existing', transport: 'stdio' },
+      providerSession: { kind: 'claude', sessionId: 'claude-session-existing', transport: 'stdio' },
     };
 
     await expect(driver.loadConversation(persistedAgent)).resolves.toStrictEqual({
@@ -754,7 +754,7 @@ describe('ClaudeBackendDriver', () => {
     expect(events).toStrictEqual([
       expect.objectContaining({
         agentId: 'agent-claude',
-        backend: 'claude',
+        provider: 'claude',
         type: 'claude.conversationSnapshotChanged',
         payload: {
           revision: 1,
@@ -769,8 +769,8 @@ describe('ClaudeBackendDriver', () => {
       }),
       expect.objectContaining({
         agentId: 'agent-claude',
-        backend: 'claude',
-        backendSessionId: 'claude-session-existing',
+        provider: 'claude',
+        providerSessionId: 'claude-session-existing',
         threadId: 'claude-session-existing',
         type: 'conversation.contextUsageUpdated',
         payload: {
@@ -788,9 +788,9 @@ describe('ClaudeBackendDriver', () => {
       }),
       expect.objectContaining({
         agentId: 'agent-claude',
-        backend: 'claude',
+        provider: 'claude',
         type: 'context.usageUpdated',
-        backendSessionId: 'claude-session-existing',
+        providerSessionId: 'claude-session-existing',
         payload: { contextUsage: expect.objectContaining({ totalTokens: 33_120 }) },
       }),
     ]);
@@ -815,7 +815,7 @@ describe('ClaudeBackendDriver', () => {
       parts: [{ type: 'text' as const, text: 'hello' }],
     }];
     const historyLoader = vi.fn().mockResolvedValue({
-      backendSession: { kind: 'claude', sessionId: 'claude-session-existing', transcriptSessionId: 'claude-session-existing', transport: 'stdio' },
+      providerSession: { kind: 'claude', sessionId: 'claude-session-existing', transcriptSessionId: 'claude-session-existing', transport: 'stdio' },
       messages,
     });
     const driver = new ClaudeBackendDriver(transport, historyLoader);
@@ -824,13 +824,13 @@ describe('ClaudeBackendDriver', () => {
 
     await expect(driver.resumeConversation(agent, {
       ref: {
-        backend: 'claude',
+        provider: 'claude',
         folder: '/Users/nbonamy/src/agent-workspace',
         sessionId: 'claude-session-existing',
       },
       storageState: 'active',
     })).resolves.toStrictEqual({
-      backendSession: { kind: 'claude', sessionId: 'claude-session-existing', transcriptSessionId: 'claude-session-existing', transport: 'stdio' },
+      providerSession: { kind: 'claude', sessionId: 'claude-session-existing', transcriptSessionId: 'claude-session-existing', transport: 'stdio' },
     });
     expect(events).toContainEqual(expect.objectContaining({
       type: 'claude.conversationSnapshotChanged',
@@ -841,7 +841,7 @@ describe('ClaudeBackendDriver', () => {
     expect(historyLoader).toHaveBeenCalledWith(expect.objectContaining({
       id: 'agent-claude',
       folder: '/Users/nbonamy/src/agent-workspace',
-      backendSession: {
+      providerSession: {
         kind: 'claude',
         sessionId: 'claude-session-existing',
         transport: 'stdio',
@@ -864,7 +864,7 @@ describe('ClaudeBackendDriver', () => {
 
     await expect(driver.resumeConversation(agent, {
       ref: {
-        backend: 'claude',
+        provider: 'claude',
         folder: '/Users/nbonamy/src/id8',
         sessionId: 'claude-session-existing',
       },
@@ -885,7 +885,7 @@ describe('ClaudeBackendDriver', () => {
 
     transport.emit({ type: 'system', subtype: 'init', session_id: 'claude-session-plan' });
     await expect(sendResult).resolves.toMatchObject({
-      backendSession: { kind: 'claude', sessionId: 'claude-session-plan', transport: 'stdio' },
+      providerSession: { kind: 'claude', sessionId: 'claude-session-plan', transport: 'stdio' },
     });
   });
 
@@ -905,7 +905,7 @@ describe('ClaudeBackendDriver', () => {
     );
     transport.emit({ type: 'system', subtype: 'init', session_id: 'claude-session-attachments' });
     await expect(sendResult).resolves.toMatchObject({
-      backendSession: { kind: 'claude', sessionId: 'claude-session-attachments' },
+      providerSession: { kind: 'claude', sessionId: 'claude-session-attachments' },
     });
   });
 
@@ -1265,9 +1265,9 @@ describe('ClaudeBackendDriver', () => {
     expect(errorEvents).toHaveLength(1);
     expect(errorEvents[0]?.payload).toStrictEqual({ message: 'Claude Code is not logged in. Open Claude Code and run /login, then try again.' });
     expect(events).toContainEqual(expect.objectContaining({
-      type: 'backend.statusChanged',
+      type: 'provider.statusChanged',
       payload: {
-        backend: 'claude',
+        provider: 'claude',
         status: 'error',
         detail: 'Claude Code is not logged in. Open Claude Code and run /login, then try again.',
       },

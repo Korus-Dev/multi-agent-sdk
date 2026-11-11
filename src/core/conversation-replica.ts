@@ -1,11 +1,5 @@
-import type {
-  CodexConversationEvent,
-  CodexConversationSnapshot,
-  Turn,
-  ConversationMessage,
-  ConversationMessageToolPart,
-  ConversationMessageToolPartUpdate,
-} from './codex-host';
+import type { Turn, ConversationMessage, ConversationMessageToolPart, ConversationMessageToolPartUpdate } from './codex-host';
+import type { CodexConversationEvent, CodexConversationSnapshot } from './codex-conversation-types';
 
 /**
  * A client-local projection initialized once from a conversation snapshot and

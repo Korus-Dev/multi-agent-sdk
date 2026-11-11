@@ -1,6 +1,6 @@
-export type BackendApprovalDecision = 'approve' | 'deny';
-export type BackendApprovalScope = 'once' | 'session';
-export type BackendRequestedPermission =
+export type ProviderApprovalDecision = 'approve' | 'deny';
+export type ProviderApprovalScope = 'once' | 'session';
+export type ProviderRequestedPermission =
   | {
     kind: 'filesystem';
     access: 'read' | 'write' | 'deny';
@@ -12,7 +12,7 @@ export type BackendRequestedPermission =
     host?: string;
     protocol?: string;
   };
-export type BackendApprovalRequest = {
+export type ProviderApprovalRequest = {
   id: string;
   kind: 'command' | 'file-change' | 'permissions';
   conversationId: string;
@@ -22,8 +22,8 @@ export type BackendApprovalRequest = {
   description?: string;
   command?: string;
   cwd?: string;
-  requestedPermissions?: BackendRequestedPermission[];
-  allowedScopes?: BackendApprovalScope[];
+  requestedPermissions?: ProviderRequestedPermission[];
+  allowedScopes?: ProviderApprovalScope[];
   canDeny?: boolean;
   /** Native mandatory-human evidence; never reinterpret as an automatic approval. */
   requiresHumanApproval?: boolean;

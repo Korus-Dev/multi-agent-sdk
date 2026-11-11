@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { CodexRealtimeInputAudioChunk } from '../../src/index';
+import type { CodexRealtimeInputAudioChunk } from '../../src/internal';
 import {
   normalizedOptionalRealtimeString,
   normalizedRealtimeText,

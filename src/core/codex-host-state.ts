@@ -1,9 +1,5 @@
-import type {
-  CodexHostSnapshot,
-  CodexHostStateChange,
-  CodexHostStatePatch,
-  CodexVersionedHostSnapshot,
-} from './codex-host';
+import type { CodexStateChange, CodexStatePatch, CodexVersionedSnapshot } from './codex-host';
+import type { CodexSnapshot } from './codex-conversation-types';
 
 type Awaitable<Value> = Value | Promise<Value>;
 type KeyedItem = { id: string };
@@ -15,8 +11,8 @@ type SnapshotRecord = Record<string, unknown>;
  * transport cannot stream patches; consumers then use `onStateChange`.
  */
 export type CodexHostStatePatchSource = {
-  getVersionedSnapshot(): Awaitable<CodexVersionedHostSnapshot | null>;
-  onStatePatch(listener: (patch: CodexHostStatePatch) => void): () => void;
+  getVersionedSnapshot(): Awaitable<CodexVersionedSnapshot | null>;
+  onStatePatch(listener: (patch: CodexStatePatch) => void): () => void;
 };
 
 export type SubscribeCodexHostStateOptions = {
@@ -30,23 +26,23 @@ export type SubscribeCodexHostStateOptions = {
 export type CodexHostStateSource =
   | CodexHostStatePatchSource
   | (Partial<CodexHostStatePatchSource> & {
-    onStateChange(listener: (snapshot: CodexHostSnapshot) => void): () => void;
+    onStateChange(listener: (snapshot: CodexSnapshot) => void): () => void;
   });
 
 export type CodexHostStateMirrorResult =
-  | { status: 'applied'; snapshot: CodexHostSnapshot }
+  | { status: 'applied'; snapshot: CodexSnapshot }
   | { status: 'ignored' }
   | { status: 'resync' };
 
 /** Keeps a local snapshot current from a versioned base and sequential patches. */
 export type CodexHostStateMirror = {
-  readonly snapshot: CodexHostSnapshot | null;
+  readonly snapshot: CodexSnapshot | null;
   /** The state version of `snapshot`, or -1 before the first base. */
   readonly version: number;
   /** Adopts an authoritative base, then replays buffered patches that are newer than it. */
-  reset(state: CodexVersionedHostSnapshot): CodexHostSnapshot;
+  reset(state: CodexVersionedSnapshot): CodexSnapshot;
   /** Applies the next patch, or buffers it and asks for a new base when the sequence is broken. */
-  receive(patch: CodexHostStatePatch): CodexHostStateMirrorResult;
+  receive(patch: CodexStatePatch): CodexHostStateMirrorResult;
 };
 
 const maximumBufferedPatches = 1_000;
@@ -62,14 +58,14 @@ export function isCodexHostStatePatchSource(value: unknown): value is CodexHostS
  * whose identity changed; everything else is replaced or deleted per key.
  */
 export function diffCodexHostState(
-  previous: CodexHostSnapshot,
-  next: CodexHostSnapshot,
-): CodexHostStateChange[] {
+  previous: CodexSnapshot,
+  next: CodexSnapshot,
+): CodexStateChange[] {
   const before = previous as unknown as SnapshotRecord;
   const after = next as unknown as SnapshotRecord;
-  const changes: CodexHostStateChange[] = [];
+  const changes: CodexStateChange[] = [];
   for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
-    const snapshotKey = key as keyof CodexHostSnapshot;
+    const snapshotKey = key as keyof CodexSnapshot;
     if (before[key] === after[key]) continue;
     if (!(key in after)) {
       changes.push({ type: 'delete', key: snapshotKey });
@@ -86,9 +82,9 @@ export function diffCodexHostState(
 
 /** Applies changes to a snapshot without mutating it; unchanged values keep their identity. */
 export function applyCodexHostStateChanges(
-  snapshot: CodexHostSnapshot,
-  changes: readonly CodexHostStateChange[],
-): CodexHostSnapshot {
+  snapshot: CodexSnapshot,
+  changes: readonly CodexStateChange[],
+): CodexSnapshot {
   const current = snapshot as unknown as SnapshotRecord;
   const next: SnapshotRecord = { ...current };
   for (const change of changes) {
@@ -108,16 +104,16 @@ export function applyCodexHostStateChanges(
       });
     }
   }
-  return next as unknown as CodexHostSnapshot;
+  return next as unknown as CodexSnapshot;
 }
 
 export function createCodexHostStateMirror(): CodexHostStateMirror {
-  let snapshot: CodexHostSnapshot | null = null;
+  let snapshot: CodexSnapshot | null = null;
   let version = -1;
   let stale = true;
-  const pending: CodexHostStatePatch[] = [];
+  const pending: CodexStatePatch[] = [];
 
-  const buffer = (patch: CodexHostStatePatch): CodexHostStateMirrorResult => {
+  const buffer = (patch: CodexStatePatch): CodexHostStateMirrorResult => {
     stale = true;
     pending.push(patch);
     if (pending.length > maximumBufferedPatches) pending.shift();
@@ -166,7 +162,7 @@ export function createCodexHostStateMirror(): CodexHostStateMirror {
  */
 export function subscribeCodexHostState(
   source: CodexHostStateSource,
-  listener: (snapshot: CodexHostSnapshot) => void,
+  listener: (snapshot: CodexSnapshot) => void,
   options: SubscribeCodexHostStateOptions = {},
 ): () => void {
   const subscribeToSnapshots = () => (
@@ -216,10 +212,10 @@ export function subscribeCodexHostState(
 }
 
 function keyedListChange(
-  key: keyof CodexHostSnapshot,
+  key: keyof CodexSnapshot,
   before: unknown,
   after: unknown,
-): CodexHostStateChange | null {
+): CodexStateChange | null {
   if (!Array.isArray(before) || !Array.isArray(after)) return null;
   const previousById = new Map<string, unknown>();
   for (const item of before) {
@@ -239,8 +235,8 @@ function keyedListChange(
   return items.length === after.length ? null : { type: 'list', key, ids, items };
 }
 
-function isVersionedSnapshot(value: unknown): value is CodexVersionedHostSnapshot {
-  const candidate = value as Partial<CodexVersionedHostSnapshot> | null | undefined;
+function isVersionedSnapshot(value: unknown): value is CodexVersionedSnapshot {
+  const candidate = value as Partial<CodexVersionedSnapshot> | null | undefined;
   return Number.isSafeInteger(candidate?.version)
     && Boolean(candidate?.snapshot)
     && typeof candidate?.snapshot === 'object';

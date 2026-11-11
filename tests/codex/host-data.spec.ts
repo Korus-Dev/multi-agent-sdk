@@ -1,12 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { v2 } from '@korus-dev/codex-sdk';
-import type {
-  CodexConversationSummary,
-  ModelDescriptor,
-  CodexRateLimitSnapshot,
-  CodexHostSnapshot,
-  ConversationMessage,
-} from '../../src/index';
+import type { ModelDescriptor, ConversationMessage } from '../../src/index';
+import type { CodexConversationSummary, CodexRateLimitSnapshot, CodexSnapshot } from '../../src/internal';
 import {
   attachmentInput,
   conversationStatus,
@@ -342,8 +337,8 @@ function summary(id: string, updatedAt: string): CodexConversationSummary {
     createdAt: updatedAt, updatedAt };
 }
 
-function snapshot(models: ModelDescriptor[]): CodexHostSnapshot {
-  return { models, selectedModelId: models[0]?.id ?? null } as CodexHostSnapshot;
+function snapshot(models: ModelDescriptor[]): CodexSnapshot {
+  return { models, selectedModelId: models[0]?.id ?? null } as CodexSnapshot;
 }
 
 function tokenUsage(lastTotalTokens: number, modelContextWindow: number | null): v2.ThreadTokenUsage {

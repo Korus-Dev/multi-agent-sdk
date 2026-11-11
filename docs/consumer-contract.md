@@ -1,11 +1,11 @@
 # Harness consumer contract
 
-Import `createHarnessDriver` from `@korus-dev/multi-agent-sdk` and public types from the same package root. The root is the generic Node harness interface. It contains no bridge, UI runtime or Computer Use API.
+Import `createHarness` from `@korus-dev/multi-agent-sdk` and public types from the same package root. The root is the generic Node harness interface. It contains no bridge, UI runtime or Computer Use API.
 
 ```ts
-import { createHarnessDriver } from '@korus-dev/multi-agent-sdk';
+import { createHarness } from '@korus-dev/multi-agent-sdk';
 
-const harness = createHarnessDriver('claude', {
+const harness = createHarness('claude', {
   client: { name: 'cpa-workbench' },
   instructions: () => 'Use only verified accounting rules.',
   mcpServers: () => [{ name: 'ledger', url: 'http://localhost:9000/ledger' }],
@@ -28,7 +28,7 @@ await harness.sendPrompt(session, 'Reconcile the invoices');
 
 ### Runtime home and switching
 
-`createHarnessDriver(provider, { client, home })` accepts an optional absolute provider-home path. Omission keeps the provider's standard home discovery. This is separate from a conversation's working folder and the SDK's auxiliary `stateDirectory`.
+`createHarness(provider, { client, home })` accepts an optional absolute provider-home path. Omission keeps the provider's standard home discovery. This is separate from a conversation's working folder and the SDK's auxiliary `stateDirectory`.
 
 Applications switch homes by awaiting `driver.close()` and creating a fresh driver. Session handles belong to the old driver; retain consumer-owned restoration data only for the home it came from. Claude's native helpers use one configuration home per process: an explicit home applies to that provider runtime and closing it restores the prior environment. Close that runtime before constructing another Claude profile. No application restart is required.
 
@@ -39,7 +39,7 @@ Codex `listConversations` starts the runtime as needed and lists normal non-arch
 `readConversationMessages` reads complete Codex history, including archived chats, without resuming, selecting, unarchiving or archiving a conversation. Resuming explicitly archived chats makes them active, but never archives the previously bound chat. The consumer controls archive policy. Native compatibility callers can explicitly request the last-message subagent view; the neutral history API uses the full read-only path.
 
 
-Use `getRuntimeStatus`, `authenticate`, catalogs, generation, history and conversation/turn operations on this interface. Check `getCapabilities(session)` before presenting controls. Native Codex remote control remains available only through its explicit native host; the neutral facade reports it unavailable. Permission choices have stable opaque IDs and optional danger flags; use `defaults.permission` or `setPermission`, without selecting a provider-specific setter. Unsupported native operations throw. `getAccountRateLimits` returns null when unavailable. Authentication exposes a generic `connected` flag and explicit `native` detail for provider-specific login flows. Provider-authored catalog names/descriptions/icons remain native data; application translation descriptors are confined to the native seam. Neutral capability choices contain no product labels or translations.
+Use `getRuntimeStatus`, `authenticate`, catalogs, generation, history and conversation/turn operations on this interface. Check `getCapabilities(session)` before presenting controls. Remote control, realtime and login are capability-gated operations on the same interface; they report as unsupported (`HarnessUnsupportedError`) on providers without them, and `getCapabilities` says in advance. available. Permission choices have stable opaque IDs and optional danger flags; use `defaults.permission` or `setPermission`, without selecting a provider-specific setter. Unsupported native operations throw. `getAccountRateLimits` returns null when unavailable. Authentication exposes a generic `connected` flag and explicit `native` detail for provider-specific login flows. Provider-authored catalog names/descriptions/icons remain native data; application translation descriptors are confined to the native seam. Neutral capability choices contain no product labels or translations.
 
 Requests arrive through `request.created` and resolve through `request.resolved`. `readSession().requests` is reconciled from authoritative native snapshots as well: Codex supplies approvals and client requests; Cursor and Antigravity supply client requests. A fresh snapshot restores missed pending requests and removes requests whose resolution frame was missed. Claude snapshots supply no pending list, so existing requests remain until native answered IDs or resolution events establish their removal. Snapshot reconciliation is exposed through `session.changed` and does not invent resolution outcomes. Respond through `respondToRequest` using the request's question IDs and supplied choices. Responses are bound to the owning session. Cancelling a request uses the native cancellation outcome; interrupting a turn uses `interrupt`. `plan.readyForReview` carries review content independently of prompt admission.
 
@@ -49,55 +49,23 @@ Requests arrive through `request.created` and resolve through `request.resolved`
 
 Each provider's existing replica owns transcript changes. The facade only dispatches to those replicas and projects snapshots. Duplicate/stale revisions are ignored; missing frames or replica failures emit `recovery.required`. Reload with `loadConversation` to obtain a fresh native snapshot. Provider hosts still own replay validation and session replacement. There is no universal transcript reducer.
 
-## Native and bridge imports
+## Imports
 
 | Import | Contract |
 | --- | --- |
-| `@korus-dev/multi-agent-sdk` | Neutral factory, `TypedEventBus`, and public neutral/UI/native type declarations |
+| `@korus-dev/multi-agent-sdk` | `createHarness`, `HarnessUnsupportedError`, `TypedEventBus`, `TtlCache` and the public types |
 | `@korus-dev/multi-agent-sdk/prompt` | Pure prompt authoring helpers |
-| `@korus-dev/multi-agent-sdk/renderer` | Pure capabilities, work phases, Codex replica and provider presentation projections |
-| `@korus-dev/multi-agent-sdk/host-bridge` | Native bridge operations and state subscriptions |
-| `@korus-dev/multi-agent-sdk/native` | Native driver, Claude/Cursor/Antigravity hosts and helpers, MCP session bridge and native contracts |
-| `@korus-dev/multi-agent-sdk/codex` | Codex host/runtime adapter |
+| `@korus-dev/multi-agent-sdk/renderer` | Pure capabilities, work phases, conversation projections and provider guards (`isHarnessProvider`, `isProviderConversationRef`) |
 
-Native wire consumers can import `NativeHarnessDriver`, `NativeHarnessContext`, and `NativeHarnessEvent` type-only from the root. Ordinary neutral `HarnessDriver` and `HarnessEvent` remain different contracts. Optional native values use `/native` and host construction uses `/codex`. Native events retain provider prefixes and reducers retain their original wire contracts. The native factory is named `createNativeHarnessDriver` to distinguish it from the neutral root factory. Application imports never need build-directory paths.
-
-## Public name map
-
-| Deprecated alias | Canonical type |
-| --- | --- |
-| `RendererMessage` | `Message` |
-| `RendererMessagePart` | `MessagePart` |
-| `RendererMessageAttachment` | `MessageAttachment` |
-| `RendererMessageMedia` | `MessageMedia` |
-| `RendererToolPart` | `ToolPart` |
-| `RendererToolPartUpdate` | `ToolPartUpdate` |
-| `RendererPromptAttachment` | `PromptReferenceAttachment` |
-| `RendererSendPromptOptions` | `ReferenceSendPromptOptions` |
-| `CreateCodexClientConversationOptions` | `CreateCodexClientConversationOptions` |
-| `ClientAttachment` | `ClientAttachment` |
-| `ClientSendMessageOptions` | `ClientSendMessageOptions` |
-| `CodexHostClientApi` | `CodexHostClientApi` |
-
-Aliases preserve native source compatibility. Reference attachments remain distinct from host filesystem attachments. These are declaration renames in the existing files, not source relocation.
-
-Vendor dependencies remain mandatory because provider construction is statically loaded. The unused direct `@anthropic-ai/sdk` dependency is absent; the Claude Agent SDK remains. The package uses versioned npm dependencies under the `@korus-dev` scope. Build/test aliases are repository-local; source imports use relative paths. No ACP transport substitution is included.
-
-## Diagnostics
-
-`CodexHostOptions.onDiagnostic` and `CodexHostAdapterOptions.onDiagnostic` accept the same `(record: HarnessDiagnostic) => void` observer. Import `HarnessDiagnostic` type-only from the package root. Records preserve native layer/stage identifiers and thread identity, epoch `at`, optional `startAt`, monotonic `stageMs`/`elapsedMs`, and optional projection counters (`revision`, `messages`, `projectMs`, `emitMs`). Host-adapter records also include `agentId`. Resume failures retain their `resume.failed` stage; failed native binding emits `bind.failed` before propagating the original error.
-
-The caller owns enablement, filtering, storage and log formatting. The SDK does not read application trace flags. Supply a sink separately to the host and adapter to collect both layers. Observer exceptions are isolated and reported through each options object's `onListenerError`; an error handler that throws is also isolated. Without an error handler, the shared listener utility reports a process warning. Diagnostic observers never change native operation success or failure.
-
-Low-level RPC settlement is separate: `CodexHostOptions.onRequestSettled` forwards the Codex client's generic settlement observer when the host creates its client. An injected client owns its own settlement observer. Every admitted method is observed without application filtering; records contain RPC ID, method, outcome, epoch start and monotonic duration, with no request parameters. Hosts can correlate IDs with their own context and choose which records to display.
+Providers are reached only through `createHarness`. Provider engines, hosts and transports are internal and have no import path.
 
 ## Portable contracts and native detail
 
-`Turn`, `TurnError`, `TurnExecutionUsage`, `TokenUsage`, `RequestUsage`, `SafetyFindings` and `JsonValue` are underlying neutral definitions in `contracts/turn.ts`; old Codex host names re-export them for native compatibility. Internal code uses canonical `Message`, `MessagePart`, `ToolPart`, `ClientApi` and `PromptPart` vocabulary. Deprecated Renderer and Codex prompt aliases remain only for existing imports. Use the neutral root factory or explicit `/native` factory according to the intended contract. Public types are available from the root; optional runtime entries preserve browser/host separation.
+`Turn`, `TurnError`, `TurnExecutionUsage`, `TokenUsage`, `RequestUsage`, `SafetyFindings` and `JsonValue` are underlying neutral definitions in `contracts/turn.ts`; old Codex host names re-export them for native compatibility. Internal code uses canonical `Message`, `MessagePart`, `ToolPart`, `ClientApi` and `PromptPart` vocabulary. Deprecated Renderer and Codex prompt aliases remain only for existing imports. Public types are available from the root; runtime entries keep browser and Node code apart.
 
 Portable consumers must not interpret `Authentication.native`, `SessionStatus.native`, `TurnError.codexErrorInfo`, arbitrary catalog `providerMetadata`, or other provider-specific escape data. Those fields preserve native evidence for integrations that deliberately accept provider coupling. Generic errors use `message` and `additionalDetails`; native details are retained without being reinterpreted. Catalog IDs/model values are selection identities. Display names, descriptions and icons are optional provider-authored metadata, not required portable behavior. Applications supply labels for SDK-default permission IDs.
 
-The package root type-exports shared UI definitions from `contracts/ui.ts`, `contracts/turn.ts` and `contracts/prompt.ts`, below the native host. Common message contracts import those modules directly. Native host names re-export compatibility aliases; portable DTOs have no dependency on the native host. Shared DTO names have no provider prefixes. `ConversationMessage` remains distinct from the facade's `Message`, which also carries an agent identity. Legacy client request envelopes are compatibility DTOs for controlled presentation; generic request actions use `AgentRequest`. `/prompt` contains only prompt authoring helpers and neutral `PromptPart`/`PromptMention` types. Provider hosts, reducers and transports remain under explicit provider/native entries.
+The package root type-exports shared UI definitions from `contracts/ui.ts`, `contracts/turn.ts` and `contracts/prompt.ts`, below the native host. Common message contracts import those modules directly. Shared DTO names have no provider prefixes. `ConversationMessage` remains distinct from the facade's `Message`, which also carries an agent identity. Legacy client request envelopes are compatibility DTOs for controlled presentation; generic request actions use `AgentRequest`. `/prompt` contains only prompt authoring helpers and neutral `PromptPart`/`PromptMention` types. Provider hosts, reducers and transports are internal.
 
 ## Claude embedding identity
 

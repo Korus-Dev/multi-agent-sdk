@@ -1,4 +1,4 @@
-import type { PromptAttachment, BackendModelOption } from './contracts';
+import type { PromptAttachment, ProviderModelOption } from './contracts';
 import type { ExecutionSelectionOverrides } from './contracts/execution';
 /** Host trust is independent of tool availability. Omission inherits native permission policy.
  * `auto` explicitly trusts the selected tools (Codex/Claude only; ACP rejects it).
@@ -19,7 +19,7 @@ export type HarnessTextGenerationInput = {
   cwd: string;
   selection?: Pick<ExecutionSelectionOverrides, 'model' | 'reasoningEffort'>;
   /** Host-local policy, evaluated against this invocation's native catalog. */
-  selectModel?: (models: readonly BackendModelOption[]) => Pick<ExecutionSelectionOverrides, 'model' | 'reasoningEffort'>;
+  selectModel?: (models: readonly ProviderModelOption[]) => Pick<ExecutionSelectionOverrides, 'model' | 'reasoningEffort'>;
   /** Isolated inspection utilities may use read-only Git and source tools. */
   tools?: boolean;
   /** Private host-owned HTTP capabilities for this invocation only. */

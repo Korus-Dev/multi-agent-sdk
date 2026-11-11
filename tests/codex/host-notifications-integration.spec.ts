@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CodexAppServerClient, type ServerNotification, type ServerRequest } from '@korus-dev/codex-sdk';
 import { CodexHost } from '../../src/providers/codex';
-import type { CodexHostEvent } from '../../src/index';
+import type { CodexEvent } from '../../src/internal';
 import { invokeCodexHostBridgeOperation } from '../../src/core/host-bridge';
-import { MockCodexAppServer, createHost, lastRequest, lastResponse, requestsFor, thread, turn } from './helpers/host-fixture';
+import { MockCodexAppServer, createHarness, lastRequest, lastResponse, requestsFor, thread, turn } from './helpers/host-fixture';
 
 describe('CodexHost', () => {
   it('preserves the status of a newly announced background thread', async () => {
-    const { host, transport } = createHost();
-    const events: CodexHostEvent[] = [];
+    const { host, transport } = createHarness();
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
     await host.connect();
     events.length = 0;
@@ -30,8 +30,8 @@ describe('CodexHost', () => {
   });
 
   it('publishes pending-work resolution when a thread closes', async () => {
-    const { host, transport } = createHost();
-    const events: CodexHostEvent[] = [];
+    const { host, transport } = createHarness();
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
     await host.connect();
 
@@ -73,8 +73,8 @@ describe('CodexHost', () => {
   });
 
   it('emits headless sub-agent events without adding standard message UI', async () => {
-    const { host, transport } = createHost();
-    const events: CodexHostEvent[] = [];
+    const { host, transport } = createHarness();
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
     await host.connect();
 
@@ -129,7 +129,7 @@ describe('CodexHost', () => {
   });
 
   it('renders and resolves MCP confirmations that are not associated with a turn', async () => {
-    const { host, transport } = createHost();
+    const { host, transport } = createHarness();
     await host.connect();
     transport.emitServerRequest('mcp-thread-level', 'mcpServer/elicitation/request', {
         threadId: 'thread-existing', turnId: null, serverName: 'calendar', mode: 'form',
@@ -158,7 +158,7 @@ describe('CodexHost', () => {
   });
 
   it('completes plan items and finalizes orphaned running tools with the turn', async () => {
-    const { host, transport } = createHost();
+    const { host, transport } = createHarness();
     await host.connect();
     transport.emitNotification('turn/started', { threadId: 'thread-existing', turn: turn('turn-plan', 'inProgress', []) });
     transport.emitNotification('item/plan/delta', { threadId: 'thread-existing', turnId: 'turn-plan', itemId: 'plan-item', delta: 'draft' });
@@ -285,7 +285,7 @@ describe('CodexHost', () => {
   });
 
   it('exposes realtime voice as a typed conversation session', async () => {
-    const { host, transport } = createHost(
+    const { host, transport } = createHarness(
       'thread/realtime/start',
       'thread/realtime/appendAudio',
       'thread/realtime/appendText',
@@ -294,7 +294,7 @@ describe('CodexHost', () => {
     );
     await host.connect();
     const conversation = host.conversation('thread-existing');
-    const events: CodexHostEvent[] = [];
+    const events: CodexEvent[] = [];
     conversation.onEvent((event) => events.push(event));
 
     const session = await conversation.startRealtime({
@@ -386,7 +386,7 @@ describe('CodexHost', () => {
   });
 
   it('hydrates an unloaded conversation before starting its realtime session', async () => {
-    const { host, transport } = createHost('thread/realtime/start', 'thread/realtime/stop');
+    const { host, transport } = createHarness('thread/realtime/start', 'thread/realtime/stop');
     await host.connect();
 
     const session = await host.conversation('thread-unloaded').startRealtime({
@@ -404,7 +404,7 @@ describe('CodexHost', () => {
   });
 
   it('negotiates WebRTC realtime before returning the session handle', async () => {
-    const { host, transport } = createHost('thread/realtime/start', 'thread/realtime/stop');
+    const { host, transport } = createHarness('thread/realtime/start', 'thread/realtime/stop');
     await host.connect();
     const conversation = host.conversation('thread-existing');
 
@@ -450,10 +450,10 @@ describe('CodexHost', () => {
   });
 
   it('negotiates renderer live chat and forwards its canonical transcript on the specified thread', async () => {
-    const { host, transport } = createHost('thread/realtime/start', 'thread/realtime/stop');
+    const { host, transport } = createHarness('thread/realtime/start', 'thread/realtime/stop');
     try {
       await host.connect();
-      const events: CodexHostEvent[] = [];
+      const events: CodexEvent[] = [];
       host.onEvent((event) => { if (event.type.startsWith('realtime.')) events.push(event); });
       const start = invokeCodexHostBridgeOperation(host, 'startLiveChat', ['thread-other', {
         sdp: 'offer', voice: 'marin', prompt: null, includeStartupContext: true, flushTranscriptTailOnSessionEnd: true,
@@ -497,9 +497,9 @@ describe('CodexHost', () => {
   });
 
   it('projects remote-control status changes as a host event', async () => {
-    const { host, transport } = createHost();
+    const { host, transport } = createHarness();
     await host.connect();
-    const events: CodexHostEvent[] = [];
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
 
     transport.emitNotification('remoteControl/status/changed', {
@@ -542,7 +542,7 @@ describe('CodexHost', () => {
     expect(onUnknownNotification).toHaveBeenCalledWith(notification);
     expect(host.getSnapshot()).toStrictEqual(before);
 
-    const withoutCallback = createHost();
+    const withoutCallback = createHarness();
     await withoutCallback.host.connect();
     expect(() => withoutCallback.transport.emitRaw(notification)).not.toThrow();
   });
@@ -567,7 +567,7 @@ describe('CodexHost', () => {
   });
 
   it('makes every non-UI server-request policy explicit and fail-closed', async () => {
-    const { host, transport } = createHost();
+    const { host, transport } = createHarness();
     await host.connect();
     const now = vi.spyOn(Date, 'now').mockReturnValue(1_700_000_123_999);
     transport.emitServerRequest('time', 'currentTime/read', { threadId: 'thread-existing' });
@@ -605,7 +605,7 @@ describe('CodexHost', () => {
   });
 
   it('removes externally resolved approvals from the active host', async () => {
-    const { host, transport } = createHost();
+    const { host, transport } = createHarness();
     await host.connect();
     transport.emitServerRequest('external-approval', 'item/commandExecution/requestApproval', { kind: 'command', startedAtMs: 1,
         threadId: 'thread-existing', turnId: 'turn', itemId: 'command', command: 'npm test',
@@ -620,8 +620,8 @@ describe('CodexHost', () => {
   });
 
   it('labels notification-driven summary changes and removal with notification origin', async () => {
-    const { host, transport } = createHost();
-    const events: CodexHostEvent[] = [];
+    const { host, transport } = createHarness();
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
     await host.connect();
     events.length = 0;

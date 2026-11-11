@@ -1,5 +1,5 @@
 import type { v2 } from '@korus-dev/codex-sdk';
-import type { CodexRealtimeInputAudioChunk } from '../../core/codex-host';
+import type { CodexRealtimeInputAudioChunk } from '../../core/codex-conversation-types';
 
 export function normalizedOptionalRealtimeString(
   value: string | undefined,

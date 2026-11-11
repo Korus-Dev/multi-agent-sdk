@@ -3,14 +3,15 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { expect, it, vi } from 'vitest';
 import { CodexAppServerClient } from '@korus-dev/codex-sdk';
-import { createHarnessDriver } from '../../src';
-import type { HarnessDriver, HarnessEvent, Session } from '../../src';
+import { } from '../../src';
+import { createInternalHarness } from '../../src/internal';
+import type { Harness, HarnessEvent, Session } from '../../src';
 import { MockCodexAppServer, requestsFor, resumeResponse, thread, turn } from '../codex/helpers/host-fixture';
 import { createQueryHarness } from '../native/claude/sdk-query-fixture';
 import * as cursorRuntime from '../../src/providers/cursor/runtime';
 import { writeAntigravityRuntimeFixture } from '../native/antigravity/session-fixture';
 
-const text = (driver: HarnessDriver, session: Session) => driver.readSession(session).messages.flatMap(m => m.parts.flatMap(p => p.type === 'text' ? [p.text] : [])).join('\n');
+const text = (driver: Harness, session: Session) => driver.readSession(session).messages.flatMap(m => m.parts.flatMap(p => p.type === 'text' ? [p.text] : [])).join('\n');
 
 it('Codex: CPA consumer observes native messages and completion through neutral state', async () => {
   const transport = new MockCodexAppServer({
@@ -19,7 +20,7 @@ it('Codex: CPA consumer observes native messages and completion through neutral 
     'thread/settings/update': () => ({}),
     'turn/start': () => ({ turn: turn('tax-turn', 'completed', [{ type: 'agentMessage', id: 'answer', text: 'Ledger verified.', phase: 'final_answer', memoryCitation: null, delivery: null, questions: null }]) }),
   });
-  const driver = createHarnessDriver('codex', { client: { name: 'cpa' }, codex: { host: { client: new CodexAppServerClient(transport) } } });
+  const driver = createInternalHarness('codex', { client: { name: 'cpa' }, codex: { host: { client: new CodexAppServerClient(transport) } } });
   const input = { id: 'tax', folder: '/accounting' }; const original = structuredClone(input);
   const session = driver.open(input); const events: HarnessEvent[] = []; driver.onEvent(e => events.push(e));
   try {
@@ -39,10 +40,10 @@ it('Codex: resuming and loading a native full-access chat never writes a default
     'thread/resume': () => ({ ...resumeResponse(thread('retained-access', false)), approvalPolicy: 'never', sandbox: { type: 'dangerFullAccess' } }),
     'thread/settings/update': () => ({}),
   });
-  const driver = createHarnessDriver('codex', { client: { name: 'cpa' }, codex: { host: { client: new CodexAppServerClient(transport) } } });
+  const driver = createInternalHarness('codex', { client: { name: 'cpa' }, codex: { host: { client: new CodexAppServerClient(transport) } } });
   const session = driver.open({ id: 'restored', folder: '/accounting' });
   try {
-    const ref = driver.restoreRef({ provider: 'codex', data: { backend: 'codex', threadId: 'retained-access' } });
+    const ref = driver.restoreRef({ provider: 'codex', data: { provider: 'codex', threadId: 'retained-access' } });
     await driver.resumeConversation(session, { ref, storageState: 'active' });
     await driver.loadConversation(session);
     expect(driver.readSession(session).permission).toBe('full-access');
@@ -59,7 +60,7 @@ it('Codex: resuming and loading a native full-access chat never writes a default
 it('Claude: admission precedes completion and neutral requests route to native approval', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'neutral-claude-'));
   const fixture = createQueryHarness();
-  const driver = createHarnessDriver('claude', { client: { name: 'cpa' }, claude: { transportOptions: { createQuery: fixture.createQuery }, host: { homeDir: root } } });
+  const driver = createInternalHarness('claude', { client: { name: 'cpa' }, claude: { transportOptions: { createQuery: fixture.createQuery }, host: { homeDir: root } } });
   const session = driver.open({ id: 'tax', folder: root });
   try {
     const sending = driver.sendPrompt(session, 'Reconcile ledger');
@@ -81,17 +82,17 @@ it('Claude: admission precedes completion and neutral requests route to native a
 for (const provider of ['cursor', 'antigravity'] as const) it(`${provider}: fixture-backed neutral CPA history, cancellation and scoped execution`, async () => {
   const root = await mkdtemp(path.join(tmpdir(), `neutral-${provider}-`));
   const discovery = provider === 'cursor' ? vi.spyOn(cursorRuntime, 'resolveCursorExecutable').mockReturnValue(null) : undefined;
-  let driver: HarnessDriver | undefined;
+  let driver: Harness | undefined;
   try {
     if (provider === 'cursor') {
       await cp(new URL('../native/cursor/fixtures/acp-agent.cjs', import.meta.url), path.join(root, 'acp-agent.cjs'));
       await writeFile(path.join(root, 'version'), '2026.10.22-27dcf5f');
       const command = path.join(root, 'agent'); await writeFile(command, `#!${process.execPath}\nrequire('./acp-agent.cjs');\n`, { mode: 0o700 });
-      driver = createHarnessDriver(provider, { client: { name: 'cpa' }, stateDirectory: () => root, cursor: { runtime: { homePath: path.join(root, 'home'), isolated: false, environment: { ...process.env, CURSOR_API_KEY: undefined } }, resolveCommand: () => command, sessionOptions: { resolveCommand: () => command } } });
+      driver = createInternalHarness(provider, { client: { name: 'cpa' }, stateDirectory: () => root, cursor: { runtime: { homePath: path.join(root, 'home'), isolated: false, environment: { ...process.env, CURSOR_API_KEY: undefined } }, resolveCommand: () => command, sessionOptions: { resolveCommand: () => command } } });
     } else {
       await writeAntigravityRuntimeFixture(root); await writeFile(path.join(root, 'harness'), '', { mode: 0o700 });
       const runtime = { command: path.join(root, 'runtime'), harness: path.join(root, 'harness'), args: [] }; const home = path.join(root, 'home');
-      driver = createHarnessDriver(provider, { client: { name: 'cpa' }, stateDirectory: () => root, antigravity: { home: () => home, resolveRuntime: () => runtime, runtimeOptions: () => ({ runtime, home }) } });
+      driver = createInternalHarness(provider, { client: { name: 'cpa' }, stateDirectory: () => root, antigravity: { home: () => home, resolveRuntime: () => runtime, runtimeOptions: () => ({ runtime, home }) } });
     }
     const host = driver; const session = host.open({ id: 'tax', folder: root });
     await host.sendPrompt(session, 'Check invoices');

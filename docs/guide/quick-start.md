@@ -3,9 +3,9 @@
 Create a driver, open a session, subscribe, and send a prompt:
 
 ```ts
-import { createHarnessDriver } from '@korus-dev/multi-agent-sdk';
+import { createHarness } from '@korus-dev/multi-agent-sdk';
 
-const driver = createHarnessDriver('claude', { client: { name: 'my-app' } });
+const driver = createHarness('claude', { client: { name: 'my-app' } });
 const session = driver.open({ id: 'main', folder: process.cwd() });
 const unsubscribe = driver.onEvent(event => {
   if (event.type === 'session.changed' && event.session === session) {

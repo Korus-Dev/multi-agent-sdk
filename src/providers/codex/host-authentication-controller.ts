@@ -1,11 +1,6 @@
 import type { CodexAppServerClient, v2 } from '@korus-dev/codex-sdk';
-import type {
-  CodexHostAuthentication,
-  CodexChatGptDeviceCodeLogin,
-  CodexChatGptLogin,
-  HostEventOrigin,
-  CodexHostSnapshot,
-} from '../../core/codex-host';
+import type { CodexChatGptDeviceCodeLogin, CodexChatGptLogin, EventOrigin } from '../../core/codex-host';
+import type { CodexAuthenticationState, CodexSnapshot } from '../../core/codex-conversation-types';
 import {
   normalizedLoginId,
   safeLoginUrl,
@@ -17,16 +12,16 @@ import { errorMessage } from './host-prompts';
 export type CodexHostAuthenticationDependencies = {
   bootstrapHostData(force?: boolean): Promise<void>;
   clearAuthenticatedHostData(): Promise<void>;
-  getSnapshot(): CodexHostSnapshot;
-  patchAuthentication(patch: Partial<CodexHostAuthentication>, origin: HostEventOrigin): void;
+  getSnapshot(): CodexSnapshot;
+  patchAuthentication(patch: Partial<CodexAuthenticationState>, origin: EventOrigin): void;
   reportError(error: unknown): void;
 };
 
 export class CodexHostAuthenticationController {
-  private accountRefreshPromise: Promise<CodexHostSnapshot> | null = null;
+  private accountRefreshPromise: Promise<CodexSnapshot> | null = null;
   private accountRefreshRequested = false;
   private accountRefreshForceBootstrap = false;
-  private accountRefreshOrigin: HostEventOrigin = 'action';
+  private accountRefreshOrigin: EventOrigin = 'action';
   private chatGptLoginPromise: Promise<CodexChatGptLogin> | null = null;
   private chatGptDeviceCodeLoginPromise: Promise<CodexChatGptDeviceCodeLogin> | null = null;
   private activeChatGptDeviceCodeLogin: CodexChatGptDeviceCodeLogin | null = null;
@@ -37,7 +32,7 @@ export class CodexHostAuthenticationController {
     private readonly host: CodexHostAuthenticationDependencies,
   ) {}
 
-  pendingRefresh(): Promise<CodexHostSnapshot> | null {
+  pendingRefresh(): Promise<CodexSnapshot> | null {
     return this.accountRefreshPromise;
   }
 
@@ -120,7 +115,7 @@ export class CodexHostAuthenticationController {
     return start;
   }
 
-  async cancelLogin(loginId: string): Promise<CodexHostSnapshot> {
+  async cancelLogin(loginId: string): Promise<CodexSnapshot> {
     const normalized = normalizedLoginId(loginId);
     const response = await this.client.request('account/login/cancel', { loginId: normalized });
     this.host.patchAuthentication({
@@ -135,7 +130,7 @@ export class CodexHostAuthenticationController {
     return this.host.getSnapshot();
   }
 
-  async logout(): Promise<CodexHostSnapshot> {
+  async logout(): Promise<CodexSnapshot> {
     await this.client.request('account/logout', undefined);
     this.host.patchAuthentication({
       login: { status: 'idle', loginId: null, authUrl: null, error: null },
@@ -150,9 +145,9 @@ export class CodexHostAuthenticationController {
   }
 
   refresh(
-    origin: HostEventOrigin,
+    origin: EventOrigin,
     forceBootstrap = false,
-  ): Promise<CodexHostSnapshot> {
+  ): Promise<CodexSnapshot> {
     this.accountRefreshRequested = true;
     this.accountRefreshForceBootstrap ||= forceBootstrap;
     this.accountRefreshOrigin = origin;
@@ -185,7 +180,7 @@ export class CodexHostAuthenticationController {
     return refresh;
   }
 
-  async load(origin: HostEventOrigin): Promise<boolean> {
+  async load(origin: EventOrigin): Promise<boolean> {
     const previousAuthenticationIdentityKey = this.lastLoadedAuthenticationIdentityKey;
     this.host.patchAuthentication({ status: 'loading', error: null }, origin);
     try {

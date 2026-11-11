@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CodexHostSnapshot, ConversationMessage } from '../../src/index';
+import type { ConversationMessage } from '../../src/index';
+import type { CodexSnapshot } from '../../src/internal';
 import type { CodexAppServerClient, v2 } from '@korus-dev/codex-sdk';
 import { initialAuthentication } from '../../src/providers/codex/host-authentication';
 import { createThreadRuntime, initialHostSnapshot } from '../../src/providers/codex/host-runtime';
@@ -559,7 +560,7 @@ function createController(options: ControllerOptions = {}) {
     getSnapshot: vi.fn(() => state),
     getState: vi.fn(() => state),
     hydrateCompleteHistory: vi.fn(async () => undefined),
-    patch: vi.fn((patch: Partial<CodexHostSnapshot>) => Object.assign(state, patch)),
+    patch: vi.fn((patch: Partial<CodexSnapshot>) => Object.assign(state, patch)),
     patchConversationStatus: vi.fn((threadId: string, status: 'idle' | 'active' | 'error') => {
       state.conversations = state.conversations.map((item) => item.id === threadId ? { ...item, status } : item);
     }),

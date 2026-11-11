@@ -1,10 +1,5 @@
-import type {
-  CodexConversationSummary,
-  CodexHostEvent,
-  HostEventOrigin,
-  CodexHostSnapshot,
-  ConversationMessage,
-} from '../../core/codex-host';
+import type { EventOrigin, ConversationMessage } from '../../core/codex-host';
+import type { CodexConversationSummary, CodexEvent, CodexSnapshot } from '../../core/codex-conversation-types';
 import { upsertConversationTurn } from './host-events';
 import { CodexHostApprovalsController } from './host-approvals-controller';
 import { CodexHostClientRequestsController } from './host-client-requests-controller';
@@ -15,17 +10,17 @@ import {
   type ThreadRuntimeState,
 } from './host-runtime';
 
-type HostEventInput = CodexHostEvent extends infer Event
-  ? Event extends CodexHostEvent
+type HostEventInput = CodexEvent extends infer Event
+  ? Event extends CodexEvent
     ? Omit<Event, 'seq' | 'occurredAt' | 'origin'>
     : never
   : never;
 
 export interface CodexHostRuntimeDependencies {
-  emitEvent(origin: HostEventOrigin, input: HostEventInput): void;
-  getState(): CodexHostSnapshot;
+  emitEvent(origin: EventOrigin, input: HostEventInput): void;
+  getState(): CodexSnapshot;
   notifyConversationListeners(threadId: string): void;
-  patch(patch: Partial<CodexHostSnapshot>, conversationId?: string): void;
+  patch(patch: Partial<CodexSnapshot>, conversationId?: string): void;
   schedulePluginRefresh(): void;
 }
 
@@ -82,7 +77,7 @@ export class CodexHostRuntimeController {
     );
   }
 
-  snapshot(runtime: ThreadRuntimeState): CodexHostSnapshot {
+  snapshot(runtime: ThreadRuntimeState): CodexSnapshot {
     return { ...this.host.getState(), ...this.projection(runtime) };
   }
 
@@ -120,7 +115,7 @@ export class CodexHostRuntimeController {
     }
   }
 
-  emitHostStatus(origin: HostEventOrigin): void {
+  emitHostStatus(origin: EventOrigin): void {
     const state = this.host.getState();
     this.host.emitEvent(origin, {
       type: 'host.statusChanged',
@@ -130,8 +125,8 @@ export class CodexHostRuntimeController {
 
   emitSummaryUpserted(
     summary: CodexConversationSummary,
-    reason: Extract<CodexHostEvent, { type: 'conversation.summaryUpserted' }>['payload']['reason'],
-    origin: HostEventOrigin,
+    reason: Extract<CodexEvent, { type: 'conversation.summaryUpserted' }>['payload']['reason'],
+    origin: EventOrigin,
   ): void {
     this.host.schedulePluginRefresh();
     const fingerprint = JSON.stringify({
@@ -152,7 +147,7 @@ export class CodexHostRuntimeController {
     });
   }
 
-  emitConversationActivity(threadId: string, origin: HostEventOrigin): void {
+  emitConversationActivity(threadId: string, origin: EventOrigin): void {
     const runtime = this.require(threadId);
     const payload = {
       threadStatus: structuredClone(runtime.threadStatus),
@@ -169,7 +164,7 @@ export class CodexHostRuntimeController {
     });
   }
 
-  emitConversationSettings(threadId: string, origin: HostEventOrigin): void {
+  emitConversationSettings(threadId: string, origin: EventOrigin): void {
     const runtime = this.require(threadId);
     const payload = {
       approvalPreset: runtime.approvalPreset,
@@ -188,7 +183,7 @@ export class CodexHostRuntimeController {
     });
   }
 
-  emitConversationSkills(threadId: string, origin: HostEventOrigin): void {
+  emitConversationSkills(threadId: string, origin: EventOrigin): void {
     const runtime = this.require(threadId);
     this.host.emitEvent(origin, {
       type: 'conversation.skillsChanged',
@@ -201,7 +196,7 @@ export class CodexHostRuntimeController {
     });
   }
 
-  emitConversationPermissions(threadId: string, origin: HostEventOrigin): void {
+  emitConversationPermissions(threadId: string, origin: EventOrigin): void {
     const runtime = this.require(threadId);
     this.host.emitEvent(origin, {
       type: 'conversation.permissionsChanged',
@@ -216,8 +211,8 @@ export class CodexHostRuntimeController {
 
   emitHistoryReplaced(
     threadId: string,
-    reason: Extract<CodexHostEvent, { type: 'conversation.historyReplaced' }>['payload']['reason'],
-    origin: HostEventOrigin,
+    reason: Extract<CodexEvent, { type: 'conversation.historyReplaced' }>['payload']['reason'],
+    origin: EventOrigin,
   ): void {
     const runtime = this.require(threadId);
     this.host.emitEvent(origin, {
@@ -235,7 +230,7 @@ export class CodexHostRuntimeController {
   emitHistoryPrepended(
     threadId: string,
     messages: readonly ConversationMessage[],
-    origin: HostEventOrigin,
+    origin: EventOrigin,
   ): void {
     if (messages.length === 0) return;
     const currentMessages = new Map(
@@ -298,7 +293,7 @@ export class CodexHostRuntimeController {
   patchConversationStatus(
     threadId: string,
     status: CodexConversationSummary['status'],
-    origin: HostEventOrigin = 'notification',
+    origin: EventOrigin = 'notification',
   ): void {
     const state = this.host.getState();
     this.host.patch({
@@ -313,7 +308,7 @@ export class CodexHostRuntimeController {
   patchConversationTurnCount(
     threadId: string,
     turnCount: number,
-    origin: HostEventOrigin = 'notification',
+    origin: EventOrigin = 'notification',
   ): void {
     const state = this.host.getState();
     this.host.patch({

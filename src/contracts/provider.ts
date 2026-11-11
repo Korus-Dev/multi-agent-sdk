@@ -1,6 +1,6 @@
 import type { ExecutionSelection } from './execution';
 import type {
-  AgentBackend,
+  HarnessProvider,
   AppText,
   ApprovalPreset,
   ReasoningEffort,
@@ -8,7 +8,7 @@ import type {
 
 export type CodexApprovalsReviewer = 'user' | 'auto_review' | 'guardian_subagent';
 
-export type BackendSession =
+export type ProviderSessionData =
   | { kind: 'cursor'; sessionId: string }
   | { kind: 'antigravity'; sessionId: string }
   | {
@@ -29,9 +29,9 @@ export type BackendSession =
 
 /** Provider settings adapt the shared selection to native defaults alongside provider policy. */
 type ProviderExecutionDefaults = {
-  [K in Exclude<keyof ExecutionSelection, 'backend'>]?: K extends 'serviceTier' ? ExecutionSelection[K] : NonNullable<ExecutionSelection[K]>;
+  [K in Exclude<keyof ExecutionSelection, 'provider'>]?: K extends 'serviceTier' ? ExecutionSelection[K] : NonNullable<ExecutionSelection[K]>;
 };
-export type BackendDefaults = ProviderExecutionDefaults & { userSelectedModel?: boolean } & (
+export type ProviderDefaults = ProviderExecutionDefaults & { userSelectedModel?: boolean } & (
   | { kind: 'cursor'; permissionMode?: string }
   | { kind: 'antigravity'; permissionMode?: string }
   | { kind: 'codex'; approvalPreset?: ApprovalPreset; approvalPolicy?: string; approvalsReviewer?: CodexApprovalsReviewer; sandboxMode?: string }
@@ -81,9 +81,9 @@ export type AccountRateLimits = {
   billing?: AccountBilling;
 };
 
-export type BackendPlanModeSupport = 'native' | 'prompted' | 'unsupported';
+export type ProviderPlanModeSupport = 'native' | 'prompted' | 'unsupported';
 
-export type BackendCapabilities = {
+export type ProviderCapabilities = {
   /** Supplies token counters for analytics; absent retains legacy support. */
   reportsTokens?: boolean;
   /** The harness supplies its own background monitor tool; absent means false. */
@@ -94,13 +94,19 @@ export type BackendCapabilities = {
   conversationResume?: boolean;
   conversationReplaceWithSummary?: boolean;
   remoteControl?: boolean;
+  /** Managed login methods `authenticate({ action: 'login' })` can start; absent or empty means none. */
+  login?: readonly import('./authentication').AuthenticationLoginMethod[];
+  /** The provider offers a live realtime (voice or text) session. */
+  realtime?: boolean;
+  /** `getAccountRateLimits` reads subscription usage and rate limits for the signed-in account. */
+  accountUsage?: boolean;
   attachments: boolean;
   models: boolean;
   skills: boolean;
   reasoningEffort: boolean;
   serviceTier?: boolean;
   thinkingBudget: boolean;
-  planMode: BackendPlanModeSupport;
+  planMode: ProviderPlanModeSupport;
   goals: boolean;
   steerPrompt: boolean;
   interrupt: boolean;
@@ -111,10 +117,10 @@ export type BackendCapabilities = {
   retryTurn: boolean;
   approvals: boolean;
   approvalPresets?: ApprovalPreset[];
-  permissionModes?: BackendPermissionModeOption[];
+  permissionModes?: ProviderPermissionModeOption[];
 };
 
-export type BackendPermissionModeOption = {
+export type ProviderPermissionModeOption = {
   id: string;
   /** Optional provider-authored metadata; consumers own labels for SDK defaults. */
   label?: AppText;
@@ -147,33 +153,33 @@ export type CodexChatGptDeviceCodeLogin = {
   userCode: string;
 };
 
-export type BackendReasoningEffortOption = {
+export type ProviderReasoningEffortOption = {
   reasoningEffort: ReasoningEffort;
   description: string;
 };
 
-export type BackendServiceTier = {
+export type ProviderServiceTier = {
   id: string;
   name: string;
   description: string;
 };
 
-export type BackendModelOption = {
+export type ProviderModelOption = {
   id: string;
   model: string;
   displayName: string;
   description?: string;
   hidden?: boolean;
-  supportedReasoningEfforts?: BackendReasoningEffortOption[];
+  supportedReasoningEfforts?: ProviderReasoningEffortOption[];
   defaultReasoningEffort?: ReasoningEffort | null;
-  serviceTiers?: BackendServiceTier[];
+  serviceTiers?: ProviderServiceTier[];
   defaultServiceTier?: string | null;
   isDefault?: boolean;
-  capabilities?: Partial<BackendCapabilities>;
+  capabilities?: Partial<ProviderCapabilities>;
   providerMetadata?: Record<string, unknown>;
 };
 
-export type BackendSkillSummary = {
+export type ProviderSkillSummary = {
   id?: string;
   name: string;
   description?: string;
@@ -189,7 +195,7 @@ export type BackendSkillSummary = {
   providerMetadata?: Record<string, unknown>;
 };
 
-export type BackendPluginSummary = {
+export type ProviderPluginSummary = {
   id: string;
   name: string;
   displayName: string;
@@ -201,9 +207,9 @@ export type BackendPluginSummary = {
   enabled: boolean;
 };
 
-export type BackendCommandSummary = {
+export type ProviderCommandSummary = {
   id: string;
-  backend: AgentBackend;
+  provider: HarnessProvider;
   name: string;
   displayName?: string;
   description?: string;
@@ -216,22 +222,22 @@ export type BackendCommandSummary = {
   providerMetadata?: Record<string, unknown>;
 };
 
-export type BackendRuntimeStatus = {
-  backend: AgentBackend;
+export type ProviderRuntimeStatus = {
+  provider: HarnessProvider;
   status: 'notConfigured' | 'starting' | 'running' | 'error';
   detail?: AppText;
-  capabilities?: Partial<BackendCapabilities>;
+  capabilities?: Partial<ProviderCapabilities>;
 };
 
-export type BackendConnectionState = {
+export type ProviderConnectionState = {
   status: 'connecting' | 'connected' | 'reconnecting' | 'error';
   detail?: AppText;
 };
 
 
 
-export type HostConnectionStatus = 'idle' | 'connecting' | 'ready' | 'error';
+export type RuntimeConnectionStatus = 'idle' | 'connecting' | 'ready' | 'error';
 
 
 
-export type HostEventOrigin = 'action' | 'notification' | 'lifecycle';
+export type EventOrigin = 'action' | 'notification' | 'lifecycle';

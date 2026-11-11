@@ -1,9 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CodexAppServerClient } from '@korus-dev/codex-sdk';
-import type {
-  CodexHostAuthentication,
-  HostEventOrigin,
-} from '../../src/index';
+import type { EventOrigin } from '../../src/index';
+import type { CodexAuthenticationState } from '../../src/internal';
 import {
   initialAuthentication,
   normalizedLoginId,
@@ -439,7 +437,7 @@ describe('CodexHostAuthenticationController', () => {
   });
 });
 
-function authentication(overrides: Partial<CodexHostAuthentication> = {}): CodexHostAuthentication {
+function authentication(overrides: Partial<CodexAuthenticationState> = {}): CodexAuthenticationState {
   return { ...initialAuthentication(), ...overrides };
 }
 
@@ -449,7 +447,7 @@ function setupController(request: ReturnType<typeof vi.fn>) {
     bootstrapHostData: vi.fn(async () => undefined),
     clearAuthenticatedHostData: vi.fn(async () => undefined),
     getSnapshot: () => state,
-    patchAuthentication: vi.fn((patch: Partial<CodexHostAuthentication>, _origin: HostEventOrigin) => {
+    patchAuthentication: vi.fn((patch: Partial<CodexAuthenticationState>, _origin: EventOrigin) => {
       state.authentication = { ...state.authentication, ...patch };
     }),
     reportError: vi.fn(),

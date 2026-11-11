@@ -1,15 +1,6 @@
 import type { v2 } from '@korus-dev/codex-sdk';
-import type {
-  Approval,
-  CodexHostAuthentication,
-  ClientRequest,
-  CodexHostSnapshot,
-  CodexConversationLoadingStrategy,
-  Skill,
-  CodexThreadStatus,
-  Turn,
-  ConversationMessage,
-} from '../../core/codex-host';
+import type { Approval, ClientRequest, Skill, Turn, ConversationMessage } from '../../core/codex-host';
+import type { CodexAuthenticationState, CodexSnapshot, CodexConversationLoadingStrategy, CodexThreadStatus } from '../../core/codex-conversation-types';
 
 export type ThreadRuntimeState = {
   threadId: string;
@@ -20,21 +11,21 @@ export type ThreadRuntimeState = {
   turnIds: string[];
   messages: ConversationMessage[];
   answeredClientRequestIds: string[];
-  approvalPreset: CodexHostSnapshot['approvalPreset'];
-  approvalPresets: CodexHostSnapshot['approvalPresets'];
-  permissionProfiles: CodexHostSnapshot['permissionProfiles'];
+  approvalPreset: CodexSnapshot['approvalPreset'];
+  approvalPresets: CodexSnapshot['approvalPresets'];
+  permissionProfiles: CodexSnapshot['permissionProfiles'];
   skills: Skill[];
-  skillCatalogStatus: CodexHostSnapshot['skillCatalogStatus'];
+  skillCatalogStatus: CodexSnapshot['skillCatalogStatus'];
   selectedModelId: string | null;
   selectedReasoningEffort: string | null;
   selectedServiceTier: string | null;
   planMode: boolean;
-  executionPlan: CodexHostSnapshot['executionPlan'];
-  contextUsage: CodexHostSnapshot['contextUsage'];
-  goal: CodexHostSnapshot['goal'];
-  turnGitDiff: CodexHostSnapshot['turnGitDiff'];
+  executionPlan: CodexSnapshot['executionPlan'];
+  contextUsage: CodexSnapshot['contextUsage'];
+  goal: CodexSnapshot['goal'];
+  turnGitDiff: CodexSnapshot['turnGitDiff'];
   threadStatus: CodexThreadStatus | null;
-  queuedPrompts: CodexHostSnapshot['queuedPrompts'];
+  queuedPrompts: CodexSnapshot['queuedPrompts'];
   busy: boolean;
   turnStartPending: boolean;
   historyLoading: boolean;
@@ -56,7 +47,7 @@ export type ConversationCatalogs = Pick<
   'approvalPresets' | 'permissionProfiles' | 'skillCatalogStatus' | 'skills'
 >;
 
-export function initialHostSnapshot(authentication: CodexHostAuthentication): CodexHostSnapshot {
+export function initialHostSnapshot(authentication: CodexAuthenticationState): CodexSnapshot {
   return {
     status: 'idle',
     authentication,
@@ -102,7 +93,7 @@ export function initialHostSnapshot(authentication: CodexHostAuthentication): Co
 
 export function createThreadRuntime(
   threadId: string,
-  state: CodexHostSnapshot,
+  state: CodexSnapshot,
   patch: ThreadRuntimePatch = {},
 ): ThreadRuntimeState {
   return {
@@ -150,7 +141,7 @@ export function runtimeProjection(
   approvals: Approval[],
   clientRequests: ClientRequest[],
 ): Pick<
-  CodexHostSnapshot,
+  CodexSnapshot,
   | 'approvalPreset'
   | 'approvalPresets'
   | 'answeredClientRequestIds'

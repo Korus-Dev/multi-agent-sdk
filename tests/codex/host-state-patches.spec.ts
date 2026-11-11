@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CodexHostStatePatch } from '../../src/index';
+import type { CodexStatePatch } from '../../src/internal';
 import { CodexAppServerClient, type v2 } from '@korus-dev/codex-sdk';
 import { CodexHost } from '../../src/providers/codex';
 import { MockCodexAppServer, pluginSummary, resumeResponse, thread } from './helpers/host-fixture';
@@ -38,7 +38,7 @@ describe('CodexHost state patches', () => {
     const host = new CodexHost({ client: new CodexAppServerClient(transport), autoSelectFirstConversation: false });
     await host.connect();
     await vi.waitFor(() => expect(host.getSnapshot().pluginCatalogStatus).toBe('loaded'));
-    const patches: CodexHostStatePatch[] = [];
+    const patches: CodexStatePatch[] = [];
     host.onStatePatch((patch) => patches.push(patch));
 
     await host.refreshConversations();
@@ -55,7 +55,7 @@ describe('CodexHost state patches', () => {
     });
     const host = new CodexHost({ client: new CodexAppServerClient(transport), autoSelectFirstConversation: false });
     await host.connect();
-    const patches: CodexHostStatePatch[] = [];
+    const patches: CodexStatePatch[] = [];
     host.onStatePatch((patch) => patches.push(patch));
 
     await host.refreshConversations();

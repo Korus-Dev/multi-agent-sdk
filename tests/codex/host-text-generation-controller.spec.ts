@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ModelDescriptor, CodexHostSnapshot } from '../../src/index';
+import type { ModelDescriptor } from '../../src/index';
+import type { CodexSnapshot } from '../../src/internal';
 import type { CodexAppServerClient, v2 } from '@korus-dev/codex-sdk';
 import { initialAuthentication } from '../../src/providers/codex/host-authentication';
 import { initialHostSnapshot } from '../../src/providers/codex/host-runtime';
@@ -457,14 +458,14 @@ type ControllerOptions = {
   ephemeral?: boolean;
   onThreadStart?: () => void;
   rejectMethods?: Set<string>;
-  state?: Partial<CodexHostSnapshot> | CodexHostSnapshot;
+  state?: Partial<CodexSnapshot> | CodexSnapshot;
   turn?: unknown;
   turnResponse?: Promise<unknown>;
 };
 
 function createController(options: ControllerOptions = {}) {
   const state = 'authentication' in (options.state ?? {})
-    ? options.state as CodexHostSnapshot
+    ? options.state as CodexSnapshot
     : Object.assign(initialHostSnapshot(initialAuthentication()), options.state);
   const request = vi.fn(async (method: string, _params: unknown): Promise<unknown> => {
     if (options.rejectMethods?.has(method)) throw new Error(`${method} failed`);

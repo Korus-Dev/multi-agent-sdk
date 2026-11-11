@@ -1,10 +1,7 @@
 import { readTurnItems } from './host-conversations-controller';
 import type { CodexOriginalHistoryImages } from './codex-original-history-images';
 import type { CodexAppServerClient, v2 } from '@korus-dev/codex-sdk';
-import type {
-  CodexConversationSummary,
-  CodexHostSnapshot,
-} from '../../core/codex-host';
+import type { CodexConversationSummary, CodexSnapshot } from '../../core/codex-conversation-types';
 import { codexThreadToConversationMessages } from './codex-conversation-history';
 import { CodexHostCatalogController } from './host-catalog-controller';
 import { CodexHostExtensionsController } from './host-extensions-controller';
@@ -42,12 +39,12 @@ export type CodexHostForkDependencies = {
   emitHistoryReplaced(threadId: string): void;
   hydrateOriginalImages?(threadId: string, path?: string | null): void;
   emitSummaryUpserted(summary: CodexConversationSummary): void;
-  getState(): CodexHostSnapshot;
+  getState(): CodexSnapshot;
   hydrateCompleteHistory(threadId: string): Promise<void>;
-  patch(patch: Partial<CodexHostSnapshot>): void;
+  patch(patch: Partial<CodexSnapshot>): void;
   rememberHostOptions(threadId: string, options: CodexConversationLoadOptions): void;
   requireRuntime(threadId: string): ThreadRuntimeState;
-  snapshotForRuntime(runtime: ThreadRuntimeState): CodexHostSnapshot;
+  snapshotForRuntime(runtime: ThreadRuntimeState): CodexSnapshot;
 };
 
 type CodexForkBoundary = {

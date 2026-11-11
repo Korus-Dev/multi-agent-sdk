@@ -6,12 +6,12 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Agent, RendererMessage } from '../../../src/contracts/index';
 import { createClaudeConversationReplica, type ClaudeConversationReplica } from '../../../src/conversations/claude-conversation-replica';
 import type { ClaudeSdkMessage } from '../../../src/providers/claude/protocol';
-import type { NativeHarnessEvent as HarnessEvent } from '../../../src/index';
+import type { NativeHarnessEvent as HarnessEvent } from '../../../src/internal';
 import { ClaudeHost } from '../../../src/providers/claude/host';
 import { loadClaudeTranscriptHistory, type ClaudeTranscriptHistory, claudeTranscriptToRendererMessages } from '../../../src/providers/claude/transcript-history-adapter';
 
 const session = { kind: 'claude' as const, sessionId: 'history-session', transport: 'stdio' as const };
-const agent: Agent = { id: 'history-agent', name: 'History', folder: '/synthetic', backend: 'claude', backendSession: session };
+const agent: Agent = { id: 'history-agent', name: 'History', folder: '/synthetic', provider: 'claude', providerSession: session };
 
 function transcript(turns: number, output: string) {
   return Array.from({ length: turns }, (_, i) => [
@@ -49,12 +49,12 @@ describe('Claude history paging', () => {
       if (frame.type === 'claude.conversationEventReceived') replica.apply(frame.payload.event);
     });
     try {
-      await driver.resumeConversation(agent, { ref: { backend: 'claude', folder: agent.folder, sessionId: session.sessionId }, storageState: 'active' });
+      await driver.resumeConversation(agent, { ref: { provider: 'claude', folder: agent.folder, sessionId: session.sessionId }, storageState: 'active' });
       expect(readSessionMessages).toHaveBeenCalledOnce();
       expect(replica.getSnapshot().historyState.hasOlder).toBe(false);
       await driver.loadTurnHistory(agent, 'claude-user-0');
       expect(JSON.stringify(replica.getSnapshot())).toContain('Readable work');
-      expect(await driver.readConversationMessages({ backend: 'claude', folder: agent.folder, sessionId: session.sessionId }, agent.id))
+      expect(await driver.readConversationMessages({ provider: 'claude', folder: agent.folder, sessionId: session.sessionId }, agent.id))
         .toStrictEqual(claudeTranscriptToRendererMessages(content, agent.id, session.sessionId));
     } finally { await driver.close(); await rm(home, { recursive: true, force: true }); }
   });
@@ -96,7 +96,7 @@ describe('Claude history paging', () => {
       if (scenario === 'retry' || scenario === 'rewrite') await rename(file, `${file}.original`);
       if (scenario === 'rewrite') await writeFile(file, content);
       if (scenario === 'release' || scenario === 'continue-release') await driver.releaseConversation(agent.id);
-      if (scenario === 'selection') await driver.loadConversation({ ...agent, backendSession: { ...session, sessionId: 'next' } });
+      if (scenario === 'selection') await driver.loadConversation({ ...agent, providerSession: { ...session, sessionId: 'next' } });
       const count = frames.length;
       unblock();
       const outcome = (await settled)[0];
@@ -158,7 +158,7 @@ describe('Claude history paging', () => {
       await driver.loadOlderHistory(agent);
       expect(replica.getSnapshot().messages.map(message => message.id)).toStrictEqual(messages.map(message => message.id));
       expect(replica.getSnapshot().historyState.hasOlder).toBe(false);
-      expect(await driver.readConversationMessages({ backend: 'claude', folder: agent.folder, sessionId: session.sessionId }, agent.id)).toStrictEqual(messages);
+      expect(await driver.readConversationMessages({ provider: 'claude', folder: agent.folder, sessionId: session.sessionId }, agent.id)).toStrictEqual(messages);
     } finally { await driver.close(); await rm(home, { recursive: true, force: true }); }
   });
 
@@ -169,8 +169,8 @@ describe('Claude history paging', () => {
     const original = await loadClaudeTranscriptHistory(agent, { projectsRoot: home });
     let resolveNext!: (history: ClaudeTranscriptHistory) => void;
     const nextHistory = new Promise<ClaudeTranscriptHistory>(resolve => { resolveNext = resolve; });
-    const nextAgent = { ...agent, backendSession: { ...session, sessionId: 'next-session' } };
-    const driver = new ClaudeHost({ startTurn: vi.fn(), close: async () => {} }, owner => owner.backendSession?.kind === 'claude' && owner.backendSession.sessionId === session.sessionId ? Promise.resolve(original) : nextHistory);
+    const nextAgent = { ...agent, providerSession: { ...session, sessionId: 'next-session' } };
+    const driver = new ClaudeHost({ startTurn: vi.fn(), close: async () => {} }, owner => owner.providerSession?.kind === 'claude' && owner.providerSession.sessionId === session.sessionId ? Promise.resolve(original) : nextHistory);
     const frames: HarnessEvent[] = []; let cancelled: Promise<unknown> | undefined;
     driver.onEvent(frame => {
       frames.push(frame);
@@ -184,11 +184,11 @@ describe('Claude history paging', () => {
       const settled = await Promise.allSettled([first]);
       expect(settled[0]).toMatchObject({ status: 'rejected', reason: expect.any(Error) });
       expect(JSON.stringify(frames)).not.toContain('Old disk detail');
-      resolveNext({ backendSession: nextAgent.backendSession, messages: [] });
+      resolveNext({ providerSession: nextAgent.providerSession, messages: [] });
       await cancelled;
       if (cancellation === 'selection') expect(frames.at(-1)).toMatchObject({ type: 'claude.conversationSnapshotChanged', payload: { snapshot: { sessionId: 'next-session', messages: [] } } });
     } finally {
-      resolveNext({ backendSession: nextAgent.backendSession, messages: [] });
+      resolveNext({ providerSession: nextAgent.providerSession, messages: [] });
       await cancelled?.catch(() => undefined); await driver.close(); await rm(home, { recursive: true, force: true });
     }
   });
@@ -196,7 +196,7 @@ describe('Claude history paging', () => {
   it('retains older history when an interrupted session continues before its conversation is opened', async () => {
     const messages = claudeTranscriptToRendererMessages(transcript(80, 'past output'), agent.id, session.sessionId);
     const driver = new ClaudeHost({ startTurn: () => ({ done: new Promise(() => {}), interrupt: async () => {} }), close: async () => {} },
-      async () => ({ backendSession: session, messages }));
+      async () => ({ providerSession: session, messages }));
     let replica!: ClaudeConversationReplica;
     driver.onEvent(frame => {
       if (frame.type === 'claude.conversationSnapshotChanged') replica = createClaudeConversationReplica(frame.payload.snapshot);
@@ -215,7 +215,7 @@ describe('Claude history paging', () => {
 
   it('prepends bounded pages without gaps or duplicate identities and exhausts idempotently', async () => {
     const messages: RendererMessage[] = Array.from({ length: 150 }, (_, i) => ({ id: `message-${i}`, agentId: agent.id, turnId: `turn-${i}`, role: 'user', status: 'complete', createdAt: '2026-01-01T00:00:00Z', parts: [{ type: 'text', text: 'x'.repeat(40_000) }] }));
-    const driver = new ClaudeHost({ startTurn: vi.fn(), close: async () => {} }, async () => ({ backendSession: session, messages }));
+    const driver = new ClaudeHost({ startTurn: vi.fn(), close: async () => {} }, async () => ({ providerSession: session, messages }));
     let replica!: ClaudeConversationReplica;
     const frames: HarnessEvent[] = [];
     driver.onEvent((frame) => {
@@ -242,7 +242,7 @@ describe('Claude history paging', () => {
   it('reads a giant tool row losslessly in bounded chunks and rejects foreign, stale and invalid reads', async () => {
     const messages = claudeTranscriptToRendererMessages(transcript(1, '工具🙂\\\"\n'.repeat(700_000)), agent.id, session.sessionId);
     expect(Buffer.byteLength(JSON.stringify(messages[1]))).toBeGreaterThan(8 * 1024 * 1024);
-    const driver = new ClaudeHost({ startTurn: vi.fn(), close: async () => {} }, async () => ({ backendSession: session, messages }));
+    const driver = new ClaudeHost({ startTurn: vi.fn(), close: async () => {} }, async () => ({ providerSession: session, messages }));
     let snapshot!: import('../../../src/contracts/index').ClaudeConversationSnapshot;
     driver.onEvent((frame) => { if (frame.type === 'claude.conversationSnapshotChanged') snapshot = frame.payload.snapshot; });
     try {
@@ -259,7 +259,7 @@ describe('Claude history paging', () => {
         input.offset = chunk.nextOffset;
       }
       expect(JSON.parse(Buffer.concat(chunks).toString('utf8'))).toStrictEqual(messages[1]);
-      expect(await driver.readConversationMessages({ backend: 'claude', folder: agent.folder, sessionId: session.sessionId }, agent.id)).toStrictEqual(messages);
+      expect(await driver.readConversationMessages({ provider: 'claude', folder: agent.folder, sessionId: session.sessionId }, agent.id)).toStrictEqual(messages);
       await expect(driver.readConversationContent({ ...agent, id: 'other' }, input)).rejects.toThrow('no longer available');
       await expect(driver.readConversationContent(agent, { ...input, sessionId: 'other' })).rejects.toThrow('no longer available');
       await expect(driver.readConversationContent(agent, { ...input, offset: -1 })).rejects.toThrow('offset');
@@ -269,19 +269,19 @@ describe('Claude history paging', () => {
   });
 
   it('ignores history reads invalidated by release or a newer session selection', async () => {
-    const pending: Array<(value: { backendSession: typeof session; messages: RendererMessage[] }) => void> = [];
+    const pending: Array<(value: { providerSession: typeof session; messages: RendererMessage[] }) => void> = [];
     const driver = new ClaudeHost({ startTurn: vi.fn(), close: async () => {} }, () => new Promise((resolve) => { pending.push(resolve); }));
     const frames: HarnessEvent[] = []; driver.onEvent((frame) => frames.push(frame));
     try {
       const obsolete = driver.loadConversation(agent);
       await driver.releaseConversation(agent.id);
-      pending[0]!({ backendSession: session, messages: [] }); await obsolete;
+      pending[0]!({ providerSession: session, messages: [] }); await obsolete;
       expect(frames).toStrictEqual([]);
       const first = driver.loadConversation(agent);
-      const secondAgent = { ...agent, backendSession: { ...session, sessionId: 'second' } };
+      const secondAgent = { ...agent, providerSession: { ...session, sessionId: 'second' } };
       const second = driver.loadConversation(secondAgent);
-      pending[2]!({ backendSession: secondAgent.backendSession, messages: [] }); await second;
-      pending[1]!({ backendSession: session, messages: [] }); await first;
+      pending[2]!({ providerSession: secondAgent.providerSession, messages: [] }); await second;
+      pending[1]!({ providerSession: session, messages: [] }); await first;
       expect(frames).toHaveLength(1);
       expect(frames[0]).toMatchObject({ payload: { snapshot: { sessionId: 'second' } } });
       await expect(driver.loadOlderHistory(agent)).rejects.toThrow('no longer open');
@@ -291,7 +291,7 @@ describe('Claude history paging', () => {
   it('keeps live tool output authoritative across older pages, oversized events and reload', async () => {
     let emit!: (message: ClaudeSdkMessage) => void;
     const messages = claudeTranscriptToRendererMessages(transcript(60, 'small'), agent.id, session.sessionId);
-    const driver = new ClaudeHost({ startTurn: (_params, listener) => { emit = listener; return { done: new Promise(() => {}), interrupt: async () => {} }; }, close: async () => {} }, async () => ({ backendSession: session, messages }));
+    const driver = new ClaudeHost({ startTurn: (_params, listener) => { emit = listener; return { done: new Promise(() => {}), interrupt: async () => {} }; }, close: async () => {} }, async () => ({ providerSession: session, messages }));
     let replica!: ClaudeConversationReplica;
     const frames: HarnessEvent[] = [];
     driver.onEvent((frame) => { frames.push(frame); if (frame.type === 'claude.conversationSnapshotChanged') replica = createClaudeConversationReplica(frame.payload.snapshot); if (frame.type === 'claude.conversationEventReceived') replica.apply(frame.payload.event); });
@@ -306,7 +306,7 @@ describe('Claude history paging', () => {
       await driver.loadConversation(agent);
       emit({ type: 'assistant', session_id: session.sessionId, message: { content: 'Final answer' } });
       emit({ type: 'result', subtype: 'success', session_id: session.sessionId, is_error: false });
-      const live = (await driver.readConversationMessages({ backend: 'claude', folder: agent.folder, sessionId: session.sessionId }, agent.id)).find((row) => row.role === 'assistant' && row.turnId === turn.turnId)!;
+      const live = (await driver.readConversationMessages({ provider: 'claude', folder: agent.folder, sessionId: session.sessionId }, agent.id)).find((row) => row.role === 'assistant' && row.turnId === turn.turnId)!;
       expect(live.parts).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'live-tool', body: output }), { type: 'text', text: 'Final answer' }]));
       expect(replica.getSnapshot().messages.filter((row) => row.role === 'assistant' && row.turnId === turn.turnId)).toHaveLength(1);
       const reference = replica.getSnapshot().messages.find((row) => row.id === live.id)!.deferredContent!;
@@ -326,7 +326,7 @@ describe('Claude history paging', () => {
   it('opens a transcript larger than the companion limit with a bounded recent snapshot', async () => {
     const messages = claudeTranscriptToRendererMessages(transcript(80, '工具 output\n'.repeat(30_000)), agent.id, session.sessionId);
     expect(Buffer.byteLength(JSON.stringify(messages))).toBeGreaterThan(32 * 1024 * 1024);
-    const driver = new ClaudeHost({ startTurn: vi.fn(), close: async () => {} }, async () => ({ backendSession: session, messages }));
+    const driver = new ClaudeHost({ startTurn: vi.fn(), close: async () => {} }, async () => ({ providerSession: session, messages }));
     const frames: HarnessEvent[] = [];
     driver.onEvent((frame) => frames.push(frame));
     try {
@@ -342,7 +342,7 @@ describe('Claude history paging', () => {
     const parts = Array.from({ length: 40 }, (_, i) => ({ type: 'tool' as const, id: `tool-${i}`, kind: 'command', title: `Ran command ${i}`, status: 'completed' as const, body: `output ${i} `.repeat(500) }));
     const message: RendererMessage = { id: 'long-turn', agentId: agent.id, turnId: 'turn', role: 'assistant', status: 'complete', createdAt: '2026-01-01T00:00:00Z', parts };
     expect(Buffer.byteLength(JSON.stringify(message))).toBeGreaterThan(100 * 1024);
-    const driver = new ClaudeHost({ startTurn: vi.fn(), close: async () => {} }, async () => ({ backendSession: session, messages: [message] }));
+    const driver = new ClaudeHost({ startTurn: vi.fn(), close: async () => {} }, async () => ({ providerSession: session, messages: [message] }));
     let snapshot!: import('../../../src/contracts/index').ClaudeConversationSnapshot;
     driver.onEvent((frame) => { if (frame.type === 'claude.conversationSnapshotChanged') snapshot = frame.payload.snapshot; });
     try {
@@ -357,7 +357,7 @@ describe('Claude history paging', () => {
     const huge = { type: 'tool' as const, id: 'huge', kind: 'mcp', title: 'Screenshot', status: 'completed' as const, body: 'x'.repeat(300_000), output: [{ type: 'text', text: 'x'.repeat(300_000) }] };
     const message: RendererMessage = { id: 'mixed', agentId: agent.id, turnId: 'turn', role: 'assistant', status: 'complete', createdAt: '2026-01-01T00:00:00Z',
       parts: [{ type: 'text', text: 'Looking at it' }, ordinary(1), huge, ordinary(2)] };
-    const driver = new ClaudeHost({ startTurn: vi.fn(), close: async () => {} }, async () => ({ backendSession: session, messages: [message] }));
+    const driver = new ClaudeHost({ startTurn: vi.fn(), close: async () => {} }, async () => ({ providerSession: session, messages: [message] }));
     let snapshot!: import('../../../src/contracts/index').ClaudeConversationSnapshot;
     driver.onEvent((frame) => { if (frame.type === 'claude.conversationSnapshotChanged') snapshot = frame.payload.snapshot; });
     try {

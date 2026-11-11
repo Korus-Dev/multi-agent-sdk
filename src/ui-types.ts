@@ -17,6 +17,7 @@ export type {
   Plugin,
   ServiceTier,
   Skill,
+  ModelDescriptor,
   SendMessageOptions,
   UpdateConversationSettings,
   ConversationMessage,
@@ -30,3 +31,4 @@ export type {
   ConversationMessageTextPart,
   ConversationMessageToolPart
 } from './contracts/ui';
+export type { BankedResets, UseBankedResetInput, BankedResetResult } from './contracts/banked-resets';

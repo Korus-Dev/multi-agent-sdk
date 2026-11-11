@@ -1,20 +1,20 @@
 import { expect, it, vi } from 'vitest';
-import { adaptHarnessDriver } from '../../src/consumer';
-import type { HarnessContext } from '../../src/context';
-import type { HarnessDriver, HarnessEvent, HarnessScopedPromptInput } from '../../src/driver';
+import { adaptHarness } from '../../src/consumer';
+import type { ProviderContext } from '../../src/context';
+import type { ProviderDriver, ProviderEvent, ProviderScopedPromptInput } from '../../src/driver';
 
 function fixture() {
-  const pending = new Map<string, { input: HarnessScopedPromptInput; resolve: (value: { text: string; session: { kind: 'cursor'; sessionId: string } }) => void; reject: (error: Error) => void }>();
+  const pending = new Map<string, { input: ProviderScopedPromptInput; resolve: (value: { text: string; session: { kind: 'cursor'; sessionId: string } }) => void; reject: (error: Error) => void }>();
   const released: string[] = [];
   const cancelled: string[] = [];
   const native = {
-    onEvent: (_listener: (event: HarnessEvent) => void) => () => {},
-    executeScopedPrompt: vi.fn((context: HarnessContext, input: HarnessScopedPromptInput) => new Promise<{ text: string; session: { kind: 'cursor'; sessionId: string } }>((resolve, reject) => pending.set(context.id, { input, resolve, reject }))),
-    cancelScopedPrompt: vi.fn(async (context: HarnessContext) => { cancelled.push(context.id); }),
+    onEvent: (_listener: (event: ProviderEvent) => void) => () => {},
+    executeScopedPrompt: vi.fn((context: ProviderContext, input: ProviderScopedPromptInput) => new Promise<{ text: string; session: { kind: 'cursor'; sessionId: string } }>((resolve, reject) => pending.set(context.id, { input, resolve, reject }))),
+    cancelScopedPrompt: vi.fn(async (context: ProviderContext) => { cancelled.push(context.id); }),
     releaseConversation: vi.fn(async (id: string) => { released.push(id); }),
     close: vi.fn(async () => {}),
-  } satisfies Partial<HarnessDriver<HarnessContext, HarnessEvent>>;
-  const driver = adaptHarnessDriver('cursor', native as unknown as HarnessDriver<HarnessContext, HarnessEvent>);
+  } satisfies Partial<ProviderDriver<ProviderContext, ProviderEvent>>;
+  const driver = adaptHarness('cursor', native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
   return { driver, native, pending, released, cancelled };
 }
 
@@ -54,10 +54,10 @@ it('does not admit an already-aborted scope', async () => {
 });
 
 it('Claude cancels a fresh native query before provider session admission', async () => {
-  const { createHarnessDriver } = await import('../../src/index');
+  const { createInternalHarness } = await import('../../src/internal');
   const { createQueryHarness } = await import('../native/claude/sdk-query-fixture');
   const harness = createQueryHarness();
-  const driver = createHarnessDriver('claude', { client: { name: 'cpa' }, claude: { transportOptions: { createQuery: harness.createQuery } } });
+  const driver = createInternalHarness('claude', { client: { name: 'cpa' }, claude: { transportOptions: { createQuery: harness.createQuery } } });
   const main = driver.open({ id: 'main', folder: '/tmp' });
   const abort = new AbortController();
   try {
@@ -72,7 +72,7 @@ it('Claude cancels a fresh native query before provider session admission', asyn
 });
 
 it.each(['before-admission', 'active'] as const)('Codex cancels a private native scope at %s without admitting late work', async phase => {
-  const { createHarnessDriver } = await import('../../src/index');
+  const { createInternalHarness } = await import('../../src/internal');
   const { CodexAppServerClient } = await import('@korus-dev/codex-sdk');
   const { MockCodexAppServer, resumeResponse, thread, turn, deferred, requestsFor } = await import('../codex/helpers/host-fixture');
   const admission = deferred<ReturnType<typeof resumeResponse>>();
@@ -83,7 +83,7 @@ it.each(['before-admission', 'active'] as const)('Codex cancels a private native
     'turn/start': () => ({ turn: turn('private-turn', 'inProgress', []) }),
     'turn/interrupt': () => { queueMicrotask(() => transport.emitNotification('turn/completed', { threadId: 'private-thread', turn: turn('private-turn', 'interrupted', []) })); return {}; },
   });
-  const driver = createHarnessDriver('codex', { client: { name: 'cpa' }, codex: { host: { client: new CodexAppServerClient(transport) } } });
+  const driver = createInternalHarness('codex', { client: { name: 'cpa' }, codex: { host: { client: new CodexAppServerClient(transport) } } });
   const main = driver.open({ id: 'main', folder: '/tmp' });
   const abort = new AbortController();
   try {
@@ -97,4 +97,40 @@ it.each(['before-admission', 'active'] as const)('Codex cancels a private native
     expect(requestsFor(transport, 'turn/interrupt')).toHaveLength(phase === 'before-admission' ? 0 : 1);
     expect(driver.readSession(main).messages).toEqual([]);
   } finally { await driver.close(); }
+});
+
+it('runs a new scope with the parent session\'s defaults', async () => {
+  const seen: unknown[] = [];
+  const native = {
+    onEvent: () => () => {}, getCapabilities: () => ({}), close: async () => {},
+    executeScopedPrompt: async (context: { providerDefaults?: unknown }) => { seen.push(structuredClone(context.providerDefaults)); return { text: 'ok', session: { kind: 'cursor', sessionId: 'scope-1' } }; },
+    disposeScopedSession: async () => {},
+  };
+  const { adaptHarness } = await import('../../src/consumer');
+  const harness = adaptHarness('cursor', native as never);
+  const main = harness.restoreSession({ id: 'main', folder: '/work', defaults: { model: 'beta', reasoningEffort: 'xhigh' } }, { provider: 'cursor', data: { kind: 'cursor', sessionId: 's' }, role: 'main' });
+  await harness.executeScopedPrompt(main, { prompt: 'review', cwd: '/work', scope: { id: 'r' } });
+  expect(seen[0]).toMatchObject({ kind: 'cursor', model: 'beta', reasoningEffort: 'xhigh' });
+});
+
+it('opens a scope ahead of its run and steers it while it executes', async () => {
+  let release!: () => void;
+  const steered: string[] = [];
+  const native = {
+    onEvent: () => () => {}, getCapabilities: () => ({}), close: async () => {},
+    executeScopedPrompt: async () => { await new Promise<void>(resolve => { release = resolve; }); return { text: 'done', session: { kind: 'cursor', sessionId: 'scope-1' } }; },
+    steerPrompt: async (context: { id: string }) => { steered.push(context.id); return { providerSession: { kind: 'cursor', sessionId: 'scope-1' }, turnId: 't' }; },
+    disposeScopedSession: async () => {},
+  };
+  const { adaptHarness } = await import('../../src/consumer');
+  const harness = adaptHarness('cursor', native as never);
+  const main = harness.restoreSession({ id: 'main', folder: '/work' }, { provider: 'cursor', data: { kind: 'cursor', sessionId: 's' }, role: 'main' });
+  const scope = harness.openScope(main, { cwd: '/work' });
+  const running = harness.executeScopedPrompt(main, { prompt: 'review', cwd: '/work', scope: { id: 'r' }, session: scope });
+  await new Promise(resolve => setTimeout(resolve, 5));
+  await harness.steerPrompt(scope, 'adjust');
+  expect(steered).toHaveLength(1);
+  expect(steered[0]).toContain(':scope:');
+  release();
+  expect((await running).text).toBe('done');
 });

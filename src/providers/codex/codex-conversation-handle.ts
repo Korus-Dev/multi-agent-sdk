@@ -1,18 +1,6 @@
-import type { ContinueCodexSafetyReviewOptions } from '../../core/codex-host';
-import type {
-  CodexConversationEvent,
-  CodexConversationHistory,
-  CodexConversationHistoryPage,
-  CodexConversationPromptHistory,
-  CodexConversationSnapshot,
-  ApprovalDecision,
-  ApprovalScope,
-  ClientRequestResponse,
-  SendMessageOptions,
-  StartCodexRealtimeOptions,
-  StartCodexReviewOptions,
-  UpdateConversationSettings,
-} from '../../core/codex-host';
+import type { ContinueCodexSafetyReviewOptions } from '../../core/codex-conversation-types';
+import type { CodexConversationHistory, CodexConversationHistoryPage, CodexConversationPromptHistory, ApprovalDecision, ApprovalScope, ClientRequestResponse, SendMessageOptions, StartCodexReviewOptions, UpdateConversationSettings } from '../../core/codex-host';
+import type { CodexConversationEvent, CodexConversationSnapshot, StartCodexRealtimeOptions } from '../../core/codex-conversation-types';
 import type {
   CodexConversation,
   CodexConversationForkResult,

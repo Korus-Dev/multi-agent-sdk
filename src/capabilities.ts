@@ -1,6 +1,7 @@
-import type { AgentBackend, BackendCapabilities } from './contracts';
+import type { HarnessProvider, ProviderCapabilities } from './contracts';
 
-export const codexBackendCapabilities: BackendCapabilities = {
+export const codexHarnessCapabilities: ProviderCapabilities = {
+  accountUsage: true,
   reportsTokens: true,
   questions: true,
   plugins: true,
@@ -8,6 +9,8 @@ export const codexBackendCapabilities: BackendCapabilities = {
   conversationResume: true,
   conversationReplaceWithSummary: true,
   remoteControl: true,
+  login: ['browser', 'deviceCode'],
+  realtime: true,
   attachments: true,
   models: true,
   skills: true,
@@ -27,7 +30,8 @@ export const codexBackendCapabilities: BackendCapabilities = {
   approvalPresets: ['ask-for-approval', 'approve-for-me', 'full-access'],
 };
 
-export const claudeBackendCapabilities: BackendCapabilities = {
+export const claudeHarnessCapabilities: ProviderCapabilities = {
+  accountUsage: true,
   reportsTokens: true,
   nativeMonitor: true,
   questions: true,
@@ -73,13 +77,13 @@ export const claudeBackendCapabilities: BackendCapabilities = {
   ],
 };
 
-export function defaultBackendCapabilities(backend: AgentBackend): BackendCapabilities {
-  if (backend === 'cursor') return cursorBackendCapabilities;
-  if (backend === 'antigravity') return antigravityBackendCapabilities;
-  return backend === 'claude' ? claudeBackendCapabilities : codexBackendCapabilities;
+export function defaultHarnessCapabilities(provider: HarnessProvider): ProviderCapabilities {
+  if (provider === 'cursor') return cursorHarnessCapabilities;
+  if (provider === 'antigravity') return antigravityHarnessCapabilities;
+  return provider === 'claude' ? claudeHarnessCapabilities : codexHarnessCapabilities;
 }
 
-export const antigravityBackendCapabilities: BackendCapabilities = {
+export const antigravityHarnessCapabilities: ProviderCapabilities = {
   reportsTokens: true, questions: true, plugins: false,
   conversationArchive: false, conversationResume: true, conversationReplaceWithSummary: false,
   remoteControl: false, attachments: true, models: true, skills: false,
@@ -94,7 +98,8 @@ export const antigravityBackendCapabilities: BackendCapabilities = {
 };
 
 // Cursor enables only capabilities implemented and verified by its host.
-export const cursorBackendCapabilities: BackendCapabilities = {
+export const cursorHarnessCapabilities: ProviderCapabilities = {
+  accountUsage: true,
   reportsTokens: false, questions: false, plugins: false,
   conversationArchive: false, conversationResume: true, conversationReplaceWithSummary: false,
   remoteControl: false, attachments: true, models: true, skills: false,

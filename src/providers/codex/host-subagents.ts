@@ -1,8 +1,5 @@
 import type { v2 } from '@korus-dev/codex-sdk';
-import type {
-  CodexSubagentState,
-  CodexSubagentToolCall,
-} from '../../core/codex-host';
+import type { CodexSubagentState, CodexSubagentToolCall } from '../../core/codex-conversation-types';
 
 export function hostSubagentToolCall(
   item: Extract<v2.ThreadItem, { type: 'collabAgentToolCall' }>,

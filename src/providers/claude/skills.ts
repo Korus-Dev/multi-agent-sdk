@@ -1,6 +1,6 @@
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { Agent, BackendSkillSummary } from '../../contracts/index';
+import type { Agent, ProviderSkillSummary } from '../../contracts/index';
 const agentFolder = (agent: { folder: string | null }) => agent.folder?.trim() || undefined;
 import { claudeConfigDirectory } from './config-directory';
 
@@ -20,7 +20,7 @@ type DirectoryEntry = {
   name: string;
 };
 
-export async function listClaudeSkills(agent: Agent, options: ClaudeSkillCatalogOptions = {}): Promise<BackendSkillSummary[]> {
+export async function listClaudeSkills(agent: Agent, options: ClaudeSkillCatalogOptions = {}): Promise<ProviderSkillSummary[]> {
   const folder = agentFolder(agent);
   const sources: ClaudeSkillSource[] = [
     {
@@ -32,7 +32,7 @@ export async function listClaudeSkills(agent: Agent, options: ClaudeSkillCatalog
       scope: 'project' as const,
     }] : []),
   ];
-  const skillsByName = new Map<string, BackendSkillSummary>();
+  const skillsByName = new Map<string, ProviderSkillSummary>();
 
   for (const source of sources) {
     for (const skill of await readSkillsFromSource(source)) {
@@ -45,7 +45,7 @@ export async function listClaudeSkills(agent: Agent, options: ClaudeSkillCatalog
   ));
 }
 
-async function readSkillsFromSource(source: ClaudeSkillSource): Promise<BackendSkillSummary[]> {
+async function readSkillsFromSource(source: ClaudeSkillSource): Promise<ProviderSkillSummary[]> {
   let entries: DirectoryEntry[];
   try {
     entries = await readdir(source.root, { withFileTypes: true });
@@ -60,10 +60,10 @@ async function readSkillsFromSource(source: ClaudeSkillSource): Promise<BackendS
     .filter((entry) => entry.isDirectory() || entry.isSymbolicLink())
     .map((entry) => readSkill(path.join(source.root, entry.name), entry.name, source)));
 
-  return skills.filter((skill): skill is BackendSkillSummary => Boolean(skill));
+  return skills.filter((skill): skill is ProviderSkillSummary => Boolean(skill));
 }
 
-async function readSkill(skillRoot: string, fallbackName: string, source: ClaudeSkillSource): Promise<BackendSkillSummary | null> {
+async function readSkill(skillRoot: string, fallbackName: string, source: ClaudeSkillSource): Promise<ProviderSkillSummary | null> {
   const skillPath = path.join(skillRoot, 'SKILL.md');
   let content: string;
   try {
@@ -155,7 +155,7 @@ function textValue(value: string | undefined): string | null {
   return trimmed || null;
 }
 
-function skillSortLabel(skill: BackendSkillSummary): string {
+function skillSortLabel(skill: ProviderSkillSummary): string {
   return (skill.displayName || skill.name).toLowerCase();
 }
 

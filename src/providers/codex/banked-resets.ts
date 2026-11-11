@@ -1,5 +1,5 @@
 import { BANKED_RESET_DETAIL_LIMIT, isBankedResets, type BankedResets } from '../../contracts/banked-resets';
-import type { CodexRateLimits } from '../../core/codex-host';
+import type { CodexRateLimits } from '../../core/codex-conversation-types';
 
 /** Keep IDs/provider metadata out of the app DTO; validate exact counts and timestamps. */
 export function bankedResetsFromHost(limits: CodexRateLimits, redemptionToken?: (id: string) => string): BankedResets {

@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type {
-  CodexConversationSummary,
-  ModelDescriptor,
-  CodexHostSnapshot,
-} from '../../src/index';
+import type { ModelDescriptor } from '../../src/index';
+import type { CodexConversationSummary, CodexSnapshot } from '../../src/internal';
 import {
   CodexHostConversationSettingsController,
   type CodexHostConversationSettingsDependencies,
@@ -394,7 +391,7 @@ function setupSettings(options: {
     }),
     getSnapshot: vi.fn(() => state),
     getState: vi.fn(() => state),
-    patch: vi.fn((patch: Partial<CodexHostSnapshot>) => Object.assign(state, patch)),
+    patch: vi.fn((patch: Partial<CodexSnapshot>) => Object.assign(state, patch)),
     patchRuntime: vi.fn((threadId: string, patch: ThreadRuntimePatch) => {
       const runtime = runtimes.get(threadId);
       if (runtime) Object.assign(runtime, patch);

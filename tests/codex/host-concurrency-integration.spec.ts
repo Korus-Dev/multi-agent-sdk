@@ -7,7 +7,7 @@ import {
 import { CodexAppServerClient, type v2 } from '@korus-dev/codex-sdk';
 import { CodexHost, createCodexHost } from '../../src/providers/codex';
 import {
-  createHost,
+  createHarness,
   deferred,
   MockCodexAppServer,
   lastRequest,
@@ -85,7 +85,7 @@ describe('CodexHost', () => {
   });
 
   it('forgets a background conversation without clearing the active selection', async () => {
-    const { host } = createHost();
+    const { host } = createHarness();
     await host.connect();
     await host.conversation('thread-background').load();
 
@@ -289,7 +289,7 @@ describe('CodexHost', () => {
   });
 
   it('stops both host and conversation state delivery after unsubscription', async () => {
-    const { host, transport } = createHost('turn/start');
+    const { host, transport } = createHarness('turn/start');
     await host.connect();
     const hostListener = vi.fn();
     const conversationListener = vi.fn();

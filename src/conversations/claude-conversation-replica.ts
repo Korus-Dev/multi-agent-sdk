@@ -44,7 +44,7 @@ function applyTurnLifecycle(
   event: ClaudeConversationEvent,
 ): ClaudeConversationSnapshot {
   if (event.type === 'turn.historyUpdated') {
-    if (event.backendSessionId !== snapshot.sessionId) return snapshot;
+    if (event.providerSessionId !== snapshot.sessionId) return snapshot;
     return { ...snapshot, turns: upsertTurn(snapshot.turns, event.payload.turn) };
   }
   if (event.type === 'turn.started') {

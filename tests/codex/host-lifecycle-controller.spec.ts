@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ModelDescriptor, CodexHostSnapshot } from '../../src/index';
+import type { ModelDescriptor } from '../../src/index';
+import type { CodexSnapshot } from '../../src/internal';
 import type { HarnessDiagnostic } from '../../src/diagnostics';
 import type { v2 } from '@korus-dev/codex-sdk';
 import {
@@ -609,7 +610,7 @@ function setupLifecycle(options: Record<string, unknown> = {}) {
     emitHistoryReplaced: vi.fn(), emitSelected: vi.fn(), emitSummaryUpserted: vi.fn(),
     ensureConnected: vi.fn(async () => undefined), getSnapshot: vi.fn(() => state),
     observeEmptyConversation: vi.fn(),
-    getState: vi.fn(() => state), patch: vi.fn((patch: Partial<CodexHostSnapshot>) => Object.assign(state, patch)),
+    getState: vi.fn(() => state), patch: vi.fn((patch: Partial<CodexSnapshot>) => Object.assign(state, patch)),
     patchRuntime: vi.fn((threadId: string, patch: ThreadRuntimePatch) => {
       const runtime = runtimes.get(threadId);
       if (runtime) Object.assign(runtime, patch);

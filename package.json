@@ -41,17 +41,13 @@
       "types": "./dist/renderer.d.ts",
       "default": "./dist/renderer.js"
     },
-    "./native": {
-      "types": "./dist/native.d.ts",
-      "default": "./dist/native.js"
+    "./runtime": {
+      "types": "./dist/runtime.d.ts",
+      "default": "./dist/runtime.js"
     },
-    "./codex": {
-      "types": "./dist/providers/codex/index.d.ts",
-      "default": "./dist/providers/codex/index.js"
-    },
-    "./host-bridge": {
-      "types": "./dist/core/host-bridge.d.ts",
-      "default": "./dist/core/host-bridge.js"
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
     },
     "./package.json": "./package.json"
   },

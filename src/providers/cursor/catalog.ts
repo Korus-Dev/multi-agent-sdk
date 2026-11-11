@@ -1,4 +1,4 @@
-import type { BackendModelOption } from '../../contracts/index';
+import type { ProviderModelOption } from '../../contracts/index';
 import { record } from '../../acp/acp-connection';
 
 type ThoughtControl = {id:string;currentValue:string;options:{value:string;name:string}[]};
@@ -50,7 +50,7 @@ function contextLabel(options: unknown): string | null {
   return selected ? selected.name : null;
 }
 
-export function cursorModels(configuration: Record<string, unknown>, catalog?: readonly CursorCatalogModel[]): BackendModelOption[] {
+export function cursorModels(configuration: Record<string, unknown>, catalog?: readonly CursorCatalogModel[]): ProviderModelOption[] {
   const config = Array.isArray(configuration.configOptions) ? configuration.configOptions.find(option => record(option) && option.category === 'model') : undefined;
   if (!record(config) || !Array.isArray(config.options)) return [];
   return config.options.flatMap(option => {

@@ -1,13 +1,8 @@
 import { suppressViewedImagePreviews } from './codex-original-history-images';
 import type { CodexOriginalHistoryImages } from './codex-original-history-images';
 import type { CodexAppServerClient, v2 } from '@korus-dev/codex-sdk';
-import type {
-  CodexConversationSummary,
-  CodexHostSnapshot,
-  ListCodexConversationsOptions,
-  ConversationMessage,
-  ConversationHistoryReason,
-} from '../../core/codex-host';
+import type { ListCodexConversationsOptions, ConversationMessage, ConversationHistoryReason } from '../../core/codex-host';
+import type { CodexConversationSummary, CodexSnapshot } from '../../core/codex-conversation-types';
 import {
   codexTurnToConversationMessages,
   preserveHistoricalMessagePresentation,
@@ -37,9 +32,9 @@ export type CodexHostConversationsDependencies = {
     origin: 'action',
   ): void;
   ensureConnected(): Promise<void>;
-  getSnapshot(): CodexHostSnapshot;
-  getState(): CodexHostSnapshot;
-  patch(patch: Partial<CodexHostSnapshot>): void;
+  getSnapshot(): CodexSnapshot;
+  getState(): CodexSnapshot;
+  patch(patch: Partial<CodexSnapshot>): void;
   patchRuntime(threadId: string, patch: ThreadRuntimePatch): void;
   removeThread(threadId: string, reason: 'archived' | 'deleted', origin: 'action'): void;
   requireRuntime(threadId: string): ThreadRuntimeState;
@@ -144,12 +139,12 @@ export class CodexHostConversationsController {
     void work.finally(() => { if (this.imageHydrations.get(threadId) === work) this.imageHydrations.delete(threadId); }).catch(() => undefined);
   }
 
-  async refresh(): Promise<CodexHostSnapshot> {
+  async refresh(): Promise<CodexSnapshot> {
     await this.host.ensureConnected();
     return this.load();
   }
 
-  async load(): Promise<CodexHostSnapshot> {
+  async load(): Promise<CodexSnapshot> {
     const conversations = reuseUnchangedItems(
       this.host.getState().conversations,
       await this.requestConversations({ limit: this.conversationLimit }),
@@ -179,7 +174,7 @@ export class CodexHostConversationsController {
     return structuredClone(summary);
   }
 
-  async archive(conversationId: string): Promise<CodexHostSnapshot> {
+  async archive(conversationId: string): Promise<CodexSnapshot> {
     const threadId = normalizedConversationId(conversationId);
     await this.host.ensureConnected();
     await this.client.request('thread/archive', { threadId });
@@ -187,7 +182,7 @@ export class CodexHostConversationsController {
     return this.host.getSnapshot();
   }
 
-  async delete(conversationId: string): Promise<CodexHostSnapshot> {
+  async delete(conversationId: string): Promise<CodexSnapshot> {
     const threadId = normalizedConversationId(conversationId);
     await this.host.ensureConnected();
     await this.client.request('thread/delete', { threadId });
@@ -195,7 +190,7 @@ export class CodexHostConversationsController {
     return this.host.getSnapshot();
   }
 
-  async unarchive(conversationId: string): Promise<CodexHostSnapshot> {
+  async unarchive(conversationId: string): Promise<CodexSnapshot> {
     const threadId = normalizedConversationId(conversationId);
     await this.host.ensureConnected();
     const response = await this.client.request('thread/unarchive', { threadId });

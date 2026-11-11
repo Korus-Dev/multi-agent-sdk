@@ -7,7 +7,7 @@ import { AcpSession } from '../../../src/providers/antigravity/session';
 import { AntigravityHost } from '../../../src/providers/antigravity/host';
 
 import type { Agent } from '../../../src/contracts/index';
-import type { NativeHarnessEvent as HarnessEvent } from '../../../src/index';
+import type { NativeHarnessEvent as HarnessEvent } from '../../../src/internal';
 
 
 
@@ -383,15 +383,15 @@ describe('Antigravity native session', () => {
     const file = path.join(root, 'notes.txt');
     await writeFile(file, 'Synthetic context');
     const host = new AntigravityHost({ resolveRuntime: fixtureRuntime, formatPrompt: (prompt, content) => promptContentDispatchText(content ?? [], prompt) + '\n\n<context>Caller-owned instructions</context>', home: () => path.join(root, 'home'), stateDirectory: () => path.join(root, 'app'), client: { name: 'cpa-workbench', metadataDirectory: 'korus-sessions', trustedMcpServerName: product.mcpServerName } });
-    const agent: Agent = { id: 'attachments', name: 'Attachments', folder: root, backend: 'antigravity' };
+    const agent: Agent = { id: 'attachments', name: 'Attachments', folder: root, provider: 'antigravity' };
     const events: HarnessEvent[] = [];
     const content = [{ type: 'mention' as const, kind: 'file' as const, id: file, value: file, label: 'Read my notes' }];
     host.onEvent(event => events.push(event));
     try {
       const result = await host.sendPrompt(agent, 'Read my notes', { content, attachments: [{ type: 'file', path: file, name: 'notes.txt', mimeType: 'text/plain' }] });
-      agent.backendSession = result.backendSession;
+      agent.providerSession = result.providerSession;
       await vi.waitFor(() => expect(events.some(event => event.type === 'antigravity.conversationEventReceived' && event.payload.event.type === 'turn.completed')).toBe(true));
-      const ref = { backend: 'antigravity' as const, sessionId: result.backendSession.kind === 'antigravity' ? result.backendSession.sessionId : '', folder: root };
+      const ref = { provider: 'antigravity' as const, sessionId: result.providerSession.kind === 'antigravity' ? result.providerSession.sessionId : '', folder: root };
       const admitted = JSON.parse((await readFile(path.join(root, 'home', 'korus-sessions', encodeURIComponent(ref.sessionId), 'prompts.jsonl'), 'utf8')).trim());
       expect(admitted.wireText.startsWith(`@${file}\n\n<context>`)).toBe(true);
       const live = await host.readConversationMessages(ref, agent.id);
@@ -406,17 +406,17 @@ describe('Antigravity native session', () => {
 
   it('opens a conversation whose prompt journal ends in a torn line, keeping the intact entries', async () => {
     const host = new AntigravityHost({ resolveRuntime: fixtureRuntime, home: () => path.join(root, 'home'), stateDirectory: () => path.join(root, 'app'), client: { name: 'cpa-workbench', metadataDirectory: 'korus-sessions', trustedMcpServerName: product.mcpServerName } });
-    const agent: Agent = { id: 'torn', name: 'Torn', folder: root, backend: 'antigravity' };
+    const agent: Agent = { id: 'torn', name: 'Torn', folder: root, provider: 'antigravity' };
     const events: HarnessEvent[] = [];
     host.onEvent(event => events.push(event));
     try {
       const result = await host.sendPrompt(agent, 'Keep this prompt');
-      agent.backendSession = result.backendSession;
+      agent.providerSession = result.providerSession;
       await vi.waitFor(() => expect(events.some(event => event.type === 'antigravity.conversationEventReceived' && event.payload.event.type === 'turn.completed')).toBe(true));
-      const sessionId = result.backendSession.kind === 'antigravity' ? result.backendSession.sessionId : '';
+      const sessionId = result.providerSession.kind === 'antigravity' ? result.providerSession.sessionId : '';
       await host.releaseConversation(agent.id);
       await appendFile(path.join(root, 'home', 'korus-sessions', encodeURIComponent(sessionId), 'prompts.jsonl'), '{"wireText":"half');
-      const replay = await host.readConversationMessages({ backend: 'antigravity', sessionId, folder: root }, agent.id);
+      const replay = await host.readConversationMessages({ provider: 'antigravity', sessionId, folder: root }, agent.id);
       expect(replay[0]?.parts).toEqual([{ type: 'text', text: 'Keep this prompt' }]);
     } finally { await host.close(); }
   });
@@ -457,14 +457,14 @@ describe('Antigravity native session', () => {
     const host = new AntigravityHost({ resolveRuntime: fixtureRuntime, home: () => path.join(root, 'home'), stateDirectory: () => path.join(root, 'app'), client: { name: 'cpa-workbench', metadataDirectory: 'korus-sessions', trustedMcpServerName: product.mcpServerName } });
     const events: HarnessEvent[] = [];
     host.onEvent(event => events.push(event));
-    const agent: Agent = { id: 'resume', name: 'Resume', folder: root, backend: 'antigravity' };
+    const agent: Agent = { id: 'resume', name: 'Resume', folder: root, provider: 'antigravity' };
     try {
       const first = await host.sendPrompt(agent, 'hello');
-      agent.backendSession = first.backendSession;
+      agent.providerSession = first.providerSession;
       await vi.waitFor(() => expect(events.some(event => event.type === 'antigravity.conversationEventReceived' && event.payload.event.type === 'turn.completed')).toBe(true));
       await host.releaseConversation(agent.id);
       const resumed = await host.continueInterruptedTurn(agent);
-      expect(resumed.backendSession).toStrictEqual(first.backendSession);
+      expect(resumed.providerSession).toStrictEqual(first.providerSession);
       expect(resumed.activeTurnId).toBeTypeOf('string');
       await vi.waitFor(() => expect(events.filter(event => event.type === 'antigravity.conversationEventReceived' && event.payload.event.type === 'turn.completed')).toHaveLength(2));
       const submitted = events.filter(event => event.type === 'antigravity.conversationEventReceived' && event.payload.event.type === 'message.upsert' && event.payload.event.payload.message.role === 'user');
@@ -474,11 +474,11 @@ describe('Antigravity native session', () => {
 
   it('validates folder-scoped history and coordinates model reads with completed or cancelled resume', async () => {
     const host = new AntigravityHost({ resolveRuntime: fixtureRuntime, home: () => path.join(root, 'home'), stateDirectory: () => path.join(root, 'app'), client: { name: 'cpa-workbench', metadataDirectory: 'korus-sessions', trustedMcpServerName: product.mcpServerName } });
-    const agent: Agent = { id: 'history', name: 'History', folder: root, backend: 'antigravity' };
+    const agent: Agent = { id: 'history', name: 'History', folder: root, provider: 'antigravity' };
     try {
       const rows = await host.listConversations(agent, { searchTerm: 'file' });
-      expect(rows).toEqual([expect.objectContaining({ id: 'stored-session', title: 'Create a file', updatedAt: '', ref: { backend: 'antigravity', sessionId: 'stored-session', folder: root } })]);
-      await expect(host.resumeConversation(agent, { storageState: 'active', ref: { backend: 'antigravity', folder: root, sessionId: 'other-folder' } })).rejects.toThrow('another workspace');
+      expect(rows).toEqual([expect.objectContaining({ id: 'stored-session', title: 'Create a file', updatedAt: '', ref: { provider: 'antigravity', sessionId: 'stored-session', folder: root } })]);
+      await expect(host.resumeConversation(agent, { storageState: 'active', ref: { provider: 'antigravity', folder: root, sessionId: 'other-folder' } })).rejects.toThrow('another workspace');
       const messages = await host.readConversationMessages(rows[0]!.ref, agent.id);
       expect(messages).toHaveLength(2);
       expect(messages[1]?.parts[0]).toMatchObject({ type: 'tool', status: 'failed' });
@@ -490,7 +490,7 @@ describe('Antigravity native session', () => {
       await expect(host.sendPrompt(agent, 'too early')).rejects.toThrow('history is still loading');
       await loading;
       await catalog;
-      await expect(host.readConversationMessages({ backend: 'antigravity', sessionId: rows[0]!.sessionId!, folder: path.join(root, 'home') }, agent.id)).rejects.toThrow('another workspace');
+      await expect(host.readConversationMessages({ provider: 'antigravity', sessionId: rows[0]!.sessionId!, folder: path.join(root, 'home') }, agent.id)).rejects.toThrow('another workspace');
       const cancelledLoad = expect(host.resumeConversation(agent, { storageState: 'active', ref: rows[0]!.ref })).rejects.toThrow('released during history loading');
       const cancelledCatalog = expect(host.listModels(agent)).rejects.toThrow('released during model loading');
       await host.releaseConversation(agent.id);

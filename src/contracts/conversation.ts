@@ -49,19 +49,31 @@ export type AgentContextUsage = {
   usedPercent: number | null;
 };
 
-export type BackendConversationRef =
-  | { backend: 'cursor'; folder: string | null; sessionId: string }
-  | { backend: 'antigravity'; folder: string | null; sessionId: string }
+export type ProviderConversationRef =
+  | { provider: 'cursor'; folder: string | null; sessionId: string }
+  | { provider: 'antigravity'; folder: string | null; sessionId: string }
   | {
-    backend: 'codex';
+    provider: 'codex';
     threadId: string;
   }
   | {
-    backend: 'claude';
+    provider: 'claude';
     folder: string | null;
     sessionId: string;
     subagentId?: string;
   };
+
+const nonEmptyString = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
+
+/** Structural check for a persisted or wire conversation reference of any provider. */
+export function isProviderConversationRef(value: unknown): value is ProviderConversationRef {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const ref = value as Record<string, unknown>;
+  if (ref.provider === 'codex') return nonEmptyString(ref.threadId);
+  if (ref.provider !== 'claude' && ref.provider !== 'cursor' && ref.provider !== 'antigravity') return false;
+  if (!nonEmptyString(ref.sessionId) || !(ref.folder === null || nonEmptyString(ref.folder))) return false;
+  return ref.provider !== 'claude' || ref.subagentId === undefined || nonEmptyString(ref.subagentId);
+}
 
 export type ConversationStorageState = 'active' | 'archived';
 
@@ -75,7 +87,7 @@ export type ConversationListInput = {
 };
 
 export type ConversationResumeTarget = {
-  ref: BackendConversationRef;
+  ref: ProviderConversationRef;
   storageState: ConversationStorageState;
 };
 
@@ -92,7 +104,7 @@ export type ConversationSummary = {
   updatedAt: string;
   messageCount: number;
   storageState: ConversationStorageState;
-  ref: BackendConversationRef;
+  ref: ProviderConversationRef;
 };
 
 export const subagentStatuses = [
@@ -246,7 +258,7 @@ export type SendPromptOptions = {
   inputMethod?: 'typed' | 'dictated';
   /** Internal delivery hint: the provider must not create another visible user row. */
   recordUserMessage?: boolean;
-  backendOptions?: BackendPromptOptions;
+  providerOptions?: ProviderPromptOptions;
 };
 
 export type ReferenceSendPromptOptions = Omit<SendPromptOptions, 'attachments' | 'recordUserMessage'> & {
@@ -255,7 +267,7 @@ export type ReferenceSendPromptOptions = Omit<SendPromptOptions, 'attachments' |
 
 export type PromptContentOptions = Pick<SendPromptOptions, 'content'>;
 
-export type BackendPromptOptions =
+export type ProviderPromptOptions =
   | { kind: 'cursor'; permissionMode?: string | null }
   | { kind: 'antigravity'; permissionMode?: string | null }
   | {

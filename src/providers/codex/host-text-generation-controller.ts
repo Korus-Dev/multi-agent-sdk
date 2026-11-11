@@ -1,6 +1,6 @@
 import { normalizeMcpServers, mcpServerConfig } from './host-mcp';
 import type { CodexAppServerClient, ServerNotification, v2 } from '@korus-dev/codex-sdk';
-import type { CodexHostSnapshot } from '../../core/codex-host';
+import type { CodexSnapshot } from '../../core/codex-conversation-types';
 import type {
   HarnessTextGenerationResult,
   GenerateCodexTextOptions,
@@ -26,7 +26,7 @@ type PendingGeneration = {
 
 export type CodexHostTextGenerationDependencies = {
   ensureConnected(): Promise<void>;
-  getSnapshot(): CodexHostSnapshot;
+  getSnapshot(): CodexSnapshot;
 };
 
 /** Runs isolated, non-persisted text turns without projecting them into host state. */

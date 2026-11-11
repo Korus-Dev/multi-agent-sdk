@@ -1,13 +1,6 @@
 import type { v2 } from '@korus-dev/codex-sdk';
-import type {
-  CodexConversationSummary,
-  HostEventOrigin,
-  CodexHostSnapshot,
-  ConversationMessage,
-  ConversationMessageTextPart,
-  ConversationMessageToolPart,
-  ConversationMessageToolPartUpdate,
-} from '../../core/codex-host';
+import type { EventOrigin, ConversationMessage, ConversationMessageTextPart, ConversationMessageToolPart, ConversationMessageToolPartUpdate } from '../../core/codex-host';
+import type { CodexConversationSummary, CodexSnapshot } from '../../core/codex-conversation-types';
 import {
   codexItemToMediaParts,
   codexItemToQuestionPart,
@@ -50,17 +43,17 @@ import {
 
 export type CodexHostItemsDependencies = {
   assistantMessageForTurn(threadId: string, turnId: string): ConversationMessage | null;
-  emitConversationActivity(threadId: string, origin: HostEventOrigin): void;
-  emitEvent(origin: HostEventOrigin, input: HostEventInput): void;
+  emitConversationActivity(threadId: string, origin: EventOrigin): void;
+  emitEvent(origin: EventOrigin, input: HostEventInput): void;
   emitSummaryUpserted(
     summary: CodexConversationSummary,
     reason: 'started' | 'listed' | 'resumed' | 'created' | 'updated',
-    origin: HostEventOrigin,
+    origin: EventOrigin,
   ): void;
-  getState(): CodexHostSnapshot;
+  getState(): CodexSnapshot;
   markRuntimeTurnActive(runtime: ThreadRuntimeState, turnId: string): void;
   messageContainingTool(threadId: string, turnId: string, itemId: string): ConversationMessage | null;
-  patch(patch: Partial<CodexHostSnapshot>): void;
+  patch(patch: Partial<CodexSnapshot>): void;
   patchRuntime(threadId: string, patch: ThreadRuntimePatch): void;
   requireRuntime(threadId: string): ThreadRuntimeState;
   sendNextQueuedPrompt(threadId: string): void;

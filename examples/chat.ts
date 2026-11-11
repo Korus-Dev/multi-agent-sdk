@@ -1,10 +1,10 @@
-import { createHarnessDriver, type HarnessProvider, type Session } from '@korus-dev/multi-agent-sdk';
+import { createHarness, type HarnessProvider, type Session } from '@korus-dev/multi-agent-sdk';
 
 const provider = process.argv[2] ?? 'codex';
 if (!['codex', 'claude', 'cursor', 'antigravity'].includes(provider)) {
   throw new Error('Choose codex, claude, cursor, or antigravity.');
 }
-const driver = createHarnessDriver(provider as HarnessProvider, { client: { name: 'sdk-example' } });
+const driver = createHarness(provider as HarnessProvider, { client: { name: 'sdk-example' } });
 const session = driver.open({ id: 'chat', folder: process.cwd() });
 const prompt = process.argv.slice(3).join(' ') || 'Describe this project in one paragraph.';
 

@@ -134,7 +134,7 @@ function agentForFolder(folder: string): Agent {
     id: 'agent-claude',
     name: 'Claude Pal',
     folder,
-    backend: 'claude',
-    backendDefaults: { kind: 'claude' },
+    provider: 'claude',
+    providerDefaults: { kind: 'claude' },
   };
 }

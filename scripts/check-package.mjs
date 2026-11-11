@@ -29,32 +29,26 @@ try {
   execFileSync(process.execPath, ['imports.mjs'], { cwd: temporary, stdio: 'inherit' });
   execFileSync(process.execPath, ['--input-type=commonjs', '-e', entries.map(entry => `require(${JSON.stringify(entry)});`).join('\n')], { cwd: temporary, stdio: 'inherit' });
   fs.writeFileSync(path.join(temporary, 'consumer.ts'), entries.map((entry, index) => `import type * as Public${index} from '${entry}';`).join('\n') + `
-import { createHarnessDriver, TypedEventBus, TtlCache, type HarnessDriver, type HarnessOptions, type Session, type SessionState, type CodexConversationSnapshot, type CodexHost, type CodexHostOptions, type CodexHostAdapterOptions, type ConversationMessage, type ModelDescriptor, type NativeHarnessEvent, type NativeHarnessDriver } from '${manifest.name}';
+import { createHarness, TypedEventBus, TtlCache, type Harness, type HarnessOptions, type Session, type SessionState, type ConversationMessage, type ModelDescriptor } from '${manifest.name}';
 import { normalizePromptContent } from '${manifest.name}/prompt';
-import { createCodexHost } from '${manifest.name}/codex';
-import { codexBackendCapabilities, claudeBackendCapabilities, cursorBackendCapabilities, antigravityBackendCapabilities, withInferredWorkPhases, withInferredTurnWorkPhases, createCodexConversationReplica, projectSessionSelection, projectCodexConversation, projectClaudeConversation, projectCursorConversation, projectAntigravityConversation } from '${manifest.name}/renderer';
-import { AcpRuntime, AcpSession, installAcpRuntime, AntigravityHost, ClaudeHost, ClaudeAgentSdkTransport, listClaudeSkills, claudeToolPart, loadClaudeTranscriptHistory, claudeTranscriptToRendererMessages, resolveClaudeLaunch, getLocalClaudeAuthentication, logoutLocalClaude, CursorHost, sessionMcpServer } from '${manifest.name}/native';
-import { AcpConnection, AcpError, record } from '${manifest.name}/native';
-const driver: HarnessDriver = createHarnessDriver('codex', { client: { name: 'pack-check' } });
+import { codexHarnessCapabilities, claudeHarnessCapabilities, cursorHarnessCapabilities, antigravityHarnessCapabilities, withInferredWorkPhases, withInferredTurnWorkPhases, createCodexConversationReplica, projectSessionSelection, projectCodexConversation, projectClaudeConversation, projectCursorConversation, projectAntigravityConversation, harnessProviders, isHarnessProvider, isProviderConversationRef } from '${manifest.name}/renderer';
+const driver: Harness = createHarness('codex', { client: { name: 'pack-check' } });
 const session: Session = driver.open({ id: 'test', folder: null });
 const state: SessionState = driver.readSession(session);
 const text: string[] = state.messages.flatMap(message => message.parts.flatMap(part => part.type === 'text' ? [part.text] : []));
 const bus = new TypedEventBus<{ changed: string }>();
 bus.emit('changed', 'ready');
-const nativeTypes: [CodexConversationSnapshot?, CodexHost?, NativeHarnessEvent?, NativeHarnessDriver?] = [];
-const hostOptions: CodexHostOptions = {}; const adapterOptions: CodexHostAdapterOptions = { inheritNativeSettings: true };
-const options: HarnessOptions = { client: { name: 'pack-check' }, codex: { host: hostOptions, adapter: adapterOptions } };
+const options: HarnessOptions = { client: { name: 'pack-check' } };
 const sharedTypes: [ConversationMessage?, ModelDescriptor?] = []; void [options, sharedTypes, TtlCache];
-void [text, nativeTypes, normalizePromptContent, createCodexHost];
-void [codexBackendCapabilities, claudeBackendCapabilities, cursorBackendCapabilities, antigravityBackendCapabilities, withInferredWorkPhases, withInferredTurnWorkPhases, createCodexConversationReplica, projectSessionSelection, projectCodexConversation, projectClaudeConversation, projectCursorConversation, projectAntigravityConversation];
-void [AcpRuntime, AcpSession, installAcpRuntime, AntigravityHost, ClaudeHost, ClaudeAgentSdkTransport, listClaudeSkills, claudeToolPart, loadClaudeTranscriptHistory, claudeTranscriptToRendererMessages, resolveClaudeLaunch, getLocalClaudeAuthentication, logoutLocalClaude, CursorHost, sessionMcpServer];
-void [AcpConnection, AcpError, record];
+void [text, normalizePromptContent, harnessProviders, isHarnessProvider, isProviderConversationRef];
+void [codexHarnessCapabilities, claudeHarnessCapabilities, cursorHarnessCapabilities, antigravityHarnessCapabilities, withInferredWorkPhases, withInferredTurnWorkPhases, createCodexConversationReplica, projectSessionSelection, projectCodexConversation, projectClaudeConversation, projectCursorConversation, projectAntigravityConversation];
 `);
   fs.writeFileSync(path.join(temporary, 'tsconfig.json'), JSON.stringify({ compilerOptions: {
     strict: true, noEmit: true, target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler',
     skipLibCheck: false, types: ['node'], typeRoots: [path.join(root, 'node_modules/@types')],
   }, files: ['consumer.ts'] }));
   execFileSync(process.execPath, [path.join(root, 'node_modules/typescript/bin/tsc'), '-p', path.join(temporary, 'tsconfig.json')], { cwd: temporary, stdio: 'inherit' });
+  execFileSync(process.execPath, [path.join(root, 'scripts/check-public-api.mjs')], { cwd: root, stdio: 'inherit' });
   console.log(`Validated ${files.size} packed files and ${entries.length} public entries: plain Node ESM and strict Bundler types.`);
 } catch (error) {
   if (error.stderr) process.stderr.write(error.stderr);

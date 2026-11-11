@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { v2 } from '@korus-dev/codex-sdk';
-import type { ModelDescriptor, CodexHostSnapshot } from '../../src/index';
+import type { ModelDescriptor } from '../../src/index';
+import type { CodexSnapshot } from '../../src/internal';
 import {
   approvalPresetFromSettings,
   approvalPresetsForProfiles,
@@ -411,7 +412,7 @@ describe('Codex host settings policy', () => {
   });
 });
 
-function snapshot(overrides: Partial<CodexHostSnapshot> = {}): CodexHostSnapshot {
+function snapshot(overrides: Partial<CodexSnapshot> = {}): CodexSnapshot {
   return Object.assign(initialHostSnapshot({
     ...initialAuthentication(),
     status: 'loaded',

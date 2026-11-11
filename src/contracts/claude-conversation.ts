@@ -41,8 +41,8 @@ type ClaudeConversationEventBase = {
   seq: number;
   occurredAt: string;
   agentId: string;
-  backend: 'claude';
-  backendSessionId?: string;
+  provider: 'claude';
+  providerSessionId?: string;
   threadId?: string;
   turnId?: string;
 };
@@ -71,7 +71,7 @@ export type ClaudeConversationEvent =
   | ClaudeConversationEventBase & {
       type: 'turn.started';
       turnId: string;
-      payload: { turn: { id: string; backend: 'claude' } };
+      payload: { turn: { id: string; provider: 'claude' } };
     }
   | ClaudeConversationEventBase & {
       type: 'turn.proposedPlanDelta';

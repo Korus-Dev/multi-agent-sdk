@@ -1,16 +1,8 @@
-import type { ContinueCodexSafetyReviewOptions } from '../../core/codex-host';
+import type { ContinueCodexSafetyReviewOptions } from '../../core/codex-conversation-types';
 import { promptContentDispatchText, promptContentText } from '../../core/prompt-content';
 import type { CodexAppServerClient, v2 } from '@korus-dev/codex-sdk';
-import type {
-  CodexConversationSummary,
-  HostEventOrigin,
-  SkillInput,
-  CodexHostSnapshot,
-  SendMessageOptions,
-  StartCodexReviewOptions,
-  ConversationMessage,
-  UpdateConversationSettings,
-} from '../../core/codex-host';
+import type { EventOrigin, SkillInput, SendMessageOptions, StartCodexReviewOptions, ConversationMessage, UpdateConversationSettings } from '../../core/codex-host';
+import type { CodexConversationSummary, CodexSnapshot } from '../../core/codex-conversation-types';
 import {
   attachmentInput,
   conversationAttachmentPart,
@@ -48,12 +40,12 @@ export type CodexHostMessagesDependencies = {
   compactForThread(threadId: string): Promise<void>;
   createConversation(): Promise<void>;
   emitConversationActivity(threadId: string, origin: 'action'): void;
-  emitEvent(origin: HostEventOrigin, input: HostEventInput): void;
+  emitEvent(origin: EventOrigin, input: HostEventInput): void;
   ensureConnected(): Promise<void>;
   ensureThreadReady(threadId: string): Promise<ThreadRuntimeState>;
   loadSkillsForThread(threadId: string): Promise<void>;
-  getSnapshot(): CodexHostSnapshot;
-  getState(): CodexHostSnapshot;
+  getSnapshot(): CodexSnapshot;
+  getState(): CodexSnapshot;
   patchConversationStatus(
     threadId: string,
     status: CodexConversationSummary['status'],
@@ -62,12 +54,12 @@ export type CodexHostMessagesDependencies = {
   patchConversationTurnCount(threadId: string, turnCount: number, origin: 'action'): void;
   patchRuntime(threadId: string, patch: ThreadRuntimePatch): void;
   requireRuntime(threadId: string): ThreadRuntimeState;
-  setGoal(objective: string): Promise<CodexHostSnapshot>;
+  setGoal(objective: string): Promise<CodexSnapshot>;
   setGoalForThread(threadId: string, objective: string): Promise<void>;
-  snapshotForRuntime(runtime: ThreadRuntimeState): CodexHostSnapshot;
-  startReview(options: StartCodexReviewOptions): Promise<CodexHostSnapshot>;
+  snapshotForRuntime(runtime: ThreadRuntimeState): CodexSnapshot;
+  startReview(options: StartCodexReviewOptions): Promise<CodexSnapshot>;
   startReviewForThread(threadId: string, options: StartCodexReviewOptions): Promise<void>;
-  updateSettings(settings: UpdateConversationSettings): Promise<CodexHostSnapshot>;
+  updateSettings(settings: UpdateConversationSettings): Promise<CodexSnapshot>;
   updateSettingsForThread(threadId: string, settings: UpdateConversationSettings): Promise<void>;
 };
 
@@ -77,7 +69,7 @@ export class CodexHostMessagesController {
     private readonly host: CodexHostMessagesDependencies,
   ) {}
 
-  async send(prompt: string, options: SendMessageOptions = {}): Promise<CodexHostSnapshot> {
+  async send(prompt: string, options: SendMessageOptions = {}): Promise<CodexSnapshot> {
     await this.host.ensureConnected();
     let text = prompt.trim();
     if (!text) throw new Error('Cannot send an empty message');
@@ -146,7 +138,7 @@ export class CodexHostMessagesController {
     await this.sendPromptToThread(threadId, text, options);
   }
 
-  async continueInterruptedTurn(): Promise<CodexHostSnapshot> {
+  async continueInterruptedTurn(): Promise<CodexSnapshot> {
     await this.host.ensureConnected();
     const threadId = this.host.getState().activeConversationId;
     if (!threadId) throw new Error('There is no active conversation');
@@ -328,7 +320,7 @@ export class CodexHostMessagesController {
   async steer(
     prompt: string,
     options: SendMessageOptions = {},
-  ): Promise<CodexHostSnapshot> {
+  ): Promise<CodexSnapshot> {
     const threadId = this.requiredActiveConversation();
     await this.steerForThread(threadId, prompt, options);
     return this.host.getSnapshot();
@@ -426,7 +418,7 @@ export class CodexHostMessagesController {
     await this.sendPromptToThread(threadId, prompt, {}, displayText);
   }
 
-  async deleteQueuedPrompt(promptId: string): Promise<CodexHostSnapshot> {
+  async deleteQueuedPrompt(promptId: string): Promise<CodexSnapshot> {
     const threadId = this.requiredActiveConversation();
     await this.deleteQueuedPromptForThread(threadId, promptId);
     return this.host.getSnapshot();
@@ -442,7 +434,7 @@ export class CodexHostMessagesController {
     this.emitQueuedPrompts(runtime.threadId);
   }
 
-  async updateQueuedPrompt(promptId: string, prompt: string, options?: SendMessageOptions): Promise<CodexHostSnapshot> {
+  async updateQueuedPrompt(promptId: string, prompt: string, options?: SendMessageOptions): Promise<CodexSnapshot> {
     const threadId = this.requiredActiveConversation();
     await this.updateQueuedPromptForThread(threadId, promptId, prompt, options);
     return this.host.getSnapshot();
@@ -470,7 +462,7 @@ export class CodexHostMessagesController {
     this.emitQueuedPrompts(runtime.threadId);
   }
 
-  async steerQueuedPrompt(promptId: string, prompt?: string, options?: SendMessageOptions): Promise<CodexHostSnapshot> {
+  async steerQueuedPrompt(promptId: string, prompt?: string, options?: SendMessageOptions): Promise<CodexSnapshot> {
     const threadId = this.requiredActiveConversation();
     await this.steerQueuedPromptForThread(threadId, promptId, prompt, options);
     return this.host.getSnapshot();
@@ -509,7 +501,7 @@ export class CodexHostMessagesController {
 
   private emitQueuedPrompts(
     threadId: string,
-    origin: HostEventOrigin = 'action',
+    origin: EventOrigin = 'action',
   ): void {
     const queuedPrompts = this.host.requireRuntime(threadId).queuedPrompts;
     this.host.emitEvent(origin, {

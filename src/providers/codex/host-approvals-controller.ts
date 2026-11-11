@@ -1,10 +1,6 @@
 import type { CodexAppServerClient } from '@korus-dev/codex-sdk';
-import type {
-  ApprovalDecision,
-  ApprovalScope,
-  HostEventOrigin,
-  CodexHostSnapshot,
-} from '../../core/codex-host';
+import type { ApprovalDecision, ApprovalScope, EventOrigin } from '../../core/codex-host';
+import type { CodexSnapshot } from '../../core/codex-conversation-types';
 import { registerCodexApprovalHandlers, type PendingCodexApproval } from './codex-approvals';
 import type { HostEventInput } from './host-events';
 import type { ThreadRuntimePatch, ThreadRuntimeState } from './host-runtime';
@@ -17,11 +13,11 @@ type ApprovalResolutionReason =
 export type CodexHostApprovalsDependencies = {
   activeConversationId(): string | null;
   createRuntime(threadId: string, patch: ThreadRuntimePatch): ThreadRuntimeState;
-  emitConversationActivity(threadId: string, origin: HostEventOrigin): void;
-  emitEvent(origin: HostEventOrigin, input: HostEventInput): void;
+  emitConversationActivity(threadId: string, origin: EventOrigin): void;
+  emitEvent(origin: EventOrigin, input: HostEventInput): void;
   markRuntimeTurnActive(runtime: ThreadRuntimeState, turnId: string): void;
   maybeClearWaitingBusy(threadId: string): void;
-  patch(patch: Partial<CodexHostSnapshot>): void;
+  patch(patch: Partial<CodexSnapshot>): void;
   patchConversationStatus(threadId: string, status: 'active'): void;
   patchRuntime(threadId: string, patch: ThreadRuntimePatch): void;
 };
@@ -44,7 +40,7 @@ export class CodexHostApprovalsController {
     this.pending.clear();
   }
 
-  approvalsForThread(threadId: string): CodexHostSnapshot['approvals'] {
+  approvalsForThread(threadId: string): CodexSnapshot['approvals'] {
     return [...this.pending.values()]
       .map((pending) => pending.approval)
       .filter((approval) => approval.conversationId === threadId);

@@ -24,9 +24,9 @@ it('resumes another active chat without archiving the previously bound chat', as
   const fixture = codexSdkFixture();
   try {
     const result = await fixture.driver.resumeConversation!(sdkAgent(), {
-      ref: { backend: 'codex', threadId: 'other-active' }, storageState: 'active',
+      ref: { provider: 'codex', threadId: 'other-active' }, storageState: 'active',
     });
-    expect(result.backendSession).toStrictEqual({ kind: 'codex', threadId: 'other-active' });
+    expect(result.providerSession).toStrictEqual({ kind: 'codex', threadId: 'other-active' });
     expect(fixture.host.archiveConversation).not.toHaveBeenCalled();
     expect(fixture.host.unarchiveConversation).not.toHaveBeenCalled();
   } finally { await fixture.driver.close(); }

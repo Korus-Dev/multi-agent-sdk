@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { CodexAppServerClient, type CodexRequestSettledInfo, type v2 } from '@korus-dev/codex-sdk';
 import { CodexHost } from '../../src/providers/codex';
 import type { HarnessDiagnostic } from '../../src/diagnostics';
-import type { CodexHostEvent } from '../../src/index';
-import { configRequirements, MockCodexAppServer, createHost, deferred, lastRequest, pluginSummary, requestsFor, resumeResponse, thread, turn } from './helpers/host-fixture';
+import type { CodexEvent } from '../../src/internal';
+import { configRequirements, MockCodexAppServer, createHarness, deferred, lastRequest, pluginSummary, requestsFor, resumeResponse, thread, turn } from './helpers/host-fixture';
 
 describe('CodexHost', () => {
   it('validates the trusted top-level CODEX_HOME seam and rejects transport conflicts', () => {
@@ -36,7 +36,7 @@ describe('CodexHost', () => {
     vi.stubEnv('CODEX_APP_SDK_TRACE_CONVERSATION_LOAD', '1');
     const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     try {
-      const events: CodexHostEvent[] = [];
+      const events: CodexEvent[] = [];
       host.onEvent((event) => events.push(event));
       await host.connect();
       events.length = 0;
@@ -86,8 +86,8 @@ describe('CodexHost', () => {
   });
 
   it('publishes why pending UI work was resolved when the app-server disconnects', async () => {
-    const { host, transport } = createHost();
-    const events: CodexHostEvent[] = [];
+    const { host, transport } = createHarness();
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
     await host.connect();
 
@@ -157,7 +157,7 @@ describe('CodexHost', () => {
   });
 
   it('bootstraps Codex and exposes conversation summaries without protocol details', async () => {
-    const { host, transport } = createHost();
+    const { host, transport } = createHarness();
     const listener = vi.fn();
     host.onStateChange(listener);
 
@@ -295,7 +295,7 @@ describe('CodexHost', () => {
       client: new CodexAppServerClient(transport),
       cwd: '/tmp/project',
     });
-    const events: CodexHostEvent[] = [];
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
 
     await host.connect();

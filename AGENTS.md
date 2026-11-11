@@ -1,5 +1,9 @@
 # Multi Agent SDK contributor instructions
 
+## Role
+
+This package is one interface to any agent harness (Codex, Claude Code, Cursor, Antigravity). An app is written once and runs against any provider unchanged, or mixes providers and relies on polymorphism so its own code stays simple. Consumer code must never branch on the provider: differences are reported as capabilities, and provider-specific classes and engines stay internal. The Host interface is allowed to be large, because a harness does a lot. It stays stateless and does no agent coordination, persistence, pricing or workflows; those are application concerns. Apps decide how permission ids, labels and settings are presented.
+
 Keep this package focused on the neutral Node harness contract, provider-native
 adapters, conversation projections, and reusable runtime/catalog/MCP operations.
 Raw Codex protocol/transports belong in codex-sdk. Vue/Electron/speech controls

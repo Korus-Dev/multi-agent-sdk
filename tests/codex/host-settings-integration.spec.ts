@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CodexAppServerClient } from '@korus-dev/codex-sdk';
 import { CodexHost } from '../../src/providers/codex';
-import type { CodexHostEvent } from '../../src/index';
+import type { CodexEvent } from '../../src/internal';
 import {
-  configRequirements, MockCodexAppServer, createHost, lastRequest, resumeResponse,
+  configRequirements, MockCodexAppServer, createHarness, lastRequest, resumeResponse,
   testGoal, testModel, thread, threadSettings, turn,
 } from './helpers/host-fixture';
 
@@ -29,7 +29,7 @@ describe('CodexHost', () => {
   });
 
   it('creates conversations with app-server-backed permission defaults and interrupts active turns', async () => {
-    const { host, transport } = createHost(
+    const { host, transport } = createHarness(
       'thread/start', 'thread/settings/update', 'turn/start', 'turn/interrupt',
     );
     await host.connect();
@@ -51,7 +51,7 @@ describe('CodexHost', () => {
   });
 
   it('maps product options, creates on first send, and queues concurrent prompts', async () => {
-    const { host, transport } = createHost('thread/start', 'thread/settings/update', 'turn/start');
+    const { host, transport } = createHarness('thread/start', 'thread/settings/update', 'turn/start');
     await host.connect();
     await host.createConversation({
       approvalMode: 'ask', cwd: '/tmp/other', model: 'gpt-mini-runtime', permissionMode: 'full-access',
@@ -67,14 +67,14 @@ describe('CodexHost', () => {
       queuedPrompts: [{ text: 'Second' }],
     });
 
-    const fresh = createHost('turn/start');
+    const fresh = createHarness('turn/start');
     await fresh.host.sendMessage('Continue automatically');
     expect(lastRequest(fresh.transport, 'thread/start')).toBeUndefined();
     expect(lastRequest(fresh.transport, 'turn/start')).toMatchObject({ params: { threadId: 'thread-existing' } });
   });
 
   it('passes a host thread source to thread/start', async () => {
-    const { host, transport } = createHost('thread/start', 'thread/settings/update');
+    const { host, transport } = createHarness('thread/start', 'thread/settings/update');
     await host.connect();
 
     await host.createConversation({ threadSource: 'user' });
@@ -96,13 +96,13 @@ describe('CodexHost', () => {
       'turn/start': () => ({ turn: turn('turn-live', 'inProgress', []) }),
     };
     const createTransport = new MockCodexAppServer(responses);
-    const createHost = new CodexHost({
+    const createHarness = new CodexHost({
       autoSelectFirstConversation: false,
       client: new CodexAppServerClient(createTransport),
       conversationDefaults: { model: 'gpt-5.6-terra', reasoningEffort: 'medium' },
     });
-    await createHost.connect();
-    await createHost.createConversation();
+    await createHarness.connect();
+    await createHarness.createConversation();
     expect(lastRequest(createTransport, 'thread/start')).toMatchObject({
       params: { model: 'gpt-5.6-terra' },
     });
@@ -136,7 +136,7 @@ describe('CodexHost', () => {
   });
 
   it('updates model, reasoning, plan mode, and permissions through app-server settings', async () => {
-    const { host, transport } = createHost('thread/settings/update');
+    const { host, transport } = createHarness('thread/settings/update');
     await host.connect();
 
     const snapshot = await host.updateConversationSettings({
@@ -172,7 +172,7 @@ describe('CodexHost', () => {
   });
 
   it('uses a model selected during generation for the next queued turn', async () => {
-    const { host, transport } = createHost('turn/start', 'thread/settings/update');
+    const { host, transport } = createHarness('turn/start', 'thread/settings/update');
     await host.connect();
     await host.sendMessage('First turn');
 
@@ -300,7 +300,7 @@ describe('CodexHost', () => {
   });
 
   it('falls back to a supported effort when the model changes', async () => {
-    const { host, transport } = createHost('thread/settings/update');
+    const { host, transport } = createHarness('thread/settings/update');
     await host.connect();
 
     await host.updateConversationSettings({ modelId: 'gpt-mini', reasoningEffort: 'high' });
@@ -312,7 +312,7 @@ describe('CodexHost', () => {
   });
 
   it('supports focused settings updates and authoritative settings notifications', async () => {
-    const { host, transport } = createHost('thread/settings/update');
+    const { host, transport } = createHarness('thread/settings/update');
     await host.connect();
 
     await host.updateConversationSettings({ approvalPreset: 'approve-for-me' });
@@ -357,8 +357,8 @@ describe('CodexHost', () => {
   });
 
   it('routes authoritative settings notifications to a background conversation', async () => {
-    const { host, transport } = createHost('thread/settings/update');
-    const events: CodexHostEvent[] = [];
+    const { host, transport } = createHarness('thread/settings/update');
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
     await host.connect();
     const background = host.conversation('thread-background');

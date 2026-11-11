@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { afterEach, expect, it, vi } from 'vitest';
-import { createHarnessDriver } from '../../src';
+import { } from '../../src';
+import { createInternalHarness } from '../../src/internal';
 import { createQueryHarness } from '../native/claude/sdk-query-fixture';
 
 afterEach(() => vi.unstubAllEnvs());
@@ -22,7 +23,7 @@ it('switches Claude home A to B to native default after fully closing each drive
       await mkdir(path.dirname(transcript), { recursive: true });
       await writeFile(transcript, JSON.stringify({ type: 'user', sessionId: id, uuid: randomUUID(), cwd, timestamp: '2026-01-01T00:00:00Z', message: { role: 'user', content: `Home ${index}` } }) + '\n');
       const fixture = createQueryHarness();
-      const driver = createHarnessDriver('claude', { client: { name: 'home-test' }, home, claude: { transportOptions: { createQuery: fixture.createQuery } } });
+      const driver = createInternalHarness('claude', { client: { name: 'home-test' }, home, claude: { transportOptions: { createQuery: fixture.createQuery } } });
       const session = driver.open({ id: 'chat', folder: cwd });
       try {
         const listed = await driver.listConversations(session);
@@ -40,6 +41,6 @@ it('switches Claude home A to B to native default after fully closing each drive
 });
 
 it('rejects ambiguous home configuration before creating a provider runtime', () => {
-  expect(() => createHarnessDriver('codex', { client: { name: 'home-test' }, home: 'relative' })).toThrow(/absolute/);
-  expect(() => createHarnessDriver('codex', { client: { name: 'home-test' }, home: '/one', codex: { host: { codexHome: '/two' } } })).toThrow(/conflict/);
+  expect(() => createInternalHarness('codex', { client: { name: 'home-test' }, home: 'relative' })).toThrow(/absolute/);
+  expect(() => createInternalHarness('codex', { client: { name: 'home-test' }, home: '/one', codex: { host: { codexHome: '/two' } } })).toThrow(/conflict/);
 });

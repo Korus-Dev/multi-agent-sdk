@@ -2,32 +2,32 @@ import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { expect, it } from 'vitest';
-import { createHarnessDriver } from '../../../src/backend';
-import type { HarnessContext, HarnessDriver, HarnessEvent } from '../../../src/driver';
+import { createProviderDriver } from '../../../src/provider-factory';
+import type { ProviderContext, ProviderDriver, ProviderEvent } from '../../../src/driver';
 
 it('serves a non-Korus consumer through the unified driver and a caller-owned execution scope', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'harness-host-cpa-'));
-  let driver: HarnessDriver<HarnessContext, HarnessEvent> | undefined;
+  let driver: ProviderDriver<ProviderContext, ProviderEvent> | undefined;
   try {
     await cp(new URL('./fixtures/acp-agent.cjs', import.meta.url), path.join(root, 'acp-agent.cjs'));
     await writeFile(path.join(root, 'version'), '2026.10.22-27dcf5f');
     const command = path.join(root, 'agent');
     await writeFile(command, `#!${process.execPath}\nrequire('./acp-agent.cjs');\n`, { mode: 0o700 });
-    const events: HarnessEvent[] = [];
-    driver = createHarnessDriver('cursor', { client: { name: 'cpa-workbench', metadataDirectory: 'accounting-sessions' }, stateDirectory: () => root, cursor: {
+    const events: ProviderEvent[] = [];
+    driver = createProviderDriver('cursor', { client: { name: 'cpa-workbench', metadataDirectory: 'accounting-sessions' }, stateDirectory: () => root, cursor: {
       runtime: { homePath: path.join(root, 'native-home'), isolated: false, environment: { ...process.env, CURSOR_API_KEY: undefined } },
       resolveCommand: () => command,
       sessionOptions: { client: { name: 'cpa-workbench', metadataDirectory: 'accounting-sessions' }, resolveCommand: () => command },
     } });
     driver.onEvent(event => events.push(event));
-    const context: HarnessContext = { id: 'tax-assistant', backend: 'cursor', folder: root, name: 'Tax assistant' };
+    const context: ProviderContext = { id: 'tax-assistant', provider: 'cursor', folder: root, name: 'Tax assistant' };
     const started = await driver.sendPrompt(context, 'Check invoices');
-    context.backendSession = started.backendSession;
+    context.providerSession = started.providerSession;
     // Loading after completion is the public read path; the fixture completes synchronously after its prompt.
     await expect.poll(() => events.some(event => event.type === 'agent.statusChanged' && event.payload.type === 'idle')).toBe(true);
-    const messages = await driver.readConversationMessages!({ backend: 'cursor', folder: root, sessionId: started.backendSession.kind === 'cursor' ? started.backendSession.sessionId : '' }, context.id);
+    const messages = await driver.readConversationMessages!({ provider: 'cursor', folder: root, sessionId: started.providerSession.kind === 'cursor' ? started.providerSession.sessionId : '' }, context.id);
     expect(messages.filter(message => message.role === 'user').map(message => message.parts.filter(part => part.type === 'text').map(part => part.text).join(''))).toStrictEqual(['Check invoices']);
-    const scoped = await driver.executeScopedPrompt!(context, { cwd: root, prompt: 'Classify invoices', session: context.backendSession, scope: { id: 'tax-rules', mcpServers: [] } });
+    const scoped = await driver.executeScopedPrompt!(context, { cwd: root, prompt: 'Classify invoices', session: context.providerSession, scope: { id: 'tax-rules', mcpServers: [] } });
     expect(scoped.text.trim().length).toBeGreaterThan(0);
     expect(scoped.session.kind).toBe('cursor');
     expect(driver.getCapabilities(context)).not.toHaveProperty('codeReview');

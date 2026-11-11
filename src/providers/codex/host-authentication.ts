@@ -1,7 +1,7 @@
 import type { v2 } from '@korus-dev/codex-sdk';
-import type { CodexHostAuthentication } from '../../core/codex-host';
+import type { CodexAuthenticationState } from '../../core/codex-conversation-types';
 
-export function initialAuthentication(): CodexHostAuthentication {
+export function initialAuthentication(): CodexAuthenticationState {
   return {
     status: 'notLoaded',
     account: null,
@@ -19,7 +19,7 @@ export function initialAuthentication(): CodexHostAuthentication {
 type CompatibleAccount = Exclude<v2.Account, { type: 'chatgpt' }>
   | (Omit<Extract<v2.Account, { type: 'chatgpt' }>, 'workspaceName'> & { workspaceName?: string | null });
 
-export function hostAccount(account: CompatibleAccount): NonNullable<CodexHostAuthentication['account']> {
+export function hostAccount(account: CompatibleAccount): NonNullable<CodexAuthenticationState['account']> {
   if (account.type === 'chatgpt') {
     return { type: 'chatgpt', email: account.email, planType: account.planType,
       ...(typeof account.workspaceName === 'string' ? { workspaceName: account.workspaceName } : {}),
@@ -35,14 +35,14 @@ export function hostAccount(account: CompatibleAccount): NonNullable<CodexHostAu
   return { type: 'apiKey' };
 }
 
-export function hostAuthenticationKey(authentication: CodexHostAuthentication): string {
+export function hostAuthenticationKey(authentication: CodexAuthenticationState): string {
   return JSON.stringify({
     account: authentication.account,
     requiresOpenaiAuth: authentication.requiresOpenaiAuth,
   });
 }
 
-export function hostAuthenticationIdentityKey(authentication: CodexHostAuthentication): string {
+export function hostAuthenticationIdentityKey(authentication: CodexAuthenticationState): string {
   const account = authentication.account;
   if (!account) {
     return JSON.stringify({ type: null, requiresOpenaiAuth: authentication.requiresOpenaiAuth });

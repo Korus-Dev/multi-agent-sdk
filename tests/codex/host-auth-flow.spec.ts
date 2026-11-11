@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CodexAppServerClient, type v2 } from '@korus-dev/codex-sdk';
 import { CodexHost } from '../../src/providers/codex';
-import type { CodexHostEvent } from '../../src/index';
+import type { CodexEvent } from '../../src/internal';
 import { MockCodexAppServer, deferred, lastRequest, requestsFor, resumeResponse, testModel, thread, turn } from './helpers/host-fixture';
 
 describe('CodexHost', () => {
@@ -87,7 +87,7 @@ describe('CodexHost', () => {
       }),
     });
     const host = new CodexHost({ client: new CodexAppServerClient(transport) });
-    const events: CodexHostEvent[] = [];
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
     await host.connect();
     const accountAHandle = host.conversation('thread-existing');
@@ -218,7 +218,7 @@ describe('CodexHost', () => {
       }),
     });
     const host = new CodexHost({ client: new CodexAppServerClient(transport) });
-    const events: CodexHostEvent[] = [];
+    const events: CodexEvent[] = [];
     const unsubscribe = host.onEvent((event) => events.push(event));
     await host.connect();
 

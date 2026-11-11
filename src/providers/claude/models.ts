@@ -1,7 +1,7 @@
-import type { BackendModelOption } from '../../contracts/index';
+import type { ProviderModelOption } from '../../contracts/index';
 import type { ClaudeAvailableModel } from './transport';
 
-export const claudeModelOptions: BackendModelOption[] = [
+export const claudeModelOptions: ProviderModelOption[] = [
   {
     id: 'opus',
     model: 'opus',
@@ -20,7 +20,7 @@ export const claudeModelOptions: BackendModelOption[] = [
   },
 ];
 
-export function claudeModelOptionsFromSdk(models: readonly ClaudeAvailableModel[]): BackendModelOption[] {
+export function claudeModelOptionsFromSdk(models: readonly ClaudeAvailableModel[]): ProviderModelOption[] {
   return models
     .filter((model) => model.value.trim().length > 0)
     .map((model) => ({

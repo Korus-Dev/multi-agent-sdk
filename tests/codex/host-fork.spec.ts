@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CodexAppServerClient, type v2 } from '@korus-dev/codex-sdk';
 import { CodexHost } from '../../src/providers/codex';
-import type { CodexHostEvent } from '../../src/index';
+import type { CodexEvent } from '../../src/internal';
 import {
   MockCodexAppServer,
   lastRequest,
@@ -47,7 +47,7 @@ describe('CodexHost conversation forks', () => {
       client: new CodexAppServerClient(transport),
       cwd: '/tmp/project',
     });
-    const events: CodexHostEvent[] = [];
+    const events: CodexEvent[] = [];
     host.onEvent((event) => events.push(event));
 
     const result = await host.conversation('thread-existing').fork();

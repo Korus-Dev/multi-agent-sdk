@@ -3,18 +3,8 @@ import { pathToFileURL } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 import { fileAttachmentInput } from './codex-file-attachment';
 import type { v2 } from '@korus-dev/codex-sdk';
-import type {
-  CodexConversationSummary,
-  Attachment,
-  AgentContextUsage,
-  CodexRateLimitSnapshot,
-  CodexRateLimits,
-  CodexHostSnapshot,
-  CodexThreadStatus,
-  SendMessageOptions,
-  ConversationMessage,
-  ConversationMessageAttachmentPart,
-} from '../../core/codex-host';
+import type { Attachment, AgentContextUsage, SendMessageOptions, ConversationMessage, ConversationMessageAttachmentPart } from '../../core/codex-host';
+import type { CodexConversationSummary, CodexRateLimitSnapshot, CodexRateLimits, CodexSnapshot, CodexThreadStatus } from '../../core/codex-conversation-types';
 import {
   requireCatalogModel,
   selectedModel,
@@ -65,7 +55,7 @@ export function upsertConversation(
 }
 
 export function validatedSendOptions(
-  state: CodexHostSnapshot,
+  state: CodexSnapshot,
   options: SendMessageOptions,
 ): SendMessageOptions {
   const model = options.model

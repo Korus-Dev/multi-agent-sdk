@@ -1,12 +1,12 @@
 import { validateMcpPolicy } from '../../mcp-policy';
-import type { HarnessHistoryLoadResult, HarnessPromptScope } from '../../driver';
+import type { ProviderHistoryLoadResult, HarnessPromptScope } from '../../driver';
 import { promptContentDispatchText, type PromptPart } from '../../core/prompt-content';
 import type { ClaudeToolPartOptions } from './claude-tool-part-adapter';
-export type ClaudeHistoryLoadResult = HarnessHistoryLoadResult<Extract<HarnessEvent, { type: 'claude.conversationEventReceived' }> & { seq: number; occurredAt: string }>;
+export type ClaudeHistoryLoadResult = ProviderHistoryLoadResult<Extract<ProviderEvent, { type: 'claude.conversationEventReceived' }> & { seq: number; occurredAt: string }>;
 export type ClaudePromptConfiguration = { cwd?: string; title?: string; appendSystemPrompt?: string; mcpServerUrl?: string | null; mcpServerName?: string; hostedMcpServerUrls?: Record<string, string>; allowedTools?: string[]; enabledMcpTools?: Record<string, readonly string[]>; formatPrompt?: (prompt: string, content: readonly PromptPart[] | undefined) => string };
 export type ClaudeHostOptions<Context extends Agent = Agent> = {
   homeDir?: string;
-  contextForConversation?: (ref: Extract<BackendConversationRef, { backend: 'claude' }>, agentId: string) => Context;
+  contextForConversation?: (ref: Extract<ProviderConversationRef, { provider: 'claude' }>, agentId: string) => Context;
   configurePrompt?: (context: Context) => ClaudePromptConfiguration;
   authentication?: { check: typeof getLocalClaudeAuthentication; logout: typeof logoutLocalClaude };
   readAccountUsage?: typeof getClaudeAccountUsage;
@@ -42,11 +42,11 @@ import { requestFromClientRequest, clientResponseFromAgentResponse, type AgentRe
 import type {
   AccountRateLimits,
   Agent,
-  BackendConversationRef,
-  BackendModelOption,
-  BackendRuntimeStatus,
-  BackendSession,
-  BackendSkillSummary,
+  ProviderConversationRef,
+  ProviderModelOption,
+  ProviderRuntimeStatus,
+  ProviderSessionData,
+  ProviderSkillSummary,
   ClientRequest, ClaudeConversationEvent,
   ClaudeConversationSnapshot,
   ClaudeConversationTurn,
@@ -62,7 +62,7 @@ import {
   type ClaudeConversationReplica,
 } from '../../conversations/claude-conversation-replica';
 import { createUserMessage } from '../../conversations/claude-conversation-transcript';
-import { type HarnessDriver, type HarnessScopedPromptInput, type HarnessScopedPromptResult, type HarnessConversationResumeResult, type HarnessEvent, type HarnessPermissionModeResult, type HarnessSendResult } from '../../driver';
+import { type ProviderDriver, type ProviderScopedPromptInput, type ProviderScopedPromptResult, type ProviderConversationResumeResult, type ProviderEvent, type ProviderPermissionModeResult, type ProviderSendResult } from '../../driver';
 import { claudeWorkingDirectory } from './working-directory';
 import { claudeConfigDirectory, claudeConfigDirectoryOverride } from './config-directory';
 
@@ -132,7 +132,7 @@ type ActiveClaudeTurn = {
   completedPlanMarkdown: string | null;
   compactionStarted: boolean;
   compactionCompleted: boolean;
-  resolveStart: (result: HarnessSendResult) => void;
+  resolveStart: (result: ProviderSendResult) => void;
   rejectStart: (error: Error) => void;
   startResolved: boolean;
   error: Error | null;
@@ -141,7 +141,7 @@ type ActiveClaudeTurn = {
   rateLimitMessage?: string;
 };
 
-type EventListener = (event: HarnessEvent) => void;
+type EventListener = (event: ProviderEvent) => void;
 type UnsequencedClaudeConversationEvent<Event extends ClaudeConversationEvent = ClaudeConversationEvent> =
   Event extends ClaudeConversationEvent
     ? Omit<Event, 'seq' | 'occurredAt'> & { occurredAt?: string }
@@ -151,13 +151,13 @@ export type ClaudeHistoryLoader<Context extends Agent = Agent> = (agent: Context
 
 type ClaudeScopedTurnConfiguration = { mcpServerUrl?: string | null; mcpServerName?: string; hostedMcpServerUrls?: Record<string, string>; allowedTools: string[]; enabledMcpTools?: Record<string, readonly string[]>; appendSystemPrompt?: string };
 
-export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<Context, HarnessEvent, Extract<HarnessEvent, { type: 'claude.conversationEventReceived' }>> {
+export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver<Context, ProviderEvent, Extract<ProviderEvent, { type: 'claude.conversationEventReceived' }>> {
   async authenticate(request: import('../../contracts/authentication').ProviderAuthenticationAction): Promise<import('../../contracts/authentication').ProviderAuthentication> {
     if (request.action === 'cancel') throw new Error('Manage Claude authentication through its CLI.');
     const state = await (request.action === 'logout' ? (this.driverOptions.authentication?.logout ?? logoutLocalClaude)() : (this.driverOptions.authentication?.check ?? getLocalClaudeAuthentication)());
     return { kind: 'claude', connected: state.loggedIn, state };
   }
-  readonly backend = 'claude' as const;
+  readonly provider = 'claude' as const;
 
   private readonly listeners = new Set<EventListener>();
   private readonly requestUsageListeners = new Set<(observation: RequestObservation) => void>();
@@ -203,7 +203,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     });
   }
 
-  getRuntimeStatus(): BackendRuntimeStatus {
+  getRuntimeStatus(): ProviderRuntimeStatus {
     return this.catalog.getRuntimeStatus();
   }
 
@@ -211,11 +211,11 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     return this.catalog.getCapabilities();
   }
 
-  async listModels(agent: Context): Promise<BackendModelOption[]> {
+  async listModels(agent: Context): Promise<ProviderModelOption[]> {
     return this.catalog.listModels(agent);
   }
 
-  async listSkills(agent: Context): Promise<BackendSkillSummary[]> {
+  async listSkills(agent: Context): Promise<ProviderSkillSummary[]> {
     return this.catalog.listSkills(agent);
   }
 
@@ -233,12 +233,12 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     finally { await this.releaseConversation(agent.id); }
   }
 
-  async executeScopedPrompt(agent: Context, input: HarnessScopedPromptInput): Promise<HarnessScopedPromptResult> {
+  async executeScopedPrompt(agent: Context, input: ProviderScopedPromptInput): Promise<ProviderScopedPromptResult> {
     input.signal?.throwIfAborted();
     if (input.session && input.session.kind !== 'claude') {
       throw new Error('Claude cannot continue a non-Claude scope conversation.');
     }
-    const scopedContext = { ...agent, folder: input.cwd, backendSession: input.session };
+    const scopedContext = { ...agent, folder: input.cwd, providerSession: input.session };
     let targetTurnId: string | null = null;
     const completedBeforeTarget = new Map<string, Error | null>();
     let resolveCompletion: (() => void) | null = null;
@@ -277,8 +277,8 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
         await completion;
       }
       input.signal?.throwIfAborted();
-      const sessionId = started.backendSession.kind === 'claude'
-        ? started.backendSession.sessionId
+      const sessionId = started.providerSession.kind === 'claude'
+        ? started.providerSession.sessionId
         : null;
       if (!sessionId) throw new Error('Claude did not create a scope conversation.');
       const snapshot = this.conversationReplicasByAgentId.get(agent.id)?.getSnapshot();
@@ -296,7 +296,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     }
   }
 
-  async disposeScopedSession(agent: Context, scopedSession: BackendSession): Promise<void> {
+  async disposeScopedSession(agent: Context, scopedSession: ProviderSessionData): Promise<void> {
     if (scopedSession.kind !== 'claude') throw new Error('Claude cannot dispose a non-Claude scope conversation.');
     if (this.transport.deleteSession) {
       await this.transport.deleteSession(scopedSession.sessionId, scopedSession.transcriptFolder ?? claudeWorkingDirectory(agent));
@@ -310,53 +310,53 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     if (!sessionId) return;
     await this.flushPromptContent(sessionId);
     if (this.transport.deleteSession) {
-      await this.transport.deleteSession(sessionId, agent.backendSession?.kind === 'claude' ? agent.backendSession.transcriptFolder ?? claudeWorkingDirectory(agent) : claudeWorkingDirectory(agent));
+      await this.transport.deleteSession(sessionId, agent.providerSession?.kind === 'claude' ? agent.providerSession.transcriptFolder ?? claudeWorkingDirectory(agent) : claudeWorkingDirectory(agent));
     } else {
       await this.transport.closeSession?.(sessionId);
     }
     await rm(promptContentDirectory(this.promptContentHome(), sessionId), { recursive: true, force: true });
   }
 
-  async setPermissionMode(agent: Context, mode: string): Promise<HarnessPermissionModeResult> {
+  async setPermissionMode(agent: Context, mode: string): Promise<ProviderPermissionModeResult> {
     return this.catalog.setPermissionMode(agent, mode);
   }
 
-  tryHandlePromptCommand(agent: Context, prompt: string): Promise<HarnessSendResult> | null {
+  tryHandlePromptCommand(agent: Context, prompt: string): Promise<ProviderSendResult> | null {
     return /^\/(?:compact|goal)(?:\s+.*)?$/s.test(prompt) ? this.sendPrompt(agent, prompt) : null;
   }
 
-  async setGoal(agent: Context, objective: string): Promise<import('../../driver').HarnessGoalResult> {
+  async setGoal(agent: Context, objective: string): Promise<import('../../driver').ProviderGoalResult> {
     const condition = objective.trim();
     if (!condition || /^(?:clear|stop|off|reset|none|cancel)$/i.test(condition)) throw new Error('Enter a goal condition instead of a clear command.');
     if (condition.length > 4000) throw new Error('Claude goal conditions must be at most 4,000 characters, including assignment context.');
     const now = Date.now() / 1000;
     const started = await this.sendPrompt(agent, `/goal ${condition}`, { recordUserMessage: false });
-    if (started.backendSession.kind !== 'claude') throw new Error('Claude did not return a session.');
-    const goal: ThreadGoal = { threadId: started.backendSession.sessionId, objective: condition, status: 'active', tokenBudget: null, tokensUsed: 0, timeUsedSeconds: 0, createdAt: now, updatedAt: now };
+    if (started.providerSession.kind !== 'claude') throw new Error('Claude did not return a session.');
+    const goal: ThreadGoal = { threadId: started.providerSession.sessionId, objective: condition, status: 'active', tokenBudget: null, tokensUsed: 0, timeUsedSeconds: 0, createdAt: now, updatedAt: now };
     this.goalsByAgentId.set(agent.id, goal);
-    return { backendSession: started.backendSession, ...(started.turnId ? { turnId: started.turnId } : {}), goal };
+    return { providerSession: started.providerSession, ...(started.turnId ? { turnId: started.turnId } : {}), goal };
   }
 
-  async clearGoal(agent: Context): Promise<import('../../driver').HarnessGoalResult> {
+  async clearGoal(agent: Context): Promise<import('../../driver').ProviderGoalResult> {
     if (this.activeTurnsByAgentId.has(agent.id)) await this.interrupt(agent);
     const started = await this.sendPromptWithConfiguration(agent, '/goal clear', { recordUserMessage: false }, undefined, true);
     this.goalRefreshIds.delete(agent.id);
     this.goalsByAgentId.delete(agent.id);
-    return { backendSession: started.backendSession, cleared: true };
+    return { providerSession: started.providerSession, cleared: true };
   }
 
-  async sendPrompt(agent: Context, prompt: string, options: SendPromptOptions = {}): Promise<HarnessSendResult> {
+  async sendPrompt(agent: Context, prompt: string, options: SendPromptOptions = {}): Promise<ProviderSendResult> {
     return this.sendPromptWithConfiguration(agent, prompt, options);
   }
 
-  async continueInterruptedTurn(agent: Context): Promise<import('../../driver').HarnessTurnActionResult> {
-    if (agent.backendSession?.kind !== 'claude') throw new Error('No Claude session to continue.');
+  async continueInterruptedTurn(agent: Context): Promise<import('../../driver').ProviderTurnActionResult> {
+    if (agent.providerSession?.kind !== 'claude') throw new Error('No Claude session to continue.');
     if (!this.conversationReplicasByAgentId.has(agent.id)) await this.loadConversation(agent);
     const result = await this.sendPromptWithConfiguration(agent, 'continue', {}, undefined, false, true);
-    return { backendSession: result.backendSession, activeTurnId: result.turnId ?? null };
+    return { providerSession: result.providerSession, activeTurnId: result.turnId ?? null };
   }
 
-  async steerPrompt(agent: Context, prompt: string, options: SendPromptOptions = {}): Promise<HarnessSendResult> {
+  async steerPrompt(agent: Context, prompt: string, options: SendPromptOptions = {}): Promise<ProviderSendResult> {
     const turn = this.activeTurnsByAgentId.get(agent.id);
     if (!turn) return this.sendPrompt(agent, prompt, options);
     if (!turn.sessionId) throw new Error('Claude has not initialized its session yet.');
@@ -369,12 +369,12 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     if (options.recordUserMessage !== false) {
       const createdAt = new Date().toISOString();
       this.emitConversation({
-        type: 'message.userSubmitted', agentId: agent.id, backend: 'claude',
-        backendSessionId: turn.sessionId ?? undefined, turnId: turn.turnId, occurredAt: createdAt,
+        type: 'message.userSubmitted', agentId: agent.id, provider: 'claude',
+        providerSessionId: turn.sessionId ?? undefined, turnId: turn.turnId, occurredAt: createdAt,
         payload: { message: { ...createUserMessage(agent.id, prompt, createdAt, `steer-${messageId}`, turn.turnId, options.attachments, options.content), id: canonicalMessageId } },
       });
     }
-    return { backendSession: claudeBackendSession(turn.sessionId, turn.model, turn.reasoningEffort, turn.transcriptFolder), turnId: turn.turnId, ...(options.recordUserMessage !== false ? { messageId: canonicalMessageId } : {}) };
+    return { providerSession: claudeProviderSession(turn.sessionId, turn.model, turn.reasoningEffort, turn.transcriptFolder), turnId: turn.turnId, ...(options.recordUserMessage !== false ? { messageId: canonicalMessageId } : {}) };
   }
 
   private async sendPromptWithConfiguration(
@@ -385,7 +385,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     waitForCompletion = false,
     waitForInputReplay = false,
     admissionGuard?: () => void,
-  ): Promise<HarnessSendResult> {
+  ): Promise<ProviderSendResult> {
     admissionGuard?.();
     if (this.forkingAgentIds.has(agent.id)) throw new Error('Claude conversation is being forked.');
     if (this.activeTurnsByAgentId.has(agent.id)) {
@@ -416,7 +416,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     admissionGuard?.();
     let activeTurn: ActiveClaudeTurn | null = null;
     const messageId = options.content === undefined ? undefined : randomUUID();
-    const started = new Promise<HarnessSendResult>((resolve, reject) => {
+    const started = new Promise<ProviderSendResult>((resolve, reject) => {
       const defaults = claudeTurnParams(agent, prompt, options, existingSessionId, this.driverOptions.configurePrompt?.(agent));
       const turnParams: ClaudeTurnParams = scope
         ? { ...defaults, ...scope, ...(scope.appendSystemPrompt === undefined ? { appendSystemPrompt: defaults.appendSystemPrompt } : {}) }
@@ -456,7 +456,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
         cwd: folder,
         turnId,
         sessionId: existingSessionId,
-        ...(agent.backendSession?.kind === 'claude' && agent.backendSession.transcriptFolder ? { transcriptFolder: agent.backendSession.transcriptFolder } : {}),
+        ...(agent.providerSession?.kind === 'claude' && agent.providerSession.transcriptFolder ? { transcriptFolder: agent.providerSession.transcriptFolder } : {}),
         model: turnParams.model ?? null,
         reasoningEffort: turnParams.effort ?? null,
         serviceTier: turnParams.fastMode ? 'fast' : null,
@@ -472,8 +472,8 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
         compactionStarted: false,
         compactionCompleted: false,
         resolveStart: result => {
-          if (messageId && options.content && result.backendSession.kind === 'claude') {
-            const sessionId = result.backendSession.sessionId;
+          if (messageId && options.content && result.providerSession.kind === 'claude') {
+            const sessionId = result.providerSession.sessionId;
             const pending = this.promptContentWrites.get(sessionId) ?? new Set<Promise<void>>();
             this.promptContentWrites.set(sessionId, pending);
             const write = savePromptContent(this.promptContentHome(), sessionId, messageId, options.content)
@@ -495,16 +495,16 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
       this.ensureConversationReplica(agent);
       this.emitConversation({
         agentId: agent.id,
-        backend: this.backend,
-        backendSessionId: existingSessionId ?? undefined,
+        provider: this.provider,
+        providerSessionId: existingSessionId ?? undefined,
         turnId,
         type: 'turn.started',
-        payload: { turn: { id: turnId, backend: this.backend } },
+        payload: { turn: { id: turnId, provider: this.provider } },
       });
       const taskPlan = this.taskPlansByAgentId.get(agent.id)?.startTurn(turnId);
       if (taskPlan) {
-        this.emitConversation({ agentId: agent.id, backend: 'claude',
-          backendSessionId: existingSessionId ?? undefined, turnId,
+        this.emitConversation({ agentId: agent.id, provider: 'claude',
+          providerSessionId: existingSessionId ?? undefined, turnId,
           type: 'turn.executionPlanUpdated', payload: { plan: taskPlan.plan } });
       }
       this.emit({
@@ -516,8 +516,8 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
         const createdAt = new Date().toISOString();
         this.emitConversation({
           agentId: agent.id,
-          backend: this.backend,
-          backendSessionId: existingSessionId ?? undefined,
+          provider: this.provider,
+          providerSessionId: existingSessionId ?? undefined,
           turnId,
           type: 'message.userSubmitted',
           payload: {
@@ -553,7 +553,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     return result;
   }
 
-  async interrupt(agent: Context, expectedTurnId?: string): Promise<HarnessSendResult> {
+  async interrupt(agent: Context, expectedTurnId?: string): Promise<ProviderSendResult> {
     const activeTurn = this.activeTurnsByAgentId.get(agent.id);
     if (!activeTurn) {
       throw new Error('No active Claude turn to interrupt.');
@@ -566,7 +566,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     if (this.activeTurnsByAgentId.get(agent.id) === activeTurn) this.activeTurnsByAgentId.delete(agent.id);
 
     return {
-      backendSession: claudeBackendSession(
+      providerSession: claudeProviderSession(
         activeTurn.sessionId ?? claudeSessionId(agent) ?? agent.id,
         activeTurn.model,
         activeTurn.reasoningEffort,
@@ -593,8 +593,8 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     this.pendingRequestOwners.delete(key!);
     this.emitConversation({
       agentId: owner.agentId,
-      backend: this.backend,
-      backendSessionId: owner.sessionId ?? undefined,
+      provider: this.provider,
+      providerSessionId: owner.sessionId ?? undefined,
       turnId: owner.turnId,
       type: 'clientRequest.resolved',
       payload: { id: response.id },
@@ -629,7 +629,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     }
   }
 
-  async loadConversation(agent: Context): Promise<BackendSession | null> {
+  async loadConversation(agent: Context): Promise<ProviderSessionData | null> {
     const sessionId = claudeSessionId(agent);
     const load = { token: Symbol(), sessionId };
     this.historyLoads.set(agent.id, load);
@@ -640,7 +640,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     if (!hasLiveSession() && cached?.sessionId === sessionId && cachedWindow && await cachedWindow.isCurrent()) {
       if (this.historyLoads.get(agent.id) !== load || this.conversationRevisionsByAgentId.get(agent.id) !== startingRevision) return null;
       this.publishConversationSnapshot(cached);
-      return agent.backendSession ?? null;
+      return agent.providerSession ?? null;
     }
     const history = hasLiveSession() ? null : await this.loadHistory(agent, true);
     if (this.historyLoads.get(agent.id) !== load) return null;
@@ -648,7 +648,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     // A turn can start while history is being read. Keep its live message identities.
     if (hasLiveSession() && current?.sessionId === sessionId) {
       this.publishConversationSnapshot(current);
-      return agent.backendSession ?? null;
+      return agent.providerSession ?? null;
     }
     if (this.conversationRevisionsByAgentId.get(agent.id) !== startingRevision && current) return null;
     if (!history) {
@@ -657,7 +657,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
 
     this.resetConversationReplica(
       agent,
-      history.backendSession.kind === 'claude' ? history.backendSession.sessionId : null,
+      history.providerSession.kind === 'claude' ? history.providerSession.sessionId : null,
       history.messages,
       history.taskPlan,
       history.turns,
@@ -665,12 +665,12 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     );
     for (const event of history.subagentEvents ?? []) this.emit(event);
 
-    if (history.backendSession.kind === 'claude') {
+    if (history.providerSession.kind === 'claude') {
       this.publishGoal(agent.id, history.goal);
-      this.queueHydratedContextUsageRefresh(agent, history.backendSession);
+      this.queueHydratedContextUsageRefresh(agent, history.providerSession);
     }
 
-    return history.backendSession;
+    return history.providerSession;
   }
 
   async loadOlderHistory(agent: Context): Promise<ClaudeHistoryLoadResult> {
@@ -692,11 +692,11 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
       const page = window.older();
       for (const turn of window.pageTurns(page.messages)) {
         if (!latest.turns.some(current => current.id === turn.id)) this.emitConversation({
-          agentId: agent.id, backend: 'claude', backendSessionId: window.sessionId ?? undefined,
+          agentId: agent.id, provider: 'claude', providerSessionId: window.sessionId ?? undefined,
           type: 'turn.historyUpdated', payload: { turn },
         });
       }
-      const frame = this.emitConversation({ agentId: agent.id, backend: 'claude', backendSessionId: window.sessionId ?? undefined,
+      const frame = this.emitConversation({ agentId: agent.id, provider: 'claude', providerSessionId: window.sessionId ?? undefined,
         type: 'history.prepended', payload: page });
       return { hasOlder: page.hasOlder, frame };
     })();
@@ -710,7 +710,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     if (!state || this.liveSessionIdsByAgentId.get(agent.id) === window.sessionId || this.activeTurnsByAgentId.has(agent.id)) return;
     const taskPlan = state.taskPlan ?? new ClaudeTaskPlan();
     this.taskPlansByAgentId.set(agent.id, taskPlan);
-    this.emitConversation({ agentId: agent.id, backend: 'claude', backendSessionId: window.sessionId ?? undefined,
+    this.emitConversation({ agentId: agent.id, provider: 'claude', providerSessionId: window.sessionId ?? undefined,
       type: 'turn.executionPlanUpdated', payload: { plan: taskPlan.plan } });
     this.publishGoal(agent.id, state.goal);
     for (const event of state.subagentEvents ?? []) this.emit(event);
@@ -732,7 +732,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
       && (!this.historyLoads.has(agent.id) || this.historyLoads.get(agent.id)!.sessionId === snapshot.sessionId)
       && this.conversationReplicasByAgentId.get(agent.id)?.getSnapshot().sessionId === snapshot.sessionId;
     const publishTurn = (update: Partial<ClaudeConversationTurn>) => this.emitConversation({
-      agentId: agent.id, backend: 'claude', backendSessionId: snapshot.sessionId ?? undefined,
+      agentId: agent.id, provider: 'claude', providerSessionId: snapshot.sessionId ?? undefined,
       type: 'turn.historyUpdated', payload: { turn: { ...turn, ...update } },
     });
     const promise = (async () => {
@@ -748,7 +748,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
         for (const message of latest.messages) if (!window.isHistoricalMessage(message.id)) visible.add(message.id);
         for (const message of messages) {
           const beforeMessageId = window.nextVisibleMessage(message.id, visible);
-          this.emitConversation({ agentId: agent.id, backend: 'claude', backendSessionId: snapshot.sessionId ?? undefined,
+          this.emitConversation({ agentId: agent.id, provider: 'claude', providerSessionId: snapshot.sessionId ?? undefined,
             type: 'message.replaced', payload: { message, ...(beforeMessageId ? { beforeMessageId } : {}) } });
           visible.add(message.id);
         }
@@ -776,48 +776,48 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     });
   }
 
-  async resumeConversation(agent: Context, target: ConversationResumeTarget): Promise<HarnessConversationResumeResult> {
+  async resumeConversation(agent: Context, target: ConversationResumeTarget): Promise<ProviderConversationResumeResult> {
     const ref = target.ref;
-    if (ref.backend !== 'claude') {
+    if (ref.provider !== 'claude') {
       throw new Error('Claude cannot resume non-Claude conversation history.');
     }
-    const currentTranscriptFolder = agent.backendSession?.kind === 'claude' && agent.backendSession.sessionId === ref.sessionId ? agent.backendSession.transcriptFolder : undefined;
+    const currentTranscriptFolder = agent.providerSession?.kind === 'claude' && agent.providerSession.sessionId === ref.sessionId ? agent.providerSession.transcriptFolder : undefined;
     if (ref.folder !== agent.folder && ref.folder !== currentTranscriptFolder) {
       throw new Error('Claude conversation folder does not match the agent folder.');
     }
 
-    const backendSession = claudeBackendSession(ref.sessionId, undefined, undefined, currentTranscriptFolder);
+    const providerSession = claudeProviderSession(ref.sessionId, undefined, undefined, currentTranscriptFolder);
     const load = { token: Symbol(), sessionId: ref.sessionId };
     this.historyLoads.set(agent.id, load);
     const revision = this.conversationRevisionsByAgentId.get(agent.id);
     const history = await this.loadHistory({
       ...agent,
-      backendSession,
+      providerSession,
     }, true);
     if (this.historyLoads.get(agent.id) !== load || this.conversationRevisionsByAgentId.get(agent.id) !== revision) {
       throw new Error('Claude conversation changed while loading history.');
     }
-    const resolvedBackendSession = history?.backendSession ?? backendSession;
+    const resolvedProviderSession = history?.providerSession ?? providerSession;
     this.resetConversationReplica(
       agent,
-      resolvedBackendSession.kind === 'claude' ? resolvedBackendSession.sessionId : ref.sessionId,
+      resolvedProviderSession.kind === 'claude' ? resolvedProviderSession.sessionId : ref.sessionId,
       history?.messages ?? [],
       history?.taskPlan,
       history?.turns,
       history?.source,
     );
-    if (resolvedBackendSession.kind === 'claude') {
+    if (resolvedProviderSession.kind === 'claude') {
       this.turnBoundariesByAgentId.delete(agent.id);
       this.goalRefreshIds.delete(agent.id);
       this.publishGoal(agent.id, history?.goal ?? null);
-      this.queueHydratedContextUsageRefresh({ ...agent, backendSession: resolvedBackendSession }, resolvedBackendSession);
+      this.queueHydratedContextUsageRefresh({ ...agent, providerSession: resolvedProviderSession }, resolvedProviderSession);
     }
     return {
-      backendSession: resolvedBackendSession,
+      providerSession: resolvedProviderSession,
     };
   }
 
-  async forkConversation(agent: Context, targetAgent: Context, turnId?: string): Promise<import('../../driver').HarnessConversationForkResult> {
+  async forkConversation(agent: Context, targetAgent: Context, turnId?: string): Promise<import('../../driver').ProviderConversationForkResult> {
     const sessionId = claudeSessionId(agent);
     if (!sessionId) throw new Error('Claude needs an existing conversation to fork.');
     if (this.activeTurnsByAgentId.has(agent.id) || this.forkingAgentIds.has(agent.id)) throw new Error('Claude must be idle before forking.');
@@ -830,18 +830,18 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
       const historicalTurnId = liveBoundary ? history?.nativeMessageTurnIds?.[liveBoundary] : turnId;
       const boundary = historicalTurnId ? history?.turnBoundaries?.[historicalTurnId] : undefined;
       if (turnId && !boundary) throw new Error('Native Claude message boundary is unavailable for this turn. Reload the conversation and retry.');
-      const storageFolder = agent.backendSession?.kind === 'claude' ? agent.backendSession.transcriptFolder : undefined;
+      const storageFolder = agent.providerSession?.kind === 'claude' ? agent.providerSession.transcriptFolder : undefined;
       const childId = await this.transport.forkSession(sessionId, claudeWorkingDirectory(agent), boundary, ...(storageFolder ? [storageFolder] : []));
       await this.flushPromptContent(sessionId);
       await cp(promptContentDirectory(this.promptContentHome(), sessionId), promptContentDirectory(this.promptContentHome(), childId), { recursive: true }).catch(error => { if (error.code !== 'ENOENT') throw error; });
-      const backendSession = claudeBackendSession(childId,
-        agent.backendSession?.kind === 'claude' ? agent.backendSession.model : undefined,
-        agent.backendSession?.kind === 'claude' ? agent.backendSession.reasoningEffort as ClaudeTurnParams['effort'] : undefined, storageFolder);
-      return { backendSession };
+      const providerSession = claudeProviderSession(childId,
+        agent.providerSession?.kind === 'claude' ? agent.providerSession.model : undefined,
+        agent.providerSession?.kind === 'claude' ? agent.providerSession.reasoningEffort as ClaudeTurnParams['effort'] : undefined, storageFolder);
+      return { providerSession };
     } finally { this.forkingAgentIds.delete(agent.id); }
   }
 
-  async forkWorktreeConversation(agent: Context, _targetAgent: Context): Promise<import('../../driver').HarnessConversationForkResult | null> {
+  async forkWorktreeConversation(agent: Context, _targetAgent: Context): Promise<import('../../driver').ProviderConversationForkResult | null> {
     if (!this.transport.forkWorktreeSession) return null;
     const sessionId = claudeSessionId(agent);
     if (!sessionId) throw new Error('Claude needs an existing conversation to fork.');
@@ -855,18 +855,18 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     }
     this.forkingAgentIds.add(agent.id);
     try {
-      const storageFolder = agent.backendSession?.kind === 'claude' ? agent.backendSession.transcriptFolder : undefined;
+      const storageFolder = agent.providerSession?.kind === 'claude' ? agent.providerSession.transcriptFolder : undefined;
       const childId = await this.transport.forkWorktreeSession(sessionId, claudeWorkingDirectory(agent), boundary, storageFolder);
       await this.flushPromptContent(sessionId);
       await cp(promptContentDirectory(this.promptContentHome(), sessionId), promptContentDirectory(this.promptContentHome(), childId), { recursive: true }).catch(error => { if (error.code !== 'ENOENT') throw error; });
       // The destination query resumes the provider-owned fork with the worker's
       // cwd, permissions, model, system appendix and identity-scoped MCP URL.
-      return { backendSession: claudeBackendSession(childId, undefined, undefined, storageFolder ?? claudeWorkingDirectory(agent)) };
+      return { providerSession: claudeProviderSession(childId, undefined, undefined, storageFolder ?? claudeWorkingDirectory(agent)) };
     } finally { this.forkingAgentIds.delete(agent.id); }
   }
 
-  async readConversationMessages(ref: BackendConversationRef, agentId: string): Promise<Message[]> {
-    if (ref.backend !== 'claude') {
+  async readConversationMessages(ref: ProviderConversationRef, agentId: string): Promise<Message[]> {
+    if (ref.provider !== 'claude') {
       throw new Error('Claude cannot read non-Claude conversation history.');
     }
 
@@ -875,8 +875,8 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
 
     const historyAgent = this.driverOptions.contextForConversation?.(ref, agentId);
     const context: Agent = historyAgent ?? {
-      id: agentId, name: agentId, folder: ref.folder, backend: 'claude',
-      backendSession: { kind: 'claude', sessionId: ref.sessionId, transport: 'stdio' },
+      id: agentId, name: agentId, folder: ref.folder, provider: 'claude',
+      providerSession: { kind: 'claude', sessionId: ref.sessionId, transport: 'stdio' },
     };
     const history = ref.subagentId === undefined && historyAgent ? await this.loadHistory(historyAgent)
       : await loadClaudeTranscriptHistory(context, { projectsRoot: this.claudeProjectsRoot(), subagentId: ref.subagentId, toolOptions: this.driverOptions.toolOptions });
@@ -896,12 +896,12 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
       ? await loadClaudeTranscriptHistory(agent, {
         projectsRoot: this.claudeProjectsRoot(), recent,
       }) : await this.historyLoader(agent, { recent });
-    if (history?.backendSession.kind === 'claude') {
-      await this.flushPromptContent(history.backendSession.sessionId);
-      await restorePromptContent(this.promptContentHome(), history.backendSession.sessionId, history.messages);
+    if (history?.providerSession.kind === 'claude') {
+      await this.flushPromptContent(history.providerSession.sessionId);
+      await restorePromptContent(this.promptContentHome(), history.providerSession.sessionId, history.messages);
       const source = history.source;
       if (source) {
-        const home = this.promptContentHome(); const sessionId = history.backendSession.sessionId;
+        const home = this.promptContentHome(); const sessionId = history.providerSession.sessionId;
         const restore = async (messages: Message[]) => { await restorePromptContent(home, sessionId, messages); return messages; };
         const restoredSource = (original: import('./history-source').ClaudeHistorySource): import('./history-source').ClaudeHistorySource => ({
           ...original, readTurn: async id => restore(await original.readTurn(id)), readAll: async () => restore(await original.readAll()),
@@ -926,7 +926,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
       for (const delay of [0, 100, 200, 400, 800]) {
         if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
         if (this.goalRefreshIds.get(agent.id) !== refreshId) return;
-        const history = await this.loadHistory({ ...agent, backendSession: claudeBackendSession(turn.sessionId, undefined, undefined, turn.transcriptFolder) });
+        const history = await this.loadHistory({ ...agent, providerSession: claudeProviderSession(turn.sessionId, undefined, undefined, turn.transcriptFolder) });
         if (this.goalRefreshIds.get(agent.id) !== refreshId) return;
         const pending = this.goalsByAgentId.get(agent.id);
         verified = history?.goal !== undefined;
@@ -1021,7 +1021,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
         windowDurationMins: slot === 'primary' ? 300 : 10_080,
         resetsAt: typeof resetsAt === 'number' && Number.isFinite(resetsAt) ? resetsAt : null,
       } };
-      this.emit({ type: 'account.rateLimitsUpdated', backend: 'claude', payload: { rateLimits: this.accountLimits } });
+      this.emit({ type: 'account.rateLimitsUpdated', provider: 'claude', payload: { rateLimits: this.accountLimits } });
       return;
     }
     const sessionId = claudeMessageSessionId(message);
@@ -1104,8 +1104,8 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
       if (event.error) {
         this.emitConversation({
           agentId: activeTurn.agentId,
-          backend: this.backend,
-          backendSessionId: activeTurn.sessionId ?? undefined,
+          provider: this.provider,
+          providerSessionId: activeTurn.sessionId ?? undefined,
           turnId: activeTurn.turnId,
           type: 'error',
           payload: { message: `Claude context compaction failed: ${event.error}` },
@@ -1118,8 +1118,8 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
       activeTurn.compactionCompleted = true;
       this.emitConversation({
         agentId: activeTurn.agentId,
-        backend: this.backend,
-        backendSessionId: activeTurn.sessionId ?? undefined,
+        provider: this.provider,
+        providerSessionId: activeTurn.sessionId ?? undefined,
         turnId: activeTurn.turnId,
         type: 'context.compactionCompleted',
         payload: {},
@@ -1133,8 +1133,8 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     activeTurn.compactionStarted = true;
     this.emitConversation({
       agentId: activeTurn.agentId,
-      backend: this.backend,
-      backendSessionId: activeTurn.sessionId ?? undefined,
+      provider: this.provider,
+      providerSessionId: activeTurn.sessionId ?? undefined,
       turnId: activeTurn.turnId,
       type: 'context.compactionStarted',
       payload: {},
@@ -1161,15 +1161,15 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     this.contextUsageRefreshesByAgentId.set(activeTurn.agentId, refresh);
   }
 
-  private queueHydratedContextUsageRefresh(agent: Context, backendSession: Extract<BackendSession, { kind: 'claude' }>): void {
+  private queueHydratedContextUsageRefresh(agent: Context, providerSession: Extract<ProviderSessionData, { kind: 'claude' }>): void {
     if (!this.transport.readContextUsage) return;
-    const sessionId = backendSession.sessionId;
+    const sessionId = providerSession.sessionId;
     this.contextUsageSessionIdsByAgentId.set(agent.id, sessionId);
     const previous = this.contextUsageRefreshesByAgentId.get(agent.id) ?? Promise.resolve();
     const refresh = previous
       .catch(() => undefined)
       .then(async () => {
-        const turnParams = claudeTurnParams({ ...agent, backendSession }, '', {}, sessionId, this.driverOptions.configurePrompt?.({ ...agent, backendSession }));
+        const turnParams = claudeTurnParams({ ...agent, providerSession }, '', {}, sessionId, this.driverOptions.configurePrompt?.({ ...agent, providerSession }));
         const { prompt: _prompt, attachments: _attachments, ...params } = turnParams;
         const usage = await this.transport.readContextUsage?.({ ...params, sessionId });
         if (!usage || this.contextUsageSessionIdsByAgentId.get(agent.id) !== sessionId) return;
@@ -1197,15 +1197,15 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     };
     this.emit({
       agentId,
-      backend: this.backend,
-      backendSessionId: sessionId,
+      provider: this.provider,
+      providerSessionId: sessionId,
       threadId: sessionId,
       ...(turnId ? { turnId } : {}),
       type: 'conversation.contextUsageUpdated',
       payload: { contextUsage },
     });
     const current = this.conversationReplicasByAgentId.get(agentId)?.getSnapshot();
-    if (current?.sessionId === sessionId) this.emitConversation({ agentId, backend: 'claude', backendSessionId: sessionId,
+    if (current?.sessionId === sessionId) this.emitConversation({ agentId, provider: 'claude', providerSessionId: sessionId,
       type: 'context.usageUpdated', payload: { contextUsage } });
   }
 
@@ -1283,8 +1283,8 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
   private emitTextDelta(activeTurn: ActiveClaudeTurn, delta: string): void {
     this.emitConversation({
       agentId: activeTurn.agentId,
-      backend: this.backend,
-      backendSessionId: activeTurn.sessionId ?? undefined,
+      provider: this.provider,
+      providerSessionId: activeTurn.sessionId ?? undefined,
       turnId: activeTurn.turnId,
       type: 'message.delta',
       payload: { delta },
@@ -1308,8 +1308,8 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
       }
       this.emitConversation({
         agentId: activeTurn.agentId,
-        backend: this.backend,
-        backendSessionId: activeTurn.sessionId ?? undefined,
+        provider: this.provider,
+        providerSessionId: activeTurn.sessionId ?? undefined,
         turnId: activeTurn.turnId,
         type: 'item.updated',
         payload: {
@@ -1325,8 +1325,8 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
       const output = message.type === 'user' ? message.tool_use_result : undefined;
       if (completedToolPart && tasks?.apply(completedToolPart, output ?? block.content,
         activeTurn.sessionId ?? activeTurn.agentId, activeTurn.turnId, new Date().toISOString())) {
-        this.emitConversation({ agentId: activeTurn.agentId, backend: 'claude',
-          backendSessionId: activeTurn.sessionId ?? undefined, turnId: activeTurn.turnId,
+        this.emitConversation({ agentId: activeTurn.agentId, provider: 'claude',
+          providerSessionId: activeTurn.sessionId ?? undefined, turnId: activeTurn.turnId,
           type: 'turn.executionPlanUpdated', payload: { plan: tasks.plan } });
       }
     }
@@ -1350,8 +1350,8 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     if (!input) {
       this.emitConversation({
         agentId: activeTurn.agentId,
-        backend: this.backend,
-        backendSessionId: activeTurn.sessionId ?? undefined,
+        provider: this.provider,
+        providerSessionId: activeTurn.sessionId ?? undefined,
         turnId: activeTurn.turnId,
         type: 'item.updated',
         payload: {
@@ -1380,8 +1380,8 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     if (existing) {
       this.emitConversation({
         agentId: activeTurn.agentId,
-        backend: this.backend,
-        backendSessionId: activeTurn.sessionId ?? undefined,
+        provider: this.provider,
+        providerSessionId: activeTurn.sessionId ?? undefined,
         turnId: activeTurn.turnId,
         type: 'item.updated',
         payload: claudeToolPartInputUpdate(toolPart),
@@ -1389,8 +1389,8 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     } else {
       this.emitConversation({
         agentId: activeTurn.agentId,
-        backend: this.backend,
-        backendSessionId: activeTurn.sessionId ?? undefined,
+        provider: this.provider,
+        providerSessionId: activeTurn.sessionId ?? undefined,
         turnId: activeTurn.turnId,
         type: 'item.started',
         payload: { toolPart },
@@ -1419,8 +1419,8 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     activeTurn.fileActivitiesById.set(itemId, activity);
     this.emit({
       agentId: activeTurn.agentId,
-      backend: this.backend,
-      backendSessionId: activeTurn.sessionId ?? undefined,
+      provider: this.provider,
+      providerSessionId: activeTurn.sessionId ?? undefined,
       threadId: claudeThreadId(activeTurn),
       turnId: activeTurn.turnId,
       type: 'workspace.fileActivityDetected',
@@ -1444,8 +1444,8 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
 
     this.emit({
       agentId: activeTurn.agentId,
-      backend: this.backend,
-      backendSessionId: activeTurn.sessionId ?? undefined,
+      provider: this.provider,
+      providerSessionId: activeTurn.sessionId ?? undefined,
       threadId: activeTurn.sessionId ?? undefined,
       turnId: activeTurn.turnId,
       type: 'conversation.modeUpdated',
@@ -1471,8 +1471,8 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
       this.pendingRequestOwners.set(JSON.stringify([activeTurn.agentId, request.id]), activeTurn);
       this.emitConversation({
         agentId: activeTurn.agentId,
-        backend: this.backend,
-        backendSessionId: activeTurn.sessionId ?? undefined,
+        provider: this.provider,
+        providerSessionId: activeTurn.sessionId ?? undefined,
         turnId: activeTurn.turnId,
         type: 'toolInput.requested',
         payload,
@@ -1506,8 +1506,8 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     this.pendingRequestOwners.set(JSON.stringify([activeTurn.agentId, request.id]), activeTurn);
     this.emitConversation({
       agentId: activeTurn.agentId,
-      backend: this.backend,
-      backendSessionId: activeTurn.sessionId ?? undefined,
+      provider: this.provider,
+      providerSessionId: activeTurn.sessionId ?? undefined,
       turnId: activeTurn.turnId,
       type: 'approval.requested',
       payload,
@@ -1604,8 +1604,8 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
 
     this.emitConversation({
       agentId: activeTurn.agentId,
-      backend: this.backend,
-      backendSessionId: activeTurn.sessionId ?? undefined,
+      provider: this.provider,
+      providerSessionId: activeTurn.sessionId ?? undefined,
       threadId: claudeThreadId(activeTurn),
       turnId: activeTurn.turnId,
       type: 'turn.proposedPlanDelta',
@@ -1625,8 +1625,8 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     activeTurn.completedPlanMarkdown = normalizedMarkdown;
     this.emitConversation({
       agentId: activeTurn.agentId,
-      backend: this.backend,
-      backendSessionId: activeTurn.sessionId ?? undefined,
+      provider: this.provider,
+      providerSessionId: activeTurn.sessionId ?? undefined,
       threadId: claudeThreadId(activeTurn),
       turnId: activeTurn.turnId,
       type: 'turn.proposedPlanCompleted',
@@ -1643,10 +1643,10 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     this.contextUsageSessionIdsByAgentId.set(activeTurn.agentId, sessionId);
     this.rebindConversationSession(activeTurn.agentId, sessionId);
     this.emit({
-      backend: this.backend,
-      type: 'backend.statusChanged',
+      provider: this.provider,
+      type: 'provider.statusChanged',
       payload: {
-        backend: this.backend,
+        provider: this.provider,
         status: 'running',
         detail: this.driverOptions.statusText?.('running') ?? 'Claude connected',
         capabilities: this.getCapabilities(),
@@ -1654,15 +1654,15 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     });
     this.emit({
       agentId: activeTurn.agentId,
-      backend: this.backend,
-      backendSessionId: sessionId,
+      provider: this.provider,
+      providerSessionId: sessionId,
       type: 'agent.conversationAttached',
       conversationId: sessionId,
       payload: {},
     });
 
     this.emit({
-      agentId: activeTurn.agentId, backend: this.backend, backendSessionId: sessionId,
+      agentId: activeTurn.agentId, provider: this.provider, providerSessionId: sessionId,
       type: 'conversation.settingsUpdated',
       payload: { settings: {
         ...(activeTurn.model ? { model: activeTurn.model } : {}),
@@ -1673,7 +1673,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     if (!activeTurn.startResolved) {
       activeTurn.startResolved = true;
       activeTurn.resolveStart({
-        backendSession: claudeBackendSession(sessionId, activeTurn.model, activeTurn.reasoningEffort, activeTurn.transcriptFolder),
+        providerSession: claudeProviderSession(sessionId, activeTurn.model, activeTurn.reasoningEffort, activeTurn.transcriptFolder),
         turnId: activeTurn.turnId,
       });
     }
@@ -1713,18 +1713,18 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     if (isClaudeAuthenticationError(error.message)) this.markAuthenticationFailed(activeTurn);
     activeTurn.error = error;
     this.emit({
-      backend: this.backend,
-      type: 'backend.statusChanged',
+      provider: this.provider,
+      type: 'provider.statusChanged',
       payload: {
-        backend: this.backend,
+        provider: this.provider,
         status: 'error',
         detail: error.message,
       },
     });
     this.emitConversation({
       agentId: activeTurn.agentId,
-      backend: this.backend,
-      backendSessionId: activeTurn.sessionId ?? undefined,
+      provider: this.provider,
+      providerSessionId: activeTurn.sessionId ?? undefined,
       turnId: activeTurn.turnId,
       type: 'error',
       payload: { message: error.message, ...(activeTurn.rateLimit ? { rateLimit: activeTurn.rateLimit } : {}) },
@@ -1761,8 +1761,8 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     this.resolvePendingRequests(activeTurn);
     this.emitConversation({
       agentId: activeTurn.agentId,
-      backend: this.backend,
-      backendSessionId: activeTurn.sessionId ?? undefined,
+      provider: this.provider,
+      providerSessionId: activeTurn.sessionId ?? undefined,
       turnId: activeTurn.turnId,
       type: 'turn.completed',
       payload: { turn: { id: activeTurn.turnId, status: activeTurn.interrupted ? 'interrupted' : activeTurn.error ? 'failed' : 'completed' } },
@@ -1780,8 +1780,8 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     this.pendingRequestOwners.delete(key);
     this.emitConversation({
       agentId: activeTurn.agentId,
-      backend: this.backend,
-      backendSessionId: activeTurn.sessionId ?? undefined,
+      provider: this.provider,
+      providerSessionId: activeTurn.sessionId ?? undefined,
       turnId: activeTurn.turnId,
       type: 'clientRequest.resolved',
       payload: { id: requestId },
@@ -1802,8 +1802,8 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
       this.pendingRequestOwners.delete(requestId);
       this.emitConversation({
         agentId: activeTurn.agentId,
-        backend: this.backend,
-        backendSessionId: activeTurn.sessionId ?? undefined,
+        provider: this.provider,
+        providerSessionId: activeTurn.sessionId ?? undefined,
         turnId: activeTurn.turnId,
         type: 'clientRequest.resolved',
         payload: { id: (JSON.parse(requestId) as [string, string])[1] },
@@ -1811,8 +1811,8 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     }
   }
 
-  private emit(event: HarnessEvent): void {
-    const conversationId = event.conversationId ?? event.backendSessionId ?? event.threadId
+  private emit(event: ProviderEvent): void {
+    const conversationId = event.conversationId ?? event.providerSessionId ?? event.threadId
       ?? (event.agentId ? this.liveSessionIdsByAgentId.get(event.agentId) : undefined);
     for (const listener of this.listeners) {
       listener(conversationId ? { ...event, conversationId } : event);
@@ -1842,13 +1842,13 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
       if (message && window) {
         const wasDeferred = window.isDeferred(message.id);
         const projected = window.project(message);
-        if (projected.deferredContent || wasDeferred) publishedEvent = { ...event, backendSessionId: snapshot.sessionId ?? undefined,
+        if (projected.deferredContent || wasDeferred) publishedEvent = { ...event, providerSessionId: snapshot.sessionId ?? undefined,
           type: input.type === 'message.userSubmitted' ? 'message.userSubmitted' : 'message.replaced', payload: { message: projected } };
       }
     }
     const frame: NonNullable<ClaudeHistoryLoadResult['frame']> = {
       agentId: input.agentId,
-      backend: 'claude',
+      provider: 'claude',
       type: 'claude.conversationEventReceived',
       seq: revision,
       occurredAt: event.occurredAt,
@@ -1861,22 +1861,22 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
       for (const message of snapshot.messages) {
         if (message.turnId !== input.turnId || !window?.isDeferred(message.id)) continue;
         const revision = this.nextConversationRevision(input.agentId);
-        const update: ClaudeConversationEvent = { agentId: input.agentId, backend: 'claude', backendSessionId: snapshot.sessionId ?? undefined,
+        const update: ClaudeConversationEvent = { agentId: input.agentId, provider: 'claude', providerSessionId: snapshot.sessionId ?? undefined,
           seq: revision, occurredAt: event.occurredAt, type: 'message.replaced', payload: { message: window.project(message) } };
         // The server retains the full row; only the transport replica receives its preview.
-        this.emit({ agentId: input.agentId, backend: 'claude', type: 'claude.conversationEventReceived', payload: { revision, event: update } });
+        this.emit({ agentId: input.agentId, provider: 'claude', type: 'claude.conversationEventReceived', payload: { revision, event: update } });
       }
     }
     if (input.type === 'toolInput.requested' || input.type === 'approval.requested') {
       this.emit({
-        agentId: input.agentId, backend: 'claude', type: 'agentRequest.created',
+        agentId: input.agentId, provider: 'claude', type: 'agentRequest.created',
         payload: { request: requestFromClientRequest(input.payload, {
-          conversationId: input.backendSessionId ?? replica.getSnapshot().sessionId ?? input.agentId,
+          conversationId: input.providerSessionId ?? replica.getSnapshot().sessionId ?? input.agentId,
           turnId: input.turnId,
         }) },
       });
     } else if (input.type === 'clientRequest.resolved') {
-      this.emit({ agentId: input.agentId, backend: 'claude', type: 'agentRequest.resolved', payload: { id: input.payload.id, outcome: resolution ?? { kind: 'cancelled', reason: 'conversation_released' } } });
+      this.emit({ agentId: input.agentId, provider: 'claude', type: 'agentRequest.resolved', payload: { id: input.payload.id, outcome: resolution ?? { kind: 'cancelled', reason: 'conversation_released' } } });
     }
     return frame;
   }
@@ -1940,7 +1940,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements HarnessDriver<
     );
     this.emit({
       agentId: snapshot.agentId,
-      backend: 'claude',
+      provider: 'claude',
       type: 'claude.conversationSnapshotChanged',
       payload: { revision, snapshot: publishedSnapshot },
     });
@@ -1966,9 +1966,9 @@ function claudeTurnParams(
   existingSessionId: string | null,
   configuration: ClaudePromptConfiguration = {},
 ): ClaudeTurnParams {
-  const claudeOptions = options.backendOptions?.kind === 'claude' ? options.backendOptions : undefined;
-  const defaults = agent.backendDefaults?.kind === 'claude' ? agent.backendDefaults : undefined;
-  const restored = agent.backendSession?.kind === 'claude' ? agent.backendSession : undefined;
+  const claudeOptions = options.providerOptions?.kind === 'claude' ? options.providerOptions : undefined;
+  const defaults = agent.providerDefaults?.kind === 'claude' ? agent.providerDefaults : undefined;
+  const restored = agent.providerSession?.kind === 'claude' ? agent.providerSession : undefined;
   const model = options.selection?.model ?? defaults?.model ?? restored?.model ?? null;
   const restoredEffort = model === restored?.model ? restored?.reasoningEffort : undefined;
   const tier = options.selection?.serviceTier !== undefined ? options.selection?.serviceTier : defaults?.serviceTier;
@@ -2001,15 +2001,15 @@ function claudeEffort(value: string | null | undefined): ClaudeTurnParams['effor
 }
 
 function claudeSessionId(agent: Agent): string | null {
-  return agent.backendSession?.kind === 'claude' ? agent.backendSession.sessionId : null;
+  return agent.providerSession?.kind === 'claude' ? agent.providerSession.sessionId : null;
 }
 
-function claudeBackendSession(
+function claudeProviderSession(
   sessionId: string,
   model?: string | null,
   reasoningEffort?: string | null,
   transcriptFolder?: string,
-): BackendSession {
+): ProviderSessionData {
   return {
     kind: 'claude',
     sessionId,

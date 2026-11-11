@@ -21,9 +21,9 @@ npm install @korus-dev/multi-agent-sdk
 Requires Node.js 22.19+ and an installed, authenticated provider runtime. This is an ESM package.
 
 ```ts
-import { createHarnessDriver } from '@korus-dev/multi-agent-sdk';
+import { createHarness } from '@korus-dev/multi-agent-sdk';
 
-const driver = createHarnessDriver('codex', { client: { name: 'my-app' } });
+const driver = createHarness('codex', { client: { name: 'my-app' } });
 const session = driver.open({ id: 'review', folder: process.cwd() });
 const unsubscribe = driver.onEvent(event => {
   if (event.type === 'session.changed' && event.session === session) {

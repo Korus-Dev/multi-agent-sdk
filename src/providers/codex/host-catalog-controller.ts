@@ -1,13 +1,7 @@
 import { isAbsolute } from 'node:path';
 import type { CodexAppServerClient, v2 } from '@korus-dev/codex-sdk';
-import type {
-  ApprovalPreset,
-  HostEventOrigin,
-  ModelDescriptor,
-  CodexHostSnapshot,
-  Skill,
-  ListCodexModelsOptions,
-} from '../../core/codex-host';
+import type { ApprovalPreset, EventOrigin, ModelDescriptor, Skill, ListCodexModelsOptions } from '../../core/codex-host';
+import type { CodexSnapshot } from '../../core/codex-conversation-types';
 import {
   boundedImageDataUrl,
   catalogIconMimeType,
@@ -28,12 +22,12 @@ import type { ConversationCatalogs, ThreadRuntimePatch, ThreadRuntimeState } fro
 
 export type CodexHostCatalogDependencies = {
   authenticationBlocksBootstrap(): boolean;
-  emitConversationSkills(threadId: string, origin: HostEventOrigin): void;
-  emitEvent(origin: HostEventOrigin, input: HostEventInput): void;
+  emitConversationSkills(threadId: string, origin: EventOrigin): void;
+  emitEvent(origin: EventOrigin, input: HostEventInput): void;
   ensureConnected(): Promise<void>;
-  getState(): CodexHostSnapshot;
+  getState(): CodexSnapshot;
   isClosed(): boolean;
-  patch(patch: Partial<CodexHostSnapshot>): void;
+  patch(patch: Partial<CodexSnapshot>): void;
   patchRuntime(threadId: string, patch: ThreadRuntimePatch): void;
   preferredApprovalPreset(): ApprovalPreset | null;
   runtimes(): Iterable<ThreadRuntimeState>;
@@ -87,7 +81,7 @@ export class CodexHostCatalogController {
     }
   }
 
-  async loadSkills(forceReload = false, origin: HostEventOrigin = 'action'): Promise<void> {
+  async loadSkills(forceReload = false, origin: EventOrigin = 'action'): Promise<void> {
     if (forceReload) this.iconDataUrls.clear();
     this.host.patch({ skillCatalogStatus: 'loading' });
     this.emitSkills(this.cwd ?? null, [], 'loading', origin);
@@ -253,7 +247,7 @@ export class CodexHostCatalogController {
     return models;
   }
 
-  private applyModels(models: ModelDescriptor[], origin: HostEventOrigin): void {
+  private applyModels(models: ModelDescriptor[], origin: EventOrigin): void {
     const selected = selectedModel(models, this.host.getState().selectedModelId);
     this.host.patch({
       models,
@@ -267,15 +261,15 @@ export class CodexHostCatalogController {
 
   private emitModels(
     models: ModelDescriptor[],
-    status: CodexHostSnapshot['modelCatalogStatus'],
-    origin: HostEventOrigin = 'action',
+    status: CodexSnapshot['modelCatalogStatus'],
+    origin: EventOrigin = 'action',
   ): void {
     this.host.emitEvent(origin, {
       type: 'catalog.modelsChanged', payload: { models: structuredClone(models), status },
     });
   }
 
-  private publishSkills(cwd: string | null, skills: Skill[], status: CodexHostSnapshot['skillCatalogStatus'], origin: HostEventOrigin): void {
+  private publishSkills(cwd: string | null, skills: Skill[], status: CodexSnapshot['skillCatalogStatus'], origin: EventOrigin): void {
     const activeId = this.host.getState().activeConversationId;
     if (!activeId) this.host.patch({ skills, skillCatalogStatus: status });
     for (const runtime of this.host.runtimes()) {
@@ -289,8 +283,8 @@ export class CodexHostCatalogController {
   private emitSkills(
     cwd: string | null,
     skills: Skill[],
-    status: CodexHostSnapshot['skillCatalogStatus'],
-    origin: HostEventOrigin,
+    status: CodexSnapshot['skillCatalogStatus'],
+    origin: EventOrigin,
   ): void {
     this.host.emitEvent(origin, {
       type: 'catalog.skillsChanged', payload: { cwd, skills: structuredClone(skills), status },
@@ -299,8 +293,8 @@ export class CodexHostCatalogController {
 
   private emitPermissions(
     cwd: string | null,
-    profiles: CodexHostSnapshot['permissionProfiles'],
-    approvalPresets: CodexHostSnapshot['approvalPresets'],
+    profiles: CodexSnapshot['permissionProfiles'],
+    approvalPresets: CodexSnapshot['approvalPresets'],
   ): void {
     this.host.emitEvent('action', {
       type: 'catalog.permissionsChanged',
@@ -309,7 +303,7 @@ export class CodexHostCatalogController {
   }
 
   private async requestPermissionProfiles(cwd: string | undefined) {
-    const profiles: CodexHostSnapshot['permissionProfiles'] = [];
+    const profiles: CodexSnapshot['permissionProfiles'] = [];
     let cursor: string | null | undefined = null;
     do {
       const response: v2.PermissionProfileListResponse = await this.client.request('permissionProfile/list', {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { CodexConversationEvent, StartCodexRealtimeOptions } from '../../src/index';
+import type { CodexConversationEvent, StartCodexRealtimeOptions } from '../../src/internal';
 import { startCodexRealtimeSession } from '../../src/providers/codex/host-realtime-session';
 
 describe('startCodexRealtimeSession', () => {
