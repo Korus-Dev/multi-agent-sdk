@@ -232,11 +232,15 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
         native: payload } });
     } else if (event.type === 'conversation.contextUsageUpdated') { b.state.contextUsage = structuredClone(event.payload.contextUsage); this.changed(session); }
   }
+  /** A malformed frame carries no activity; the projection already asked for recovery. */
+  private readActivity(event: ProviderEvent): FrameActivity[] {
+    try { return this.activityOf(event); } catch { return []; }
+  }
   /** Hands consumers what a provider event means: activity for a native conversation frame, the notice itself otherwise. */
   private publish(event: ProviderEvent, session: Session | undefined): void {
     if (isConversationFrame(event)) {
       if (!session) return;
-      for (const activity of this.activityOf(event)) {
+      for (const activity of this.readActivity(event)) {
         if (activity.type === 'plan.proposed') {
           const { type: _proposed, conversationId: _conversation, ...plan } = activity;
           this.emit({ type: 'plan.readyForReview', session, ...plan });

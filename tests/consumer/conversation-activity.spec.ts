@@ -70,3 +70,13 @@ describe('conversation activity', () => {
     expect(activity.at(-1)).toMatchObject({ type: 'turn.completed', status: 'completed', error: null });
   });
 });
+
+it.each(['codex', 'claude', 'cursor', 'antigravity'] as const)('reads no activity from a malformed %s frame, and asks for recovery', provider => {
+  const { harness, script } = createScriptedHarness(provider);
+  harness.open({ id: 'agent', folder: '/work' });
+  const seen: string[] = [];
+  harness.onEvent(event => seen.push(event.type));
+  expect(() => script.emit({ type: `${provider}.conversationEventReceived`, agentId: 'agent', provider, payload: { revision: 3, event: {} } } as never)).not.toThrow();
+  expect(seen).toContain('recovery.required');
+  expect(seen.filter(type => type.startsWith('turn.'))).toEqual([]);
+});

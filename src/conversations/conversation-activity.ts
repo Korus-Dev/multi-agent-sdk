@@ -48,15 +48,15 @@ export function transcriptActivity(
   frame: { type: string; turnId?: string; payload: unknown },
   conversationId: string | undefined,
 ): FrameActivity[] {
-  const event = frame as { type: string; turnId?: string; payload: { turn?: { id: string; status?: string }; message?: MessageLike; error?: string } };
-  const turnId = event.turnId ?? event.payload.turn?.id;
+  const event = frame as { type: string; turnId?: string; payload?: { turn?: { id: string; status?: string }; message?: MessageLike; error?: string } };
+  const turnId = event.turnId ?? event.payload?.turn?.id;
   const scope = activityScope(turnId, conversationId);
   if (event.type === 'turn.started') return turnId ? [{ ...scope, type: 'turn.started', turnId }] : [];
   if (event.type === 'turn.completed') {
-    const status = event.payload.turn?.status;
+    const status = event.payload?.turn?.status;
     if (!turnId || (status !== 'completed' && status !== 'interrupted' && status !== 'failed')) return [];
-    return [{ ...scope, type: 'turn.completed', turnId, status, error: harnessError(event.payload.error), willRetry: false }];
+    return [{ ...scope, type: 'turn.completed', turnId, status, error: harnessError(event.payload?.error), willRetry: false }];
   }
-  if (event.type === 'message.upsert' && event.payload.message) return messageActivity(scope, event.payload.message);
+  if (event.type === 'message.upsert' && Array.isArray(event.payload?.message?.parts)) return messageActivity(scope, event.payload.message);
   return [];
 }
