@@ -147,7 +147,7 @@ export type Harness<P extends HarnessProvider = HarnessProvider> = {
   /** What the provider offers in general, before any session exists. Session capabilities can be narrower. */
   getProviderCapabilities(): HarnessCapabilities;
   readSession(session: Session): SessionState;
-  /** The full state with its revision: where a replica starts, or resyncs after missing a patch. */
+  /** The full state with its revision: where a replica starts, or resyncs after missing a patch. Publishes any pending change as a `session.patch` first. */
   readSessionSnapshot(session: Session): import('./session-patch').SessionSnapshot;
   sendPrompt(session: Session, prompt: string, options?: PromptOptions): Promise<Admission>;
   interrupt(session: Session, expectedTurnId?: string): Promise<Admission>;

@@ -356,10 +356,12 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
   getCapabilities(session: Session) { return this.capabilitiesFor(this.interactive(session).context); }
   getProviderCapabilities() { return this.capabilitiesFor(); }
   readSession(session: Session) { return structuredClone(this.get(session).state); }
+  /** Publishes any pending change as a `session.patch` first, so the snapshot and the patch stream agree. */
   readSessionSnapshot(session: Session): SessionSnapshot {
     this.publishPatch(session);
     const binding = this.get(session);
-    return { revision: binding.revision, state: structuredClone(binding.state) };
+    // The same JSON path as patches, so a state rebuilt from patches matches it exactly.
+    return { revision: binding.revision, state: JSON.parse(JSON.stringify(binding.state)) as SessionState };
   }
   async sendPrompt(session: Session, prompt: string, options?: Parameters<Harness['sendPrompt']>[2]) { return this.admitted(session, await this.native.sendPrompt(this.main(session).context, prompt, options)); }
   async interrupt(session: Session, expectedTurnId?: string) { return this.admitted(session, await this.native.interrupt(this.interactive(session).context, expectedTurnId)); }
