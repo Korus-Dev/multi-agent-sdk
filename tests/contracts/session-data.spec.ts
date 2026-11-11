@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  conversationRefId, defaultsPermission, isProviderSessionData, sameConversationRef, sessionConversationId, sessionConversationRef,
+  conversationRefId, conversationSessionData, defaultsPermission, isProviderSessionData, sameConversationRef, sessionConversationId, sessionConversationRef,
   sessionHasConversation, subagentOfRef, subagentRef,
 } from '../../src/contracts-entry';
 import type { ProviderConversationRef, ProviderSessionData } from '../../src/contracts';
@@ -15,6 +15,7 @@ const sessions: ProviderSessionData[] = [
 
 describe('session data readers', () => {
   it.each(sessions)('names the conversation of %o and finds it again by reference', data => {
+    expect(sessionConversationId(conversationSessionData(data.kind, sessionConversationId(data)))).toBe(sessionConversationId(data));
     const ref = sessionConversationRef(data, '/work');
     expect(conversationRefId(ref)).toBe(sessionConversationId(data));
     expect(sessionHasConversation(data, ref)).toBe(true);

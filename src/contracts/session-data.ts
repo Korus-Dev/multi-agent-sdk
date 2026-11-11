@@ -52,6 +52,13 @@ export function sessionConversationRef(data: ProviderSessionData, folder: string
   return { provider: data.kind, folder, sessionId: data.sessionId };
 }
 
+/** Session data that continues conversation `conversationId` on `provider`, as a harness reports attaching to it. */
+export function conversationSessionData(provider: import('./shared').HarnessProvider, conversationId: string): ProviderSessionData {
+  if (provider === 'codex') return { kind: 'codex', threadId: conversationId };
+  if (provider === 'claude') return { kind: 'claude', sessionId: conversationId, transport: 'stdio' };
+  return { kind: provider, sessionId: conversationId };
+}
+
 /** Whether a reference names the conversation persisted session data continues. */
 export function sessionHasConversation(data: ProviderSessionData, ref: ProviderConversationRef): boolean {
   if (data.kind !== ref.provider) return false;
