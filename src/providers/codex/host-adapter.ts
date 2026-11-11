@@ -415,7 +415,6 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
       ...(selection.model ? { model: selection.model } : {}),
       ...(selection.reasoningEffort ? { reasoningEffort: selection.reasoningEffort } : {}),
       serviceTier: null,
-      ...(input.tools === true ? { tools: 'read-only' as const } : {}),
       ...(input.attachments ? { attachments: input.attachments } : {}),
       ...(servers.length ? {mcpServers: servers.map(server => ({name: server.name, transport: {type: 'http' as const, url: server.url}, enabledTools: [...server.enabledTools], ...(server.approval === 'auto' ? { toolApprovalMode: 'auto' as const } : {}), ...(server.required === undefined ? {} : { required: server.required })}))} : {}),
       ...(input.developerInstructions ? { developerInstructions: input.developerInstructions } : {}),

@@ -12,14 +12,13 @@ import { AcpPromptJournal } from './prompt-journal';
 import { acpConsumption, selectedModel } from './consumption';
 import type { MessagePart } from '../../contracts/index';
 import type { ExecutionObservation } from '../../contracts/usage';
-import { hasGitSafeguards, nativeTargetsInside, readOnlyGitCommand } from '../../tools/read-only-workspace';
 
 type SessionOptions = {
   client?: { metadataDirectory?: string; trustedMcpServerName?: string };
   runtimeOptions?: Partial<Parameters<typeof AcpRuntime.open>[0]>;
   agentId: string; cwd: string; home?: string; sessionId?: string;
   mcpServers: unknown[];
-  tools?: boolean | 'read-only';
+  tools?: boolean;
   promptTimeoutMs?: number | null;
   utilityMcpTools?: readonly {server: string; tools: readonly string[]}[];
   /** Not a user conversation: persist no prompts and hide it from history. */
@@ -50,7 +49,7 @@ export class AcpSession {
   static async open(options: SessionOptions): Promise<AcpSession> {
     const session = new AcpSession(options);
     try {
-      session.runtime = await AcpRuntime.open({ ...options.runtimeOptions, cwd: options.cwd, home: options.home ?? options.runtimeOptions?.home, filesystem: options.tools === 'read-only' ? 'read-only' : options.tools !== false,
+      session.runtime = await AcpRuntime.open({ ...options.runtimeOptions, cwd: options.cwd, home: options.home ?? options.runtimeOptions?.home, filesystem: options.tools !== false,
         onRequest: (method, params) => session.request(method, params),
         onNotification: (method, params) => session.notification(method, params),
         onClose: error => session.closed(error),
@@ -231,21 +230,6 @@ export class AcpSession {
     if (method === 'session/request_permission') {
       if (!this.active) throw new Error('Antigravity permission request has no active turn.');
       if (this.interrupted) return { outcome: { outcome: 'cancelled' } };
-      if (this.options.tools === 'read-only') {
-        const call = record(params.toolCall) ? params.toolCall : {};
-        const input = record(call.rawInput) ? call.rawInput : {};
-        const command = input.CommandLine ?? input.command;
-        const cwd = input.Cwd ?? input.cwd;
-        const read = ['read', 'search'].includes(String(call.kind)) && await nativeTargetsInside(call, this.options.cwd);
-        // Native command permissions cannot rewrite tool input; require the hardened invocation, including diff-driver and fsmonitor safeguards.
-        const safeCommand = readOnlyGitCommand(command);
-        const diffCommand = safeCommand && /\b(?:diff|show|log) --no-ext-diff/u.test(safeCommand);
-        const git = call.kind === 'execute' && safeCommand
-          && hasGitSafeguards(command) && typeof command === 'string' && (!diffCommand || (/--no-ext-diff\b/u.test(command) && /--no-textconv\b/u.test(command)))
-          && (cwd === undefined || cwd === this.options.cwd);
-        const option = (read || git) && Array.isArray(params.options) ? params.options.find(value => record(value) && value.kind === 'allow_once') : undefined;
-        return record(option) && typeof option.optionId === 'string' ? { outcome: { outcome: 'selected', optionId: option.optionId } } : { outcome: { outcome: 'cancelled' } };
-      }
       const name = this.options.client?.trustedMcpServerName;
       const trustedMcpServerName = name && this.options.mcpServers.filter(server => record(server) && server.name === name).length === 1 ? name : undefined;
       const pending = permissionRequest(params, trustedMcpServerName);
@@ -256,7 +240,6 @@ export class AcpSession {
       });
     }
     if (!this.active) throw new Error('Antigravity file request has no active turn.');
-    if (this.options.tools === 'read-only' && method !== 'fs/read_text_file') throw new Error('This utility only reads its working folder.');
     const result = await handleAcpFileRequest(method, params, [this.options.cwd,
       path.join(this.options.home ?? antigravityHome(), 'antigravity-acp', 'brain', this.sessionId)]);
     if (method === 'fs/write_text_file' && typeof params.path === 'string' && /^(?:PLAN|implementation_plan)\.md$/i.test(path.basename(params.path)) && typeof params.content === 'string') this.planMarkdown = params.content;

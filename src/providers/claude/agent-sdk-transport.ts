@@ -33,7 +33,6 @@ import {
 } from './transport';
 import { claudeMessageSessionId, type ClaudeSdkMessage } from './protocol';
 import { claudeConfigDirectoryOverride } from './config-directory';
-import { readOnlyWorkspaceTool } from '../../tools/read-only-workspace';
 
 export type ClaudeAgentSdkTransportOptions = {
   command?: string;
@@ -327,7 +326,6 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
     input.signal?.throwIfAborted();
     const prompt = new AsyncPushQueue<SDKUserMessage>();
     const sessionId = this.createSessionId();
-    const inspect = input.tools === true;
     const servers = this.options.validateMcpServers?.(input.mcpServers) ?? input.mcpServers ?? [];
     validateMcpPolicy(servers, 'claude');
     const enabledMcpTools = Object.fromEntries(servers.map(server => [server.name, server.enabledTools]));
@@ -335,17 +333,14 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
     const canUseTool: CanUseTool = async (name, args, context) => {
       if (!mcpToolEnabled(name, enabledMcpTools)) return { behavior: 'deny', message: 'Tool unavailable in this scope.' };
       if (allowedTools.some(pattern => toolMatchesPattern(name, pattern))) return {behavior: 'allow', updatedInput: args};
-      if (!inspect) return denyInspectionToolUse(name, args, context);
-      const updatedInput = await readOnlyWorkspaceTool(name, args, input.cwd);
-      return updatedInput ? { behavior: 'allow', updatedInput } : { behavior: 'deny', message: 'This utility only inspects Git and source in its working folder.' };
+      return denyInspectionToolUse(name, args, context);
     };
     const runtime = this.createQuery({
       prompt,
       options: {
         ...claudeQueryOptions({ cwd: input.cwd, prompt: input.prompt, appendSystemPrompt: input.developerInstructions, ...selection }, sessionId, null, canUseTool, this.options),
         persistSession: false,
-        tools: inspect ? ['Read', 'Glob', 'Grep', 'Bash'] : [],
-        ...(inspect ? { settingSources: [], permissionMode: 'default' as const } : {}),
+        tools: [],
         mcpServers: Object.fromEntries(servers.map(server => [server.name, {type: 'http' as const, url: server.url}])),
         ...(allowedTools.length ? {allowedTools} : {}),
         ...(input.outputSchema ? { outputFormat: { type: 'json_schema' as const, schema: input.outputSchema as Record<string, unknown> } } : {}),

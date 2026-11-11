@@ -32,7 +32,7 @@ describe('CodexHost ephemeral generation', () => {
     await host.close();
   });
 
-  it.each([{ tools: undefined, images: false }, { tools: 'none', images: true }, { tools: 'read-only', images: true }] as const)('returns isolated structured text with policy=%j and the complete RPC input', async ({ tools, images }) => {
+  it.each([{ images: false }, { images: true }] as const)('returns isolated structured text with policy=%j and the complete RPC input', async ({ images }) => {
     const transport = new MockCodexAppServer({
       'thread/start': () => resumeResponse({
         ...thread('thread-ephemeral', false),
@@ -52,7 +52,6 @@ describe('CodexHost ephemeral generation', () => {
     host.onEvent((event) => events.push(event));
 
     const resultPromise = host.generateText('Write a commit message', {
-      ...(tools === undefined ? {} : { tools }),
       ...(images ? {mcpServers:[{name:'icons_job',transport:{type:'http' as const,url:'http://127.0.0.1:1234/icons/token'},enabledTools:['fetch_tech_icon'],toolApprovalMode:'auto' as const}]} : {}),
       ...(images ? { attachments: [
         { type: 'image' as const, path: '/tmp/reference image.png ', detail: 'high' as const },
@@ -106,7 +105,7 @@ describe('CodexHost ephemeral generation', () => {
         developerInstructions: 'Return JSON only.',
         dynamicTools: [],
         ...(images ? {config:{'mcp_servers.icons_job':{url:'http://127.0.0.1:1234/icons/token',enabled_tools:['fetch_tech_icon'],default_tools_approval_mode:'auto'}}} : {}),
-        ...(tools === 'read-only' ? {} : { environments: [] }),
+        environments: [],
         ephemeral: true,
         model: 'gpt-mini-runtime',
         permissions: ':read-only',
@@ -122,7 +121,7 @@ describe('CodexHost ephemeral generation', () => {
       params: {
         threadId: 'thread-ephemeral',
         effort: 'high',
-        ...(tools === 'read-only' ? {} : { environments: [] }),
+        environments: [],
         input: [
           { type: 'text', text: 'Write a commit message', text_elements: [] },
           ...(images ? [

@@ -171,28 +171,19 @@ describe('ClaudeAgentSdkTransport', () => {
   });
 
 
-  it('lets repository utilities inspect Git and source without enabling writes or altering conversation permissions', async () => {
-    const folder = await mkdtemp(path.join(os.tmpdir(), 'utility-inspection-'));
+  it('gives a text generation no tools of its own and denies any tool call it still makes', async () => {
     const harness = createQueryHarness();
     const transport = new ClaudeAgentSdkTransport({ createQuery: harness.createQuery });
     try {
-      await writeFile(path.join(folder, 'source.ts'), 'export const value = 1');
-      const result = transport.generateText({ cwd: folder, prompt: 'Inspect the uncommitted scope', tools: true });
+      const result = transport.generateText({ cwd: os.tmpdir(), prompt: 'Write it' });
       await vi.waitFor(() => expect(harness.options).toHaveLength(1));
-      expect(harness.options[0]).toMatchObject({ persistSession: false, tools: ['Read', 'Glob', 'Grep', 'Bash'], mcpServers: {} });
-      const permission = (tool: string, input: Record<string, unknown>) => harness.options[0]!.canUseTool!(tool, input, { signal: new AbortController().signal, toolUseID: 'inspect', requestId: 'inspect' });
-      expect(await permission('Bash', { command: 'git diff --stat HEAD' })).toMatchObject({ behavior: 'allow', updatedInput: { command: expect.stringContaining('--no-ext-diff --no-textconv') } });
-      expect(await permission('Read', { file_path: path.join(folder, 'source.ts') })).toMatchObject({ behavior: 'allow' });
-      for (const [tool, input] of [
-        ['Bash', { command: 'git reset --hard' }], ['Bash', { command: 'git diff --output=source.ts' }],
-        ['Bash', { command: 'git status; touch source.ts' }], ['Bash', { command: 'git -c diff.external=evil diff' }],
-        ['Read', { file_path: '/etc/passwd' }], ['Edit', { file_path: path.join(folder, 'source.ts') }],
-      ] as const) expect(await permission(tool, input)).toMatchObject({ behavior: 'deny' });
-      harness.emit({ type: 'result', subtype: 'success', session_id: 'inspection', is_error: false, result: 'done' } as ClaudeSdkMessage);
+      expect(harness.options[0]).toMatchObject({ persistSession: false, tools: [], mcpServers: {} });
+      const permission = (tool: string) => harness.options[0]!.canUseTool!(tool, {}, { signal: new AbortController().signal, toolUseID: 'x', requestId: 'x' });
+      for (const tool of ['Bash', 'Read', 'Edit']) expect(await permission(tool)).toMatchObject({ behavior: 'deny' });
+      harness.emit({ type: 'result', subtype: 'success', session_id: 'generation', is_error: false, result: 'done' } as ClaudeSdkMessage);
       await expect(result).resolves.toEqual({ text: 'done' });
-    } finally { await transport.close(); await rm(folder, { recursive: true, force: true }); }
+    } finally { await transport.close(); }
   });
-
 
   it('deletes a review-owned SDK session from the workspace store', async () => {
     const deleteSession = vi.fn().mockResolvedValue(undefined);

@@ -20,8 +20,6 @@ export type HarnessTextGenerationInput = {
   selection?: Pick<ExecutionSelectionOverrides, 'model' | 'reasoningEffort'>;
   /** Host-local policy, evaluated against this invocation's native catalog. */
   selectModel?: (models: readonly ProviderModelOption[]) => Pick<ExecutionSelectionOverrides, 'model' | 'reasoningEffort'>;
-  /** Isolated inspection utilities may use read-only Git and source tools. */
-  tools?: boolean;
   /** Private host-owned HTTP capabilities for this invocation only. */
   mcpServers?: readonly HarnessMcpServer[];
   developerInstructions?: string;

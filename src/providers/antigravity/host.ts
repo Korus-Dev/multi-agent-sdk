@@ -213,10 +213,9 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
     if (this.closed) throw new Error('Antigravity host is closed.');
     input.signal?.throwIfAborted();
     if (input.outputSchema !== undefined) throw new HarnessUnsupportedError('Structured output');
-    const inspect = input.tools === true;
     const servers = input.mcpServers ?? [];
     validateMcpPolicy(servers, 'antigravity');
-    const session = await this.openSession({ agentId: `generation-${randomUUID()}`, cwd: input.cwd, mcpServers: servers.map(server => sessionMcpServer(server.url, server.name, [...server.enabledTools])), utilityMcpTools: [], tools: inspect ? 'read-only' : false, ...(input.timeoutMs === null ? {promptTimeoutMs:null} : {}), ephemeral: true, changed: () => {}, usage: event => this.observeUsage({ ...event, agentId: agent.id }) });
+    const session = await this.openSession({ agentId: `generation-${randomUUID()}`, cwd: input.cwd, mcpServers: servers.map(server => sessionMcpServer(server.url, server.name, [...server.enabledTools])), utilityMcpTools: [], tools: false, ...(input.timeoutMs === null ? {promptTimeoutMs:null} : {}), ephemeral: true, changed: () => {}, usage: event => this.observeUsage({ ...event, agentId: agent.id }) });
     this.auxiliary.add(session);
     const abort = () => { void session.interrupt().catch(() => session.close()); };
     input.signal?.addEventListener('abort', abort, { once: true });

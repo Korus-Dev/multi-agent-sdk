@@ -10,7 +10,7 @@ import { antigravityHarnessCapabilities, claudeHarnessCapabilities, codexHarness
 export type ScriptedOperation =
   | 'sendPrompt' | 'steerPrompt' | 'interrupt' | 'setGoal' | 'clearGoal' | 'deleteTurn' | 'editTurn' | 'retryTurn'
   | 'continueInterruptedTurn' | 'loadConversation' | 'loadOlderHistory' | 'loadTurnHistory' | 'readConversationContent' | 'listConversations' | 'resumeConversation' | 'forkConversation' | 'readConversationMessages' | 'readConversationSummary' | 'executeScopedPrompt'
-  | 'cancelScopedPrompt' | 'forkWorktreeConversation' | 'tryHandlePromptCommand' | 'preparePromptOptions' | 'disposeScopedSession' | 'generateText' | 'generateImage' | 'setConversationTitle' | 'setPermissionMode' | 'setApprovalPreset' | 'releaseConversation' | 'archiveAgentConversation' | 'deleteAgentConversation' | 'reconcileConversations' | 'respondToAgentRequest' | 'listModels' | 'listSkills'
+  | 'cancelScopedPrompt' | 'startReview' | 'forkWorktreeConversation' | 'tryHandlePromptCommand' | 'preparePromptOptions' | 'disposeScopedSession' | 'generateText' | 'generateImage' | 'setConversationTitle' | 'setPermissionMode' | 'setApprovalPreset' | 'releaseConversation' | 'archiveAgentConversation' | 'deleteAgentConversation' | 'reconcileConversations' | 'respondToAgentRequest' | 'listModels' | 'listSkills'
   | 'listPlugins' | 'authenticate' | 'getAccountRateLimits' | 'getBankedResets' | 'useBankedReset' | 'setConversationStorage' | 'startRealtime' | 'getRemoteControlStatus' | 'enableRemoteControl' | 'disableRemoteControl' | 'startDevicePairing' | 'checkDevicePairing' | 'listPairedDevices' | 'revokePairedDevice' | 'getRuntimeStatus' | 'getCapabilities' | 'close';
 type Handler = (...args: never[]) => unknown;
 
@@ -58,6 +58,7 @@ export function createScriptedHarness(provider: HarnessProvider, options: Script
     getCapabilities: () => ({ ...capabilitiesOf[provider], ...options.capabilities }),
     sendPrompt: (context: ProviderContext) => turn(context),
     steerPrompt: (context: ProviderContext) => turn(context),
+    startReview: (context: ProviderContext) => turn(context),
     interrupt: (context: ProviderContext) => ({ providerSession: sessionFor(provider, context) }),
     setGoal: (context: ProviderContext, objective: string) => ({ providerSession: sessionFor(provider, context), goal: { objective, status: 'active' } }),
     clearGoal: (context: ProviderContext) => ({ providerSession: sessionFor(provider, context), cleared: true }),

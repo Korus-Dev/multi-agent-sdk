@@ -34,3 +34,13 @@ it('rejects operations a test has not enabled with the typed unsupported error',
   const session = harness.open({ id: 'chat', folder: '/work' });
   await expect(harness.setGoal(session, 'x')).rejects.toBeInstanceOf(HarnessUnsupportedError);
 });
+
+it('scripts the native review like any other operation', async () => {
+  const { harness, script } = createScriptedHarness('codex');
+  const session = harness.open({ id: 'review', folder: '/tmp' });
+  expect(harness.getCapabilities(session).review).toBe(true);
+  expect((await harness.startReview(session)).turnId).toBeDefined();
+  expect(script.calls('startReview')).toHaveLength(1);
+  script.on('startReview', async () => { throw new Error('review refused'); });
+  await expect(harness.startReview(session, { type: 'baseBranch', branch: 'main' })).rejects.toThrow('review refused');
+});

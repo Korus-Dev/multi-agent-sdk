@@ -307,47 +307,6 @@ describe('Antigravity native session', () => {
     expect(JSON.parse(await readFile(path.join(root, 'permission-response.json'), 'utf8')).result).toStrictEqual({ outcome: { outcome: 'cancelled' } });
   });
 
-  it('automatically admits hardened read-only Git inspection and denies mutation in a utility session', async () => {
-    const { session, changed } = await open(undefined, { tools: 'read-only' });
-    const safe = 'git --no-pager --no-optional-locks -c core.fsmonitor=false';
-    for (const [command, allowed] of [
-      [`${safe} status --short`, true],
-      [`${safe} diff --no-ext-diff --no-textconv --stat HEAD`, true],
-      ['git status --short', false],
-      ['git --no-optional-locks status --short', false],
-      [`${safe} reset --hard`, false],
-      [`${safe} diff --no-ext-diff --no-textconv --output=source.ts`, false],
-      [`${safe} status; touch source.ts`, false],
-    ] as const) {
-      const fixture = mcpPermission('inspect');
-      await session.prompt(`permission-fixture:${JSON.stringify({ ...fixture, toolCall: { toolCallId: 'git-inspect', kind: 'execute', rawInput: { CommandLine: command, Cwd: root } } })}`).completion;
-      expect(JSON.parse(await readFile(path.join(root, 'permission-response.json'), 'utf8')).result).toStrictEqual({ outcome: allowed ? { outcome: 'selected', optionId: 'native-once-42' } : { outcome: 'cancelled' } });
-    }
-    expect(changed.mock.calls.map(([event]) => event.type)).not.toContain('request.created');
-  });
-
-  it('admits native reads and searches only for targets established inside the working folder', async () => {
-    await writeFile(path.join(root, 'inside.ts'), 'export {};');
-    const outside = path.join(path.dirname(root), `${path.basename(root)}-outside.ts`);
-    await writeFile(outside, 'secret');
-    const { session } = await open(undefined, { tools: 'read-only' });
-    for (const [toolCall, allowed] of [
-      [{ kind: 'read', rawInput: { AbsolutePath: path.join(root, 'inside.ts') } }, true],
-      [{ kind: 'read', locations: [{ path: 'inside.ts' }] }, true],
-      [{ kind: 'search', rawInput: { SearchPath: root } }, true],
-      [{ kind: 'read', rawInput: { AbsolutePath: outside } }, false],
-      [{ kind: 'read', rawInput: { path: `../${path.basename(outside)}` } }, false],
-      [{ kind: 'read', locations: [{ path: 'inside.ts' }, { path: path.dirname(root) }] }, false],
-      [{ kind: 'search', rawInput: { Query: 'secret' } }, false],
-      [{ kind: 'read' }, false],
-    ] as const) {
-      const fixture = mcpPermission('inspect');
-      await session.prompt(`permission-fixture:${JSON.stringify({ ...fixture, toolCall: { toolCallId: 'native-read', ...toolCall } })}`).completion;
-      expect(JSON.parse(await readFile(path.join(root, 'permission-response.json'), 'utf8')).result).toStrictEqual({ outcome: allowed ? { outcome: 'selected', optionId: 'native-once-42' } : { outcome: 'cancelled' } });
-    }
-    await rm(outside, { force: true });
-  });
-
   it('does not authorize a Korus MCP request arriving after cancellation', async () => {
     const { session, changed } = await open(undefined, { mcpServers: [sessionMcpServer('http://127.0.0.1:1/mcp')] });
     const turn = session.prompt(`cancel-permission-fixture:${JSON.stringify(mcpPermission('finish_turn'))}`);

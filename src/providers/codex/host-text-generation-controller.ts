@@ -94,7 +94,7 @@ export class CodexHostTextGenerationController {
       cwd: options.cwd ?? this.defaultCwd,
       dynamicTools: [],
       ...(servers.length ? { config: mcpServerConfig(servers) } : {}),
-      ...(options.tools === 'read-only' ? {} : { environments: [] }),
+      environments: [],
       ephemeral: true,
       ...(model ? { model } : {}),
       permissions: ':read-only',
@@ -127,7 +127,7 @@ export class CodexHostTextGenerationController {
       const turnResponse = await this.client.request('turn/start', {
         threadId,
         input: [{ type: 'text', text, text_elements: [] }, ...attachments.map(attachmentInput)],
-        ...(options.tools === 'read-only' ? {} : { environments: [] }),
+        environments: [],
         permissions: ':read-only',
         ...(model ? { model } : {}),
         ...(reasoningEffort ? { effort: reasoningEffort as v2.TurnStartParams['effort'] } : {}),
