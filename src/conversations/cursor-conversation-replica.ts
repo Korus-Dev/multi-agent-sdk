@@ -1,10 +1,10 @@
 import type { CursorConversationEvent, CursorConversationSnapshot } from '../contracts/cursor-conversation';
-import { workPhaseView } from './work-phases';
+import { workPhaseView, type WorkPhaseRules } from './work-phases';
 
 /** Cursor owns this replica; the app coordination reducer never contains its transcript. */
-export function createCursorConversationReplica(initial: CursorConversationSnapshot) {
+export function createCursorConversationReplica(initial: CursorConversationSnapshot, rules: WorkPhaseRules = {}) {
   let snapshot = structuredClone(initial);
-  const view = workPhaseView<CursorConversationSnapshot>();
+  const view = workPhaseView<CursorConversationSnapshot>(rules);
   const replica = {
     getSnapshot: () => snapshot,
     replace: (value: CursorConversationSnapshot) => { snapshot = structuredClone(value); },

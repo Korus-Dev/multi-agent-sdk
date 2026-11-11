@@ -7,7 +7,7 @@ import { sessionMcpServer } from '../../acp/mcp-bridge';
 export type CursorHostOptions<Context extends ProviderContext = ProviderContext> = {
   runtime?: import('./runtime').CursorRuntime;
   resolveCommand?: () => string | null;
-  sessionOptions?: Pick<CursorSessionOptions, 'client' | 'resolveCommand'>;
+  sessionOptions?: Pick<CursorSessionOptions, 'client' | 'resolveCommand' | 'isBookkeepingTool'>;
   stateDirectory?: () => string;
   steeringFallbackEnabled?: () => boolean;
   trustedMcpServerName?: string;

@@ -29,6 +29,7 @@ export class AntigravityHarness extends SessionHarness<'antigravity'> {
       ...sharedProviderOptions(options, permissionOf),
       antigravity: {
         client: { ...options.client, ...(options.trustedMcpServerName ? { trustedMcpServerName: options.trustedMcpServerName } : {}) },
+        ...(options.isBookkeepingTool ? { isBookkeepingTool: options.isBookkeepingTool } : {}),
         ...(instructions ? { instructions: (native: ProviderContext, { planMode }: { planMode: boolean }) => instructions(harnessContext(native, permissionOf), { planMode }) } : {}),
         ...(options.antigravity?.command || options.antigravity?.harnessPath ? { resolveRuntime: () => resolveAcpRuntime(options.stateDirectory?.(), { command: options.antigravity?.command, harnessPath: options.antigravity?.harnessPath }) } : {}),
       },

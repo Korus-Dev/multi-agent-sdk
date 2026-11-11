@@ -1,10 +1,10 @@
 import type { AntigravityConversationEvent, AntigravityConversationSnapshot } from '../contracts/antigravity-conversation';
-import { workPhaseView } from './work-phases';
+import { workPhaseView, type WorkPhaseRules } from './work-phases';
 
 /** Antigravity owns this replica; the app coordination reducer never contains its transcript. */
-export function createAntigravityConversationReplica(initial: AntigravityConversationSnapshot) {
+export function createAntigravityConversationReplica(initial: AntigravityConversationSnapshot, rules: WorkPhaseRules = {}) {
   let snapshot = structuredClone(initial);
-  const view = workPhaseView<AntigravityConversationSnapshot>();
+  const view = workPhaseView<AntigravityConversationSnapshot>(rules);
   const replica = {
     getSnapshot: () => snapshot,
     apply(event: AntigravityConversationEvent): AntigravityConversationSnapshot {

@@ -64,4 +64,9 @@ for (const provider of providers) {
   }).map(symbol => symbol.name);
   assert(!values.length, `./${provider} must export types only; it exports values: ${values.join(', ')}`);
 }
-console.log(`Public API: ${seen.size} declaration files reachable from ${entries.length} entries, no provider engine names, a neutral root and types-only provider entries.`);
+// ./contracts only shrinks: it lists what apps still need without Node, and each removal retires a transitional export.
+const allowed = new Set(JSON.parse(fs.readFileSync(path.join(root, 'scripts/contracts-entry-allowlist.json'), 'utf8')));
+const contractsFile = entries.find(([entry]) => entry === './contracts')?.[1];
+const grown = exportsOf(contractsFile).map(symbol => symbol.name).filter(name => !allowed.has(name));
+assert(!grown.length, `./contracts grew beyond its frozen list (${grown.length}): ${grown.join(', ')}\nKeep new exports on the root or a provider entry; ./contracts only shrinks.`);
+console.log(`Public API: ${seen.size} declaration files reachable from ${entries.length} entries, no provider engine names, a neutral root, types-only provider entries and a frozen ./contracts (${allowed.size}).`);

@@ -1,5 +1,6 @@
 import { claudeHarnessCapabilities } from '../../capabilities';
 import { validateMcpPolicy } from '../../mcp-policy';
+import { tagTurnWorkPhases } from '../../conversations/work-phases';
 import type { ProviderHistoryLoadResult, HarnessPromptScope } from '../../driver';
 import { promptContentDispatchText, type PromptPart } from '../../core/prompt-content';
 import type { ClaudeToolPartOptions } from './claude-tool-part-adapter';
@@ -14,6 +15,8 @@ export type ClaudeHostOptions<Context extends Agent = Agent> = {
   mcpServerLabel?: (server: string | undefined) => string | undefined;
   statusText?: (status: 'notConfigured' | 'running') => import('../../contracts').AppText;
   toolOptions?: ClaudeToolPartOptions;
+  /** The app's bookkeeping tool calls, which do not count as work when tagging work phases. */
+  isBookkeepingTool?: import('../../conversations/work-phases').WorkPhaseRules['isBookkeepingTool'];
   log?: (level: 'warn', component: string, message: string, details?: Record<string, unknown>) => void;
 };
 function scopedConfiguration(scope: HarnessPromptScope): ClaudeScopedTurnConfiguration {
@@ -189,6 +192,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
 
   private readonly historyLoader: ClaudeHistoryLoader<Context>;
 
+  private readonly tagHistoryTurn = (turn: Message[]) => tagTurnWorkPhases(turn, { isBookkeepingTool: this.driverOptions.isBookkeepingTool });
   constructor(
     private readonly transport: ClaudeTurnTransport = new ClaudeAgentSdkTransport(),
     historyLoader: ClaudeHistoryLoader<Context> | undefined = undefined,
@@ -816,19 +820,15 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
     if (!sessionId) throw new Error('Claude needs an existing conversation to fork.');
     const snapshot = this.conversationReplicasByAgentId.get(agent.id)?.getSnapshot();
     const running = this.activeTurnsByAgentId.has(agent.id) || Boolean(snapshot?.busy);
-    if (agent.folder !== targetAgent.folder || (running && turnId === undefined)) {
+    if (agent.folder !== targetAgent.folder || running) {
       // Another folder, or a running source, needs the native fork that keeps the transcript resumable from elsewhere.
-      return turnId === undefined ? this.forkElsewhere(agent, sessionId, running ? snapshot?.turns ?? [] : undefined) : null;
+      return this.forkElsewhere(agent, sessionId, turnId, running && turnId === undefined ? snapshot?.turns ?? [] : undefined);
     }
-    if (running || this.forkingAgentIds.has(agent.id)) throw new Error('Claude must be idle before forking.');
+    if (this.forkingAgentIds.has(agent.id)) throw new Error('Claude must be idle before forking.');
     if (!this.transport.forkSession) throw new Error('Native Claude forks are unavailable.');
     this.forkingAgentIds.add(agent.id);
     try {
-      const history = turnId ? await this.loadHistory(agent) : null;
-      const liveBoundary = turnId ? this.turnBoundariesByAgentId.get(agent.id)?.get(turnId) : undefined;
-      const historicalTurnId = liveBoundary ? history?.nativeMessageTurnIds?.[liveBoundary] : turnId;
-      const boundary = historicalTurnId ? history?.turnBoundaries?.[historicalTurnId] : undefined;
-      if (turnId && !boundary) throw new Error('Native Claude message boundary is unavailable for this turn. Reload the conversation and retry.');
+      const boundary = turnId ? await this.turnBoundary(agent, turnId) : undefined;
       const storageFolder = agent.providerSession?.kind === 'claude' ? agent.providerSession.transcriptFolder : undefined;
       const childId = await this.transport.forkSession(sessionId, claudeWorkingDirectory(agent), boundary, ...(storageFolder ? [storageFolder] : []));
       await this.copyPromptContent(sessionId, childId);
@@ -839,12 +839,15 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
     } finally { this.forkingAgentIds.delete(agent.id); }
   }
 
-  /** Forks for another folder, or from the last completed turn of a running source; null when there is nothing to fork. */
-  private async forkElsewhere(agent: Context, sessionId: string, runningTurns: readonly { id: string; status: string }[] | undefined): Promise<import('../../driver').ProviderConversationForkResult | null> {
+  /**
+   * Forks for another folder or from a running source: at the selected turn, else at the last completed turn while it runs.
+   * Resolves null when there is nothing to fork from yet, or when the transport has no cross-folder fork.
+   */
+  private async forkElsewhere(agent: Context, sessionId: string, turnId: string | undefined, runningTurns: readonly { id: string; status: string }[] | undefined): Promise<import('../../driver').ProviderConversationForkResult | null> {
     if (!this.transport.forkWorktreeSession) return null;
     if (this.forkingAgentIds.has(agent.id)) throw new Error('Claude conversation is being forked.');
     let boundary: string | undefined;
-    let forkedFromTurnId: string | undefined;
+    let forkedFromTurnId = turnId;
     if (runningTurns) {
       const completed = [...runningTurns].reverse().find(turn => turn.status === 'completed');
       boundary = completed ? this.turnBoundariesByAgentId.get(agent.id)?.get(completed.id) : undefined;
@@ -853,6 +856,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
     }
     this.forkingAgentIds.add(agent.id);
     try {
+      if (turnId) boundary = await this.turnBoundary(agent, turnId);
       const storageFolder = agent.providerSession?.kind === 'claude' ? agent.providerSession.transcriptFolder : undefined;
       const childId = await this.transport.forkWorktreeSession(sessionId, claudeWorkingDirectory(agent), boundary, storageFolder);
       await this.copyPromptContent(sessionId, childId);
@@ -860,6 +864,16 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
       return { providerSession: claudeProviderSession(childId, undefined, undefined, storageFolder ?? claudeWorkingDirectory(agent)),
         ...(forkedFromTurnId ? { forkedFromTurnId } : {}) };
     } finally { this.forkingAgentIds.delete(agent.id); }
+  }
+
+  /** The native message a turn ends at, resolved through loaded history; throws for a turn Claude cannot locate. */
+  private async turnBoundary(agent: Context, turnId: string): Promise<string> {
+    const history = await this.loadHistory(agent);
+    const liveBoundary = this.turnBoundariesByAgentId.get(agent.id)?.get(turnId);
+    const historicalTurnId = liveBoundary ? history?.nativeMessageTurnIds?.[liveBoundary] : turnId;
+    const boundary = historicalTurnId ? history?.turnBoundaries?.[historicalTurnId] : undefined;
+    if (!boundary) throw new Error('Native Claude message boundary is unavailable for this turn. Reload the conversation and retry.');
+    return boundary;
   }
 
   private async copyPromptContent(sessionId: string, childId: string): Promise<void> {
@@ -1897,7 +1911,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
     source?: import('./history-source').ClaudeHistorySource,
   ): void {
     this.taskPlansByAgentId.set(agent.id, taskPlan);
-    const window = new ClaudeHistoryWindow(sessionId, messages, new Set(turns.filter(turn => turn.status !== 'inProgress').map(turn => turn.id)), source);
+    const window = new ClaudeHistoryWindow(sessionId, messages, new Set(turns.filter(turn => turn.status !== 'inProgress').map(turn => turn.id)), source, this.tagHistoryTurn);
     this.historyWindows.set(agent.id, window);
     const page = window.older();
     this.publishConversationSnapshot({
@@ -1922,7 +1936,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
     if (!current || current.sessionId === sessionId) return;
     const window = this.historyWindows.get(agentId);
     if (window?.sessionId === null) window.sessionId = sessionId;
-    else if (window?.sessionId !== sessionId) this.historyWindows.set(agentId, new ClaudeHistoryWindow(sessionId));
+    else if (window?.sessionId !== sessionId) this.historyWindows.set(agentId, new ClaudeHistoryWindow(sessionId, undefined, undefined, undefined, this.tagHistoryTurn));
     this.publishConversationSnapshot({ ...current, sessionId });
   }
 
@@ -1938,7 +1952,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
     const revision = this.nextConversationRevision(snapshot.agentId);
     this.conversationReplicasByAgentId.set(
       snapshot.agentId,
-      createClaudeConversationReplica(snapshot),
+      createClaudeConversationReplica(snapshot, { isBookkeepingTool: this.driverOptions.isBookkeepingTool }),
     );
     this.emit({
       agentId: snapshot.agentId,

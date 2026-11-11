@@ -30,7 +30,7 @@ export class CursorHarness extends SessionHarness<'cursor'> {
         ...(options.cursor?.command ? { resolveCommand: options.cursor.command } : {}),
         ...(options.cursor?.steeringFallback ? { steeringFallbackEnabled: options.cursor.steeringFallback } : {}),
         ...(options.trustedMcpServerName ? { trustedMcpServerName: options.trustedMcpServerName } : {}),
-        sessionOptions: { client: options.client, ...(options.cursor?.command ? { resolveCommand: options.cursor.command } : {}) },
+        sessionOptions: { client: options.client, ...(options.cursor?.command ? { resolveCommand: options.cursor.command } : {}), ...(options.isBookkeepingTool ? { isBookkeepingTool: options.isBookkeepingTool } : {}) },
       },
     };
   }

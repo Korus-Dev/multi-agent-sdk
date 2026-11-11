@@ -16,8 +16,8 @@ export class CursorTranscript {
   private replayUser: Record<string, unknown>[] = [];
   private readonly toolBodies = new Map<string,string>();
   private denied = new Set<string>();
-  constructor(private readonly agentId: string, private readonly sessionId: string, private readonly changed: (event: CursorConversationEvent) => void, private readonly display: (text: string) => { text: string; parts: MessagePart[]; metadata?: Message['metadata'] } = text => ({ text, parts: [] }), private readonly cwd?: string) {
-    this.replica = createCursorConversationReplica(emptyCursorSnapshot(agentId, sessionId));
+  constructor(private readonly agentId: string, private readonly sessionId: string, private readonly changed: (event: CursorConversationEvent) => void, private readonly display: (text: string) => { text: string; parts: MessagePart[]; metadata?: Message['metadata'] } = text => ({ text, parts: [] }), private readonly cwd?: string, rules: import('../../conversations/work-phases').WorkPhaseRules = {}) {
+    this.replica = createCursorConversationReplica(emptyCursorSnapshot(agentId, sessionId), rules);
   }
   private event(change: Change, turnId = this.replica.getSnapshot().activeTurnId!): void {
     const event = { ...change, agentId: this.agentId, sessionId: this.sessionId, turnId, occurredAt: new Date().toISOString() } as CursorConversationEvent;

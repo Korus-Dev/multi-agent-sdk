@@ -14,8 +14,9 @@ export class AcpTranscript {
   private replaying = false;
 
   constructor(readonly agentId: string, readonly sessionId: string, private readonly changed: (event: AntigravityConversationEvent) => void,
-    private readonly displayUser: (text: string) => { text: string; parts: MessagePart[]; metadata?: Message['metadata'] } = text => ({ text, parts: [] })) {
-    this.replica = createAntigravityConversationReplica(emptyAntigravitySnapshot(agentId, sessionId));
+    private readonly displayUser: (text: string) => { text: string; parts: MessagePart[]; metadata?: Message['metadata'] } = text => ({ text, parts: [] }),
+    rules: import('../../conversations/work-phases').WorkPhaseRules = {}) {
+    this.replica = createAntigravityConversationReplica(emptyAntigravitySnapshot(agentId, sessionId), rules);
   }
 
   event(change: Change): void {

@@ -21,10 +21,11 @@ const conversation = [
 ];
 const claudeSnapshot = (messages: Message[]): ClaudeConversationSnapshot => ({ agentId: 'agent', sessionId: 'session', activeTurnId: null, turnIds: [], turns: [], messages,
   answeredClientRequestIds: [], busy: false, historyLoading: false, historyState: { hasOlder: false, loadingOlder: false }, contextUsage: null, plan: null, error: null });
+type Rules = { isBookkeepingTool?: (tool: { title?: string }) => boolean };
 const replicas = {
-  claude: (messages: Message[]) => createClaudeConversationReplica(claudeSnapshot(messages)),
-  cursor: (messages: Message[]) => createCursorConversationReplica({ ...emptyCursorSnapshot('agent', 'session'), messages }),
-  antigravity: (messages: Message[]) => createAntigravityConversationReplica({ ...emptyAntigravitySnapshot('agent', 'session'), messages }),
+  claude: (messages: Message[], rules?: Rules) => createClaudeConversationReplica(claudeSnapshot(messages), rules),
+  cursor: (messages: Message[], rules?: Rules) => createCursorConversationReplica({ ...emptyCursorSnapshot('agent', 'session'), messages }, rules),
+  antigravity: (messages: Message[], rules?: Rules) => createAntigravityConversationReplica({ ...emptyAntigravitySnapshot('agent', 'session'), messages }, rules),
 };
 
 describe.each(Object.entries(replicas))('%s replica work phases', (_provider, create) => {
@@ -32,6 +33,18 @@ describe.each(Object.entries(replicas))('%s replica work phases', (_provider, cr
     expect(phases(create(structuredClone(conversation)).getSnapshot().messages)).toStrictEqual([
       ['Fix the bug', undefined], ['Looking at the code.', 'commentary'], ['Fixed it.', 'final_answer'], ['Thanks', undefined], ['You are welcome.', undefined],
     ]);
+  });
+
+  it('does not count the app\'s bookkeeping tools as work', () => {
+    const bookkeeping = (part: { title?: string }) => part.title === 'finish';
+    const turn = [message('a1', 'turn-1', 'assistant', [text('Reading.'), tool('read'), text('All done.'), tool('finish')])];
+    expect(phases(create(turn, { isBookkeepingTool: bookkeeping }).getSnapshot().messages)).toStrictEqual([['Reading.', 'commentary'], ['All done.', 'final_answer']]);
+    expect(phases(create(turn).getSnapshot().messages)).toStrictEqual([['Reading.', 'commentary'], ['All done.', 'commentary']]);
+  });
+
+  it('gives a message without a turn its own group', () => {
+    const loose = [{ ...message('a0', 'x', 'assistant', [text('Preamble.')]), turnId: undefined }, message('a1', 'turn-1', 'assistant', [tool('read'), text('Answer.')])];
+    expect(phases(create(loose).getSnapshot().messages)).toStrictEqual([['Preamble.', undefined], ['Answer.', 'final_answer']]);
   });
 
   it('recomputes phases, so an answer that a later tool call turns into commentary does not keep a stale tag', () => {
@@ -43,4 +56,13 @@ describe.each(Object.entries(replicas))('%s replica work phases', (_provider, cr
 it('keeps the inference internal: apps read phase, they never compute it', () => {
   expect(contractsEntry).not.toHaveProperty('withInferredWorkPhases');
   expect(contractsEntry).not.toHaveProperty('withInferredTurnWorkPhases');
+});
+
+it('hands the app\'s bookkeeping rule to every harness that tags phases itself', async () => {
+  const { harnesses } = await import('../../src/harnesses');
+  const isBookkeepingTool = () => true;
+  const options = { client: { name: 'x' }, isBookkeepingTool };
+  expect(harnesses.claude.mapOptions(options).claude?.host?.isBookkeepingTool).toBe(isBookkeepingTool);
+  expect(harnesses.cursor.mapOptions(options).cursor?.sessionOptions?.isBookkeepingTool).toBe(isBookkeepingTool);
+  expect(harnesses.antigravity.mapOptions(options).antigravity?.isBookkeepingTool).toBe(isBookkeepingTool);
 });

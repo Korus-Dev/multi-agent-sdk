@@ -2,17 +2,20 @@
 
 ## Unreleased
 
-- The SDK adds no prompt text or policy of its own. Plan-exit denial, session-handoff wording, the handoff model and Antigravity's inspection and schema wording are removed; consumers supply them through `claude.decideTool`, `codex.handoff` and their own prompts. `outputSchema` is rejected where the provider cannot enforce it.
+- `createHarness(provider, options)` is the only way to reach a provider. Each provider is one class behind a single registry, and shared code never branches on the provider. Options are typed per provider: a Codex harness takes no `claude` block.
+- The root entry is provider-neutral. `/codex`, `/claude`, `/cursor` and `/antigravity` export that provider's types only; `/native` and `/host-bridge` are removed, and provider hosts, transports and the Codex engine are internal.
+- `/renderer` is now `/contracts`: data contracts, guards and capability tables for code that runs without Node. Its list of exports is frozen and only shrinks. The `Renderer*` type aliases and the per-provider conversation projections are removed.
+- `forkConversation(session, target, turnId?)` forks into the target session's folder. Without a turn, a running source forks from its last completed turn, and the result reports `forkedFromTurnId`. It resolves `null` when the provider cannot fork the conversation yet. `forkWorktreeConversation` is removed.
+- Assistant text carries its work phase (`commentary` or `final_answer`) for every provider. `isBookkeepingTool` tells the harness which of the app's own tool calls are not work. The phase inference helpers and Claude's `inferWorkPhases` option are removed.
+- The SDK adds no prompt text or policy of its own. Plan-exit denial, session-handoff wording and Antigravity's inspection and schema wording are removed; apps supply them through `claude.decideTool` and their own prompts. `outputSchema` is rejected where the provider cannot enforce it.
 - `startReview` runs a provider's own review. Codex's `/review` prompt command now starts the native review instead of sending text.
-- Capabilities cover text and image generation, structured output, review, banked resets, conversation deletion, titles and scoped execution; a conformance test keeps each flag in step with the operation behind it. Antigravity reports account usage; Codex no longer claims it.
-- `createHarness` is the only way to reach a provider. The `/native`, `/codex` and `/host-bridge` entries are removed; provider hosts, transports and the Codex engine are internal.
+- Every optional operation has a capability flag, kept in step with its implementation by a conformance test. New flags cover interrupted-turn continuation, conversation content and storage, turn history, and MCP support for required servers and automatic approval. Claude reports reasoning effort and service tiers.
 - `Harness` covers login, remote control, realtime, conversation summaries and storage, interrupted-turn continuation, conversation reconciliation, session syncing and provider-level capabilities. Operations a provider lacks reject with `HarnessUnsupportedError`.
 - `harness.onEvent` forwards provider events, including those without a session, as `provider.event`.
 - Persisted and wire names use `provider` instead of `backend`.
 - `/testing` provides `createScriptedHarness`, `createScriptedCodexHarness` and `createScriptedClaudeHarness`: Harnesses whose provider is scripted by the test.
 - `/runtime` finds provider executables and builds their search path.
-- `/renderer` exports `harnessProviders`, `isHarnessProvider` and `isProviderConversationRef`.
-- `npm run check:package` fails when the public types reach a provider engine, so provider engines cannot leak back in.
+- `npm run check:package` fails when the public types reach a provider engine or use display wording, so neither can leak back in.
 
 ## 0.26.0 (2026-11-10)
 

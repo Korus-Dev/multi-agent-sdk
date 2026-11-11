@@ -1,6 +1,9 @@
 
 type Message = { role?: string; kind?: string; turnId?: string; parts?: readonly WorkPhasePart[] };
 export type WorkPhasePart = { type: string; phase?: string; text?: string; content?: string; metadata?: Record<string, unknown> };
+/** App rules for phase tagging: a bookkeeping tool call, such as the app's own status report, is not work. */
+export type WorkPhaseRules = { isBookkeepingTool?: (tool: import('../contracts').ToolPart) => boolean };
+const bookkeeping = (rules: WorkPhaseRules = {}) => (part: WorkPhasePart) => part.metadata?.workPhase === 'bookkeeping' || (rules.isBookkeepingTool?.(part as never) ?? false);
 
 /**
  * Gives backends that do not tag work phases (Claude) the Working / Done grouping Codex has:
@@ -42,24 +45,30 @@ function isWorkTool(part: WorkPhasePart, isBookkeepingTool: (part: WorkPhasePart
  * Tags assistant text with its work phase, turn by turn, for harnesses that do not tag it natively.
  * Phases are recomputed, so text a later tool call turns into commentary never keeps a stale final-answer tag.
  */
-export function tagWorkPhases<T extends Message>(messages: readonly T[]): T[] {
+export function tagWorkPhases<T extends Message>(messages: readonly T[], rules: WorkPhaseRules = {}): T[] {
+  const isBookkeepingTool = bookkeeping(rules);
   const tagged: T[] = [];
   for (let start = 0; start < messages.length;) {
     const turnId = messages[start]!.turnId;
     let end = start + 1;
     if (turnId !== undefined) while (end < messages.length && messages[end]!.turnId === turnId) end++;
-    tagged.push(...withInferredTurnWorkPhases(messages.slice(start, end), undefined, true));
+    tagged.push(...withInferredTurnWorkPhases(messages.slice(start, end), isBookkeepingTool, true));
     start = end;
   }
   return tagged;
 }
 
 /** A snapshot view whose messages carry work phases, computed once per snapshot. */
-export function workPhaseView<S extends { messages: readonly Message[] }>(): (snapshot: S) => S {
+export function workPhaseView<S extends { messages: readonly Message[] }>(rules: WorkPhaseRules = {}): (snapshot: S) => S {
   let source: S | undefined;
   let view: S | undefined;
   return snapshot => {
-    if (snapshot !== source) { source = snapshot; view = { ...snapshot, messages: tagWorkPhases(snapshot.messages) }; }
+    if (snapshot !== source) { source = snapshot; view = { ...snapshot, messages: tagWorkPhases(snapshot.messages, rules) }; }
     return view!;
   };
+}
+
+/** Tags one historical turn with the app's rules; for history the provider loads in pages. */
+export function tagTurnWorkPhases<T extends Message>(turn: T[], rules: WorkPhaseRules = {}): T[] {
+  return withInferredTurnWorkPhases(turn, bookkeeping(rules));
 }

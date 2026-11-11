@@ -4,7 +4,7 @@ import type {
   ClaudeConversationTurn,
 } from '../contracts';
 import { applyClaudeConversationEvent } from './claude-conversation-reducer';
-import { workPhaseView } from './work-phases';
+import { workPhaseView, type WorkPhaseRules } from './work-phases';
 
 export type ClaudeConversationReplica = {
   apply(event: ClaudeConversationEvent): ClaudeConversationSnapshot;
@@ -13,10 +13,11 @@ export type ClaudeConversationReplica = {
 
 export function createClaudeConversationReplica(
   initialSnapshot: ClaudeConversationSnapshot,
+  rules: WorkPhaseRules = {},
 ): ClaudeConversationReplica {
   let snapshot = structuredClone(initialSnapshot);
   // Reads carry work phases Claude does not tag itself.
-  const view = workPhaseView<ClaudeConversationSnapshot>();
+  const view = workPhaseView<ClaudeConversationSnapshot>(rules);
 
   return {
     apply(event) {

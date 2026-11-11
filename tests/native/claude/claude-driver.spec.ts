@@ -110,6 +110,24 @@ describe('ClaudeBackendDriver', () => {
     await driver.close();
   });
 
+  it('forks a selected turn into another folder through the cross-folder fork, and rejects an unknown turn', async () => {
+    const transport = createFakeTransport();
+    const forkWorktreeSession = vi.fn().mockResolvedValue('worker-session');
+    const history = vi.fn().mockResolvedValue({
+      providerSession: { kind: 'claude', sessionId: 'parent-session', transport: 'stdio' },
+      messages: [], turnBoundaries: { 'claude-user-1': 'native-answer-1' },
+    });
+    const driver = new ClaudeBackendDriver({ ...transport, forkWorktreeSession }, history);
+    const parent: Agent = { ...agent, providerSession: { kind: 'claude', sessionId: 'parent-session', transport: 'stdio' } };
+    const worker: Agent = { ...agent, id: 'worker', folder: '/tmp/worker' };
+    await expect(driver.forkConversation(parent, worker, 'unknown')).rejects.toThrow('boundary');
+    expect(forkWorktreeSession).not.toHaveBeenCalled();
+    const result = await driver.forkConversation(parent, worker, 'claude-user-1');
+    expect(forkWorktreeSession).toHaveBeenCalledExactlyOnceWith('parent-session', agent.folder, 'native-answer-1', undefined);
+    expect(result).toMatchObject({ providerSession: { kind: 'claude', sessionId: 'worker-session' }, forkedFromTurnId: 'claude-user-1' });
+    await driver.close();
+  });
+
   it('forks into another folder through the native cross-folder fork, resumable from the new folder', async () => {
     const transport = createFakeTransport();
     const forkSession = vi.fn();
