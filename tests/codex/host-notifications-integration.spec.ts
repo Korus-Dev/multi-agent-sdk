@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { CodexAppServerClient, type ServerNotification, type ServerRequest } from '@korus-dev/codex-sdk';
 import { CodexHost } from '../../src/providers/codex';
 import type { CodexEvent } from '../../src/internal';
-import { invokeCodexHostBridgeOperation } from '../../src/core/host-bridge';
+import { invokeCodexHostBridgeOperation } from '../../src/core/codex-host-bridge';
 import { MockCodexAppServer, createHarness, lastRequest, lastResponse, requestsFor, thread, turn } from './helpers/host-fixture';
 
 describe('CodexHost', () => {

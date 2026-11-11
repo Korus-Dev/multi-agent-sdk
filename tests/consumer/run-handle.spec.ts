@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createScriptedHarness } from '../../src/testing';
 import { emptyCursorSnapshot } from '../../src/conversations/cursor-conversation-replica';
 import type { Run, RunEvent } from '../../src';
+import { codexSnapshot } from '../support/codex-snapshot';
 
 // A run follows one prompt to the end of its turn, from the neutral events every harness reports.
 const at = '2026-11-11T10:00:00.000Z';
@@ -18,6 +19,20 @@ function cursor() {
     said: (turnId: string, id: string, text: string) => frame({ type: 'message.upsert', turnId,
       payload: { message: { id, agentId: 'agent', role: 'assistant', status: 'complete', turnId, createdAt: at, parts: [{ type: 'text', text }] } } }),
     completed: (turnId: string, status = 'completed', extra: Record<string, unknown> = {}) => frame({ type: 'turn.completed', turnId, payload: { turn: { id: turnId, status }, ...extra } }),
+  };
+}
+/** Codex reports turns it retries; the other fixture's provider never does. */
+function codex() {
+  const { harness, script } = createScriptedHarness('codex');
+  const session = harness.open({ id: 'agent', folder: '/work' });
+  let revision = 1;
+  script.emit({ type: 'codex.conversationSnapshotChanged', agentId: 'agent', provider: 'codex', threadId: 'conversation-1', payload: { revision, snapshot: codexSnapshot() } } as never);
+  const frame = (turnId: string, type: string, payload: Record<string, unknown>) => script.emit({ type: 'codex.conversationEventReceived', agentId: 'agent', provider: 'codex', threadId: 'conversation-1',
+    payload: { revision: ++revision, event: { seq: revision, occurredAt: at, origin: 'notification', conversationId: 'conversation-1', turnId, type, payload } } } as never);
+  return {
+    harness, session,
+    started: (turnId: string) => frame(turnId, 'turn.started', { startedAt: at }),
+    completed: (turnId: string, status = 'completed', willRetry = false) => frame(turnId, 'turn.completed', { status, error: null, willRetry, startedAt: null, completedAt: null, durationMs: null }),
   };
 }
 async function drain(run: Run): Promise<RunEvent[]> {
@@ -61,11 +76,11 @@ describe('run', () => {
   });
 
   it('ignores the end of another turn and waits out a turn the provider retries', async () => {
-    const { harness, session, started, completed } = cursor();
+    const { harness, session, started, completed } = codex();
     const run = harness.run(session, 'Again');
     await run.admission;
     completed('turn-0');
-    started('turn-1'); completed('turn-1', 'failed', { willRetry: true }); completed('turn-1', 'failed');
+    started('turn-1'); completed('turn-1', 'failed', true); completed('turn-1', 'failed');
     expect(turnEvents(await drain(run))).toEqual([['turn.started', 'turn-1'], ['turn.completed', 'turn-1'], ['turn.completed', 'turn-1']]);
     expect(await run.result).toMatchObject({ turnId: 'turn-1', status: 'failed' });
   });

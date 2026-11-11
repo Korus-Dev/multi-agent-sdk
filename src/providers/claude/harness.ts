@@ -13,6 +13,7 @@ import { ClaudeHost, type ClaudeHostOptions } from './host';
 import { ClaudeAgentSdkTransport, type ClaudeAgentSdkTransportOptions } from './agent-sdk-transport';
 import type { ClaudeTurnTransport } from './transport';
 import { resolveClaudeLaunch } from './claude-command';
+import { claudeActivity } from './activity';
 
 export type ClaudeProviderOptions<Context extends ProviderContext = ProviderContext> = SharedProviderOptions<Context> & {
   claude?: { transport?: ClaudeTurnTransport; transportOptions?: ClaudeAgentSdkTransportOptions; host?: ClaudeHostOptions<Context> };
@@ -103,6 +104,7 @@ export class ClaudeHarness extends SessionHarness<'claude'> {
       ...(data.reasoningEffort === undefined ? {} : { reasoningEffort: data.reasoningEffort }),
     };
   }
+  protected activityOf(frame: ProviderEvent) { return claudeActivity(frame); }
   protected createProjection(): HarnessProjection {
     return replicaProjection({
       snapshotEvent: 'claude.conversationSnapshotChanged', conversationEvent: 'claude.conversationEventReceived', label: 'Claude',

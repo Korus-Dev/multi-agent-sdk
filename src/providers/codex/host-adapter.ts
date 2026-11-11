@@ -91,7 +91,7 @@ import type { CodexConversationEvent, CodexConversationSummary, CodexConversatio
 import {
   invokeCodexConversationBridgeOperation,
   subscribeCodexConversationReplicaBridge,
-} from '../../core/host-bridge';
+} from '../../core/codex-host-bridge';
 
 type AdapterListener = (event: ProviderEvent) => void;
 type ThreadProviderEvent<Event extends ProviderEvent = ProviderEvent> = Event extends ProviderEvent

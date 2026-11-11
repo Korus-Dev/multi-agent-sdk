@@ -1,6 +1,6 @@
 import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import type { CodexEvent } from '../../src/internal';
-import { createCodexConversationReplica } from '../../src/core/index';
+import { createCodexConversationReplica } from '../../src/core/codex-engine';
 import { CodexAppServerClient, type v2 } from '@korus-dev/codex-sdk';
 import { CodexHost } from '../../src/providers/codex';
 import { MockCodexAppServer, createHarness, deferred, lastRequest, resumeResponse, testGoal, thread, turn } from './helpers/host-fixture';

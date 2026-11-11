@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createCodexConversationReplica } from '../../src/core/index';
+import { createCodexConversationReplica } from '../../src/core/codex-engine';
 import type { CodexEvent } from '../../src/internal';
 import { CodexAppServerClient, type v2 } from '@korus-dev/codex-sdk';
 import { CodexHost } from '../../src/providers/codex';

@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from 'node:util';
 import { afterEach, beforeEach, expect } from 'vitest';
-import { createCodexHostStateMirror, type CodexHostStateMirror } from '../../../src/core/host-bridge';
+import { createCodexHostStateMirror, type CodexHostStateMirror } from '../../../src/core/codex-host-bridge';
 
 // Every host in the suite doubles as a state-patch consistency check:
 // after each state change, a mirror built only from the emitted patches must

@@ -28,7 +28,7 @@ describe('conversation activity', () => {
     const { session, activity } = run('codex', codexSnapshot(), [
       { ...scope, type: 'turn.started', payload: { turn: { id: 'turn-1', status: 'inProgress', items: [], error: null } } },
       { ...scope, type: 'message.delta', payload: { messageId: 'm1', itemId: 'item-1', delta: 'Hi' } },
-      { ...scope, type: 'turn.proposedPlanCompleted', payload: { itemId: 'plan-1', markdown: '# Plan' } },
+      { ...scope, type: 'plan.completed', payload: { itemId: 'plan-1', markdown: '# Plan' } },
       { ...scope, type: 'turn.completed', payload: { status: 'failed', error: { message: 'Quota reached', codexErrorInfo: 'usageLimitExceeded' }, willRetry: false, startedAt: null, completedAt: null, durationMs: null } },
     ], { threadId: 'conversation-1' });
     expect(activity).toEqual(expect.arrayContaining([

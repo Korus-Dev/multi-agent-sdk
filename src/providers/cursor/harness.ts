@@ -10,6 +10,7 @@ import { createCursorConversationReplica } from '../../conversations/cursor-conv
 import type { WorkPhaseRules } from '../../conversations/work-phases';
 import { CursorHost, type CursorHostOptions } from './host';
 import { cursorRuntime } from './runtime';
+import { transcriptActivity } from '../../conversations/conversation-activity';
 
 export type CursorProviderOptions<Context extends ProviderContext = ProviderContext> = SharedProviderOptions<Context> & { cursor?: CursorHostOptions<Context> };
 
@@ -49,6 +50,7 @@ export class CursorHarness extends SessionHarness<'cursor'> {
     });
   }
 
+  protected activityOf(frame: ProviderEvent) { return frame.type === 'cursor.conversationEventReceived' ? transcriptActivity(frame.payload.event, frame.payload.event.sessionId) : []; }
   protected createProjection(): HarnessProjection {
     return replicaProjection({
       snapshotEvent: 'cursor.conversationSnapshotChanged', conversationEvent: 'cursor.conversationEventReceived', label: 'Cursor',

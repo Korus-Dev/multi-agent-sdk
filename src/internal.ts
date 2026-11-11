@@ -1,7 +1,7 @@
 /** Engine types for the SDK's own tests and examples. Not part of the package exports. */
 export type * from './core/codex-host';
 export type * from './providers/codex';
-export type * from './core/host-bridge';
+export type * from './core/codex-host-bridge';
 export type { ProviderEvent, ProviderDriver, ProviderContext } from './driver';
 export type { ProviderOptions } from './harnesses';
 export type { ProviderEvent as NativeHarnessEvent, ProviderDriver as NativeHarnessDriver, ProviderContext as NativeHarnessContext } from './driver';

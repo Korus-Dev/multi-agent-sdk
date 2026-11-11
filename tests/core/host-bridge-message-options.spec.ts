@@ -2,7 +2,7 @@ import {
   invokeCodexHostBridgeOperation,
   type CodexHostBridgeAttachmentResolver,
   type CodexHostBridgeTarget,
-} from '../../src/core/host-bridge';
+} from '../../src/core/codex-host-bridge';
 import { describe, expect, it, vi } from 'vitest';
 
 function targetWithSend(sendMessage = vi.fn().mockResolvedValue(undefined)) {

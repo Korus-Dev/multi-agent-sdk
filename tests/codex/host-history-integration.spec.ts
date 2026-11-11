@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CodexAppServerClient, type v2 } from '@korus-dev/codex-sdk';
 import { CodexHost } from '../../src/providers/codex';
-import { createCodexConversationReplica } from '../../src/core/index';
+import { createCodexConversationReplica } from '../../src/core/codex-engine';
 import type { ConversationMessage } from '../../src/core/codex-client-contracts';
 import type { CodexEvent } from '../../src/internal';
 import { MockCodexAppServer, createHarness, deferred, lastRequest, resumeResponse, thread, turn } from './helpers/host-fixture';

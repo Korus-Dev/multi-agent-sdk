@@ -10,6 +10,7 @@ import { createAntigravityConversationReplica } from '../../conversations/antigr
 import type { WorkPhaseRules } from '../../conversations/work-phases';
 import { AntigravityHost, type AntigravityHostOptions } from './host';
 import { antigravityHome, resolveAcpRuntime } from './runtime';
+import { transcriptActivity } from '../../conversations/conversation-activity';
 
 export type AntigravityProviderOptions<Context extends ProviderContext = ProviderContext> = SharedProviderOptions<Context> & { antigravity?: AntigravityHostOptions<Context> };
 
@@ -50,6 +51,7 @@ export class AntigravityHarness extends SessionHarness<'antigravity'> {
     });
   }
 
+  protected activityOf(frame: ProviderEvent) { return frame.type === 'antigravity.conversationEventReceived' ? transcriptActivity(frame.payload.event, frame.payload.event.sessionId) : []; }
   protected createProjection(): HarnessProjection {
     return replicaProjection({
       snapshotEvent: 'antigravity.conversationSnapshotChanged', conversationEvent: 'antigravity.conversationEventReceived', label: 'Antigravity',

@@ -14,6 +14,7 @@ import { createCodexHost, type CodexHost, type CodexHostOptions } from './index'
 import { mcpServerConfig } from './host-mcp';
 import { CodexHostAdapter, conversationMessages, type CodexHostAdapterOptions } from './host-adapter';
 import { CodexHostController } from './host-controller';
+import { codexActivity } from './activity';
 
 export type CodexProviderOptions<Context extends ProviderContext = ProviderContext> = SharedProviderOptions<Context> & {
   codex?: {
@@ -118,6 +119,7 @@ export class CodexHarness extends ProviderHarness<'codex'> {
     context.providerDefaults = { ...context.providerDefaults, kind: 'codex', approvalPreset: result.approvalPreset };
     return result.approvalPreset;
   }
+  protected activityOf(frame: ProviderEvent) { return codexActivity(frame); }
   protected createProjection(): HarnessProjection {
     return replicaProjection({
       snapshotEvent: 'codex.conversationSnapshotChanged', conversationEvent: 'codex.conversationEventReceived', label: 'Codex',

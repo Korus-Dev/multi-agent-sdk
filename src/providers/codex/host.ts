@@ -10,7 +10,7 @@ import {
 import { notifyListeners } from '@korus-dev/codex-sdk';
 import type { CodexConversationHistory, CodexConversationHistoryPage, ApprovalDecision, ApprovalScope, CodexChatGptDeviceCodeLogin, CodexChatGptLogin, ClientRequestResponse, EventOrigin, ModelDescriptor, CodexAccountUsage, ConsumeCodexRateLimitResetCreditOptions, CodexRateLimitResetCreditResult, ReadCodexRateLimitsOptions, Skill, CreateCodexConversationOptions, ListCodexConversationsOptions, ListCodexModelsOptions, SendMessageOptions, StartCodexLiveChatOptions, StartCodexReviewOptions, ConversationMessage, UpdateConversationSettings, CodexStatePatch, CodexVersionedSnapshot } from '../../core/codex-host';
 import type { CodexConversationSummary, CodexConversationEvent, CodexConversationSnapshot, CodexEvent, CodexRateLimits, CodexSnapshot, StartCodexRealtimeOptions } from '../../core/codex-conversation-types';
-import { diffCodexHostState } from '../../core/host-bridge';
+import { diffCodexHostState } from '../../core/codex-host-bridge';
 import {
   CodexAppServerStdioTransport,
 } from '@korus-dev/codex-sdk';

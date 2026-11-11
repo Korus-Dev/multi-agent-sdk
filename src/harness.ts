@@ -10,7 +10,7 @@ import { harnessContext } from './harness-options';
 import type { HarnessProjection } from './harness-projection';
 import { HarnessUnsupportedError } from './errors';
 import { startRun } from './run';
-import { conversationActivity, isConversationFrame } from './conversations/conversation-activity';
+import { isConversationFrame, type FrameActivity } from './conversations/conversation-activity';
 import { diffSessionState, emptyPatchBase, type SessionPatchBase, type SessionSnapshot } from './session-patch';
 
 const emptyState = (): SessionState => ({ messages: [], busy: false, activeTurnId: null, turns: [], requests: [], error: null, title: null, goal: null, contextUsage: null, plan: null });
@@ -73,6 +73,8 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
   protected abstract applyPermission(context: ProviderContext, id: string): Promise<string | null | undefined>;
   /** A fresh projection from native conversation events to session state. */
   protected abstract createProjection(): HarnessProjection;
+  /** The neutral activity one native frame carries, read the way this provider writes its frames. */
+  protected abstract activityOf(frame: ProviderEvent): FrameActivity[];
   /** The permission option a native settings or mode event reports; undefined when it reports none. */
   protected abstract permissionFromEvent(event: ProviderEvent): string | null | undefined;
   /** Extra checks on persisted session data. */
@@ -234,7 +236,7 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
   private publish(event: ProviderEvent, session: Session | undefined): void {
     if (isConversationFrame(event)) {
       if (!session) return;
-      for (const activity of conversationActivity(event)) {
+      for (const activity of this.activityOf(event)) {
         if (activity.type === 'plan.proposed') {
           const { type: _proposed, conversationId: _conversation, ...plan } = activity;
           this.emit({ type: 'plan.readyForReview', session, ...plan });

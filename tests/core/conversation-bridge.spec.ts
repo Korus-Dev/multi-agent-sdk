@@ -6,7 +6,7 @@ import {
   subscribeCodexConversationReplicaBridge,
   type CodexConversationBridgeHandle,
   type CodexConversationBridgeTarget,
-} from '../../src/core/host-bridge';
+} from '../../src/core/codex-host-bridge';
 import type {
   CodexConversationEvent,
   CodexConversationSnapshot,

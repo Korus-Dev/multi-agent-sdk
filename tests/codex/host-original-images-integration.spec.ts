@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { mkdtemp, writeFile, rm, open, truncate, appendFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createCodexConversationReplica } from '../../src/core/index';
+import { createCodexConversationReplica } from '../../src/core/codex-engine';
 import { CodexAppServerClient } from '@korus-dev/codex-sdk';
 import { CodexHost, ConversationContentTransport } from '../../src/providers/codex';
 import { generatedPngBase64, MockCodexAppServer, resumeResponse, thread, turn } from './helpers/host-fixture';

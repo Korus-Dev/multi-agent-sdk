@@ -15,6 +15,10 @@ const allowed = [
   /^testing-(codex|claude|cursor|antigravity)\.ts$/,
   /^core\/codex-/,
   /^conversations\/(codex|claude|cursor|antigravity)-/,
+  // Each provider's types-only entry, the per-provider install and runtime helpers, and the capability tables.
+  /^(codex|claude|cursor|antigravity)\.ts$/,
+  /^runtime\.ts$/,
+  /^contracts-entry\.ts$/,
 ];
 // The shared harness machinery does not even mention a provider.
 const core = ['harness.ts', 'session-harness.ts', 'create-harness.ts', 'harness-options.ts', 'harness-projection.ts', 'testing.ts'];
@@ -33,6 +37,13 @@ describe('harness polymorphism', () => {
   it('keeps provider values out of shared code', () => {
     const literal = new RegExp(`['"](${providers.join('|')})['"]`);
     const leaks = files(src).filter(file => !allowed.some(pattern => pattern.test(file))).flatMap(file => offending(file, literal));
+    expect(leaks).toStrictEqual([]);
+  });
+
+  it('keeps provider-named identifiers out of shared code', () => {
+    const names = providers.flatMap(provider => [provider, provider[0]!.toUpperCase() + provider.slice(1)]).join('|');
+    const identifier = new RegExp(`\\b(${names})[A-Z0-9_]\\w*`);
+    const leaks = files(src).filter(file => !allowed.some(pattern => pattern.test(file))).flatMap(file => offending(file, identifier));
     expect(leaks).toStrictEqual([]);
   });
 

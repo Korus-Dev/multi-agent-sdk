@@ -50,10 +50,7 @@ export type { JsonValue, RequestUsage, RequestUsageField, SafetyFindings, TokenU
 export type { TurnGitDiff } from './contracts/turn-diff';
 export type { ApiPricingProvider, Consumption, ExecutionObservation, ExecutionTiming, RequestCoverageReason, RequestObservation } from './contracts/usage';
 export type { AgentRequest, AgentRequestOutcome, AgentRequestResponse } from './conversations/agent-request';
-export type {
-  CodexRealtimeEvent as RealtimeEvent, CodexRealtimeInputAudioChunk as RealtimeAudioChunk, ContinueCodexSafetyReviewOptions,
-  StartCodexRealtimeOptions, StartCodexRealtimeOptions as RealtimeOptions
-} from './core/codex-conversation-types';
+export type { RealtimeAudioChunk, RealtimeEvent, RealtimeOptions, RealtimeSession } from './contracts/realtime';
 export type { HarnessDiagnostic } from './diagnostics';
 export type {
   HarnessImageGenerationInput, HarnessImageGenerationResult, HarnessJsonValue, HarnessMcpEndpoint, HarnessMcpPolicy,
@@ -63,5 +60,4 @@ export type {
   HarnessConversationConfig, HarnessLaunch, HarnessLog, HarnessLogLevel, HarnessOptions, HarnessOptionsFor, HarnessRequestRecord,
   SharedHarnessOptions
 } from './options';
-export type { CodexRealtimeSession as RealtimeSession } from './providers/codex/realtime-types';
 export type { PermissionFor } from './contracts/permissions';

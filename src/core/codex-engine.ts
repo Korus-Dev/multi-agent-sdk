@@ -38,6 +38,6 @@ export {
   type CodexHostBridgeOperationArguments,
   type CodexHostBridgeOperationResult,
   type CodexHostBridgeTarget,
-} from './host-bridge';
+} from './codex-host-bridge';
 
 export { normalizePromptContent, promptContentText, promptContentDispatchText, trimPromptContent, slicePromptContent, replacePromptContentRange } from './prompt-content';

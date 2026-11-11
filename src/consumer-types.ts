@@ -40,8 +40,7 @@ export type HarnessCapabilities = Omit<ProviderCapabilities, 'approvalPresets' |
   realtime: boolean;
   accountUsage: boolean;
 };
-export type { StartCodexRealtimeOptions as RealtimeOptions, CodexRealtimeInputAudioChunk as RealtimeAudioChunk, CodexRealtimeEvent as RealtimeEvent } from './core/codex-conversation-types';
-export type { CodexRealtimeSession as RealtimeSession } from './providers/codex/realtime-types';
+export type { RealtimeOptions, RealtimeAudioChunk, RealtimeEvent, RealtimeSession } from './contracts/realtime';
 export type { DevicePairingStatus as RemoteControlStatus, DevicePairingSession, PairedDevice } from './contracts/remote-control';
 export type PromptOptions = Omit<SendPromptOptions, 'providerOptions' | 'recordUserMessage'>;
 export type Admission = { session: Session; turnId?: string; messageId?: string };

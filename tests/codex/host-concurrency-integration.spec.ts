@@ -3,7 +3,7 @@ import {
   invokeCodexConversationBridgeOperation,
   subscribeCodexConversationBridge,
   type CodexConversationBridgeNotification,
-} from '../../src/core/host-bridge';
+} from '../../src/core/codex-host-bridge';
 import { CodexAppServerClient, type v2 } from '@korus-dev/codex-sdk';
 import { CodexHost, createCodexHost } from '../../src/providers/codex';
 import {
