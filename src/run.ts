@@ -58,7 +58,8 @@ export function startRun(source: RunSource, onEnd: () => void): { run: Run; aban
     }
   };
   const off = source.subscribe(event => {
-    if (ended || !('session' in event) || event.session !== session) return;
+    // Full states are left to readSession: a run nobody reads would otherwise hold one per change.
+    if (ended || event.type === 'session.changed' || !('session' in event) || event.session !== session) return;
     if (admitted) accept(event as RunEvent); else held.push(event as RunEvent);
   });
 

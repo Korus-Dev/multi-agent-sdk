@@ -54,8 +54,8 @@ export type RunResult = {
   /** The turn's messages: those tagged with its id, or those new since the run started when the provider tags none. */
   messages: Message[];
 };
-/** The events of a run's session, never another session's. */
-export type RunEvent = Extract<HarnessEvent, { session: Session }> | (HarnessNotice & { session: Session });
+/** The events of a run's session, never another session's. Full states are not among them: `session.patch` carries each change and `readSession` the state. */
+export type RunEvent = Exclude<Extract<HarnessEvent, { session: Session }>, { type: 'session.changed' }> | (HarnessNotice & { session: Session });
 /** One prompt followed to the end of its turn. */
 export type Run = {
   readonly session: Session;
@@ -68,6 +68,7 @@ export type Run = {
   readonly events: AsyncIterable<RunEvent>;
   /** Settles when the turn finishes. Rejects when the prompt is not admitted, the session needs recovery, or it is released or the harness closed first. */
   readonly result: Promise<RunResult>;
+  /** Steers the run's turn. A provider that steers by interrupting and resending ends the run with the interrupted turn. */
   steer(prompt: string): Promise<Admission>;
   interrupt(): Promise<Admission>;
 };
@@ -182,7 +183,10 @@ export type Harness<P extends HarnessProvider = HarnessProvider> = {
   /** The full state with its revision: where a replica starts, or resyncs after missing a patch. Publishes any pending change as a `session.patch` first. */
   readSessionSnapshot(session: Session): import('./session-patch').SessionSnapshot;
   sendPrompt(session: Session, prompt: string, options?: PromptOptions): Promise<Admission>;
-  /** Sends a prompt and follows its turn: its events and how it ended. Built on `sendPrompt` and `onEvent`. */
+  /**
+   * Sends a prompt and follows its turn: its events and how it ended. Built on `sendPrompt` and `onEvent`.
+   * The turn is the one admission names; when the provider names none, it is the first turn that starts after admission.
+   */
   run(session: Session, prompt: string, options?: PromptOptions): Run;
   interrupt(session: Session, expectedTurnId?: string): Promise<Admission>;
   respondToRequest(session: Session, response: Omit<AgentRequestResponse, 'agentId'>): Promise<void>;

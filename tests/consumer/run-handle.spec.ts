@@ -43,6 +43,23 @@ describe('run', () => {
     expect(result.messages.map(message => message.id)).toEqual(['m1']);
   });
 
+  it('reports the turn finished only once the session state shows it, and reports its output once', async () => {
+    const { harness, session, started, said, completed } = cursor();
+    const seen: { busy: boolean; status: string | undefined }[] = [];
+    harness.onEvent(event => {
+      if (event.type === 'turn.completed') { const state = harness.readSession(session); seen.push({ busy: state.busy, status: state.turns.find(turn => turn.id === event.turnId)?.status }); }
+    });
+    const run = harness.run(session, 'Hello?');
+    await run.admission;
+    started('turn-1'); said('turn-1', 'm1', 'Hi'); said('turn-1', 'm1', 'Hi there.'); completed('turn-1');
+    const events = await drain(run);
+    expect(seen).toEqual([{ busy: false, status: 'completed' }]);
+    expect(events.filter(event => event.type === 'turn.output')).toHaveLength(1);
+    // The closing state arrives before the end of the turn; full states are left to readSession.
+    expect(events.at(-2)?.type).toBe('session.patch');
+    expect(events.map(event => event.type as string)).not.toContain('session.changed');
+  });
+
   it('ignores the end of another turn and waits out a turn the provider retries', async () => {
     const { harness, session, started, completed } = cursor();
     const run = harness.run(session, 'Again');
@@ -93,7 +110,7 @@ describe('run', () => {
     const run = harness.run(session, 'Go');
     await run.admission;
     started('turn-1');
-    for await (const event of run.events) { expect(event.type).toBe('turn.started'); break; }
+    for await (const event of run.events) if (event.type === 'turn.started') break;
     completed('turn-1');
     expect(await run.result).toMatchObject({ status: 'completed' });
   });

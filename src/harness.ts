@@ -16,6 +16,8 @@ import { diffSessionState, emptyPatchBase, type SessionPatchBase, type SessionSn
 const emptyState = (): SessionState => ({ messages: [], busy: false, activeTurnId: null, turns: [], requests: [], error: null, title: null, goal: null, contextUsage: null, plan: null });
 type Binding = {
   stored?: { providerSession?: unknown };
+  /** The last turn that reported output; `turn.output` is published once per turn. */
+  outputTurn?: string;
   kind: 'main' | 'scope';
   parent?: Session;
   operation?: 'executing' | 'disposing' | 'releasing' | 'hydrating';
@@ -169,8 +171,7 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
   }
   private receive(event: ProviderEvent): void {
     const session = event.agentId ? this.byId.get(event.agentId) : undefined;
-    this.publish(event, session);
-    if (!session) return;
+    if (!session) { this.publish(event, session); return; }
     const b = this.get(session);
     const snapshotFrame = event.type.endsWith('.conversationSnapshotChanged');
     if (!b.recovery || snapshotFrame) {
@@ -189,6 +190,8 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
         b.state.error = reason; this.emit({ type: 'recovery.required', session, reason }); this.changed(session);
       }
     }
+    // Activity follows the state it describes, so a consumer reading the session on `turn.completed` sees the turn finished.
+    this.publish(event, session);
     if (event.type === 'plan.readyForReview') this.emit({ type: 'plan.readyForReview', session, turnId: event.turnId, ...event.payload });
     else if (event.type === 'agentRequest.created') {
       if (b.state.answeredClientRequestIds?.includes(event.payload.request.id)) return;
@@ -235,6 +238,11 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
         if (activity.type === 'plan.proposed') {
           const { type: _proposed, conversationId: _conversation, ...plan } = activity;
           this.emit({ type: 'plan.readyForReview', session, ...plan });
+        } else if (activity.type === 'turn.output') {
+          const binding = this.get(session);
+          if (activity.turnId && binding.outputTurn === activity.turnId) continue;
+          binding.outputTurn = activity.turnId;
+          this.emit({ ...activity, session });
         } else this.emit({ ...activity, session });
       }
       return;

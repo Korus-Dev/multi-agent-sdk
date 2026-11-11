@@ -14,7 +14,8 @@ it('surfaces a lost native frame and recovers only from a fresh native snapshot'
   const snapshot = (revision: number) => deliver({ type: 'cursor.conversationSnapshotChanged', provider: 'cursor', agentId: 'tax', payload: { revision, snapshot: initial } });
   const started = (revision: number) => deliver({ type: 'cursor.conversationEventReceived', provider: 'cursor', agentId: 'tax', payload: { revision, event: { type: 'turn.started', agentId: 'tax', sessionId: 'native-session', turnId: 't', occurredAt: new Date().toISOString(), payload: { turn: { id: 't' } } } } });
   snapshot(1); started(3);
-  expect(events.some(e => e.type === 'recovery.required')).toBe(true);
+  // The frame's activity still follows, after the recovery it caused, so no turn's start or end goes missing.
+  expect(events.map(e => e.type).filter(type => type === 'recovery.required' || type === 'turn.started')).toEqual(['recovery.required', 'turn.started']);
   expect(driver.readSession(session).busy).toBe(false);
   snapshot(4); started(5); started(5);
   expect(driver.readSession(session).busy).toBe(true);

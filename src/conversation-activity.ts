@@ -18,7 +18,7 @@ export type ConversationActivity =
   /** An error outside a turn's own completion; `willRetry` means the provider is retrying it. */
   | ActivityScope & { type: 'session.error'; error: HarnessError; willRetry: boolean }
   | ActivityScope & { type: 'tool.updated'; tool: { id: string; kind?: string; status: 'running' | 'completed' | 'failed' } }
-  /** The agent produced output: text, reasoning, a plan or the start of a tool call. */
+  /** The turn's first output: text, reasoning, a plan or the start of a tool call. Reported once per turn. */
   | ActivityScope & { type: 'turn.output' }
   /** The conversation's file changes changed. */
   | ActivityScope & { type: 'diff.updated' }
