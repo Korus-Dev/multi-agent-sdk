@@ -40,4 +40,23 @@ if (unique.length) {
   console.error(`Public API reaches provider engine names (${unique.length}):\n${unique.map(line => `  ${line}`).join('\n')}\nExpose a neutral type instead, or keep the engine type out of public signatures.`);
   process.exit(1);
 }
-console.log(`Public API: ${seen.size} declaration files reachable from ${entries.length} entries, no provider engine names.`);
+// The root entry is provider-neutral; provider-specific types live on types-only provider entries, so createHarness stays the only way in.
+const ts = (await import('typescript')).default;
+const providers = ['codex', 'claude', 'cursor', 'antigravity'];
+const providerNamed = /^(Codex|Claude|Cursor|Antigravity)[A-Z]/;
+const program = ts.createProgram(entries.map(([, file]) => file), { skipLibCheck: true });
+const checker = program.getTypeChecker();
+const exportsOf = file => { const source = program.getSourceFile(file); const module = source && checker.getSymbolAtLocation(source); return module ? checker.getExportsOfModule(module) : []; };
+const rootFile = entries.find(([entry]) => entry === '.')?.[1];
+const named = exportsOf(rootFile).map(symbol => symbol.name).filter(name => providerNamed.test(name));
+assert(!named.length, `The root entry exports provider-named types (${named.length}); move them to their provider entry:\n${named.map(name => `  ${name}`).join('\n')}`);
+for (const provider of providers) {
+  const file = entries.find(([entry]) => entry === `./${provider}`)?.[1];
+  assert(file, `Missing the ./${provider} types entry.`);
+  const values = exportsOf(file).filter(symbol => {
+    const target = symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
+    return target.flags & ts.SymbolFlags.Value;
+  }).map(symbol => symbol.name);
+  assert(!values.length, `./${provider} must export types only; it exports values: ${values.join(', ')}`);
+}
+console.log(`Public API: ${seen.size} declaration files reachable from ${entries.length} entries, no provider engine names, a neutral root and types-only provider entries.`);

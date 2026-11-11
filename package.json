@@ -49,6 +49,22 @@
       "types": "./dist/testing.d.ts",
       "default": "./dist/testing.js"
     },
+    "./codex": {
+      "types": "./dist/codex.d.ts",
+      "default": "./dist/codex.js"
+    },
+    "./claude": {
+      "types": "./dist/claude.d.ts",
+      "default": "./dist/claude.js"
+    },
+    "./cursor": {
+      "types": "./dist/cursor.d.ts",
+      "default": "./dist/cursor.js"
+    },
+    "./antigravity": {
+      "types": "./dist/antigravity.d.ts",
+      "default": "./dist/antigravity.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
