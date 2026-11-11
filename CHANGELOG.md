@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `./contracts` reads persisted session data for apps: `sessionConversationId`, `sessionConversationRef`, `sessionHasConversation`, `conversationRefId`, `sameConversationRef`, `isProviderSessionData` and `defaultsPermission`, so an app stores what a harness hands out without knowing each provider's shape.
 - Each harness reads its own conversation frames into neutral activity, so shared code never interprets a provider's events. The realtime types come from one neutral module, and the root no longer exports `ContinueCodexSafetyReviewOptions` or `StartCodexRealtimeOptions` (use `RealtimeOptions`).
 - `harness.run(session, prompt, options)` sends a prompt and follows its turn. `run.events` yields the session's events for that turn and ends with its `turn.completed`; `run.result` gives the turn's status, error and messages. A turn the provider retries keeps the run going. The result rejects when the prompt is not admitted, the session needs recovery, or the session is released or the harness closed first. `run.steer` and `run.interrupt` act on the run's turn. Run events leave out `session.changed`; patches carry each change. `sendPrompt` and `onEvent` are unchanged.
 - `createHarness(provider, options)` is the only way to reach a provider. Each provider is one class behind a single registry, and shared code never branches on the provider. Options are typed per provider: a Codex harness takes no `claude` block.
