@@ -11,6 +11,11 @@ const unrestricted = new Set<string>(['full-access', 'bypassPermissions']);
 const permissionModes = (ids: readonly string[]) => ids.map(id => ({ id, ...(unrestricted.has(id) ? { dangerous: true } : {}) }));
 
 export const codexHarnessCapabilities: ProviderCapabilities = {
+  commands: [
+    { id: 'codex.compact', provider: 'codex', name: 'compact', displayName: 'Compact', description: 'Compact the current Codex context.', slashName: 'compact', submitOnSelect: true },
+    { id: 'codex.plan', provider: 'codex', name: 'plan', displayName: 'Plan', description: 'Switch to Codex Plan mode.', slashName: 'plan', submitOnSelect: true },
+    { id: 'codex.goal', provider: 'codex', name: 'goal', displayName: 'Goal', description: 'Set or view the Codex thread goal.', slashName: 'goal', composerMode: { label: 'Goal', placeholder: 'Describe the goal' } },
+  ],
   mcpRequiredServers: true, mcpAutoApproval: true,
   turnContinuation: true, conversationContent: true, turnHistory: true, conversationStorage: true, safetyReview: true,
   accountUsage: true,
@@ -43,6 +48,10 @@ export const codexHarnessCapabilities: ProviderCapabilities = {
 };
 
 export const claudeHarnessCapabilities: ProviderCapabilities = {
+  commands: [
+    { id: 'claude.compact', provider: 'claude', name: 'compact', displayName: 'Compact', description: 'Compact the current Claude context while preserving a summary.', slashName: 'compact', submitOnSelect: true },
+    { id: 'claude.plan', provider: 'claude', name: 'plan', displayName: 'Plan', description: 'Switch to Claude Plan mode.', slashName: 'plan', submitOnSelect: true },
+  ],
   mcpRequiredServers: false, mcpAutoApproval: true,
   turnContinuation: true, conversationContent: true, turnHistory: true,
   accountUsage: true,
@@ -81,6 +90,9 @@ export function defaultHarnessCapabilities(provider: HarnessProvider): ProviderC
 }
 
 export const antigravityHarnessCapabilities: ProviderCapabilities = {
+  commands: [
+    { id: 'antigravity.plan', provider: 'antigravity', name: 'plan', displayName: 'Plan', description: 'Create an Antigravity plan for review.', slashName: 'plan', submitOnSelect: true },
+  ],
   mcpRequiredServers: false, mcpAutoApproval: false,
   turnContinuation: true,
   accountUsage: true,
@@ -97,6 +109,9 @@ export const antigravityHarnessCapabilities: ProviderCapabilities = {
 
 // Cursor enables only capabilities implemented and verified by its host.
 export const cursorHarnessCapabilities: ProviderCapabilities = {
+  commands: [
+    { id: 'cursor.plan', provider: 'cursor', name: 'plan', displayName: 'Plan', description: 'Switch to Cursor Plan mode.', slashName: 'plan', submitOnSelect: true },
+  ],
   mcpRequiredServers: false, mcpAutoApproval: false,
   turnContinuation: true,
   accountUsage: true,

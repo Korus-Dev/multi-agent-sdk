@@ -131,6 +131,8 @@ export type ProviderCapabilities = {
   mcpAutoApproval?: boolean;
   attachments: boolean;
   models: boolean;
+  /** The harness's own slash commands, which it handles when a prompt starts with one. */
+  commands?: readonly ProviderCommandSummary[];
   skills: boolean;
   reasoningEffort: boolean;
   serviceTier?: boolean;

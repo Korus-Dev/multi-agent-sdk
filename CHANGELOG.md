@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `capabilities.commands` lists each harness's own slash commands (compact, plan, goal), so an app can offer them without knowing the harness.
 - `capabilities.safetyReview` says whether a harness stops turns on safety findings and resumes them from a safety review.
 - Provider updates name their conversation in `conversationId` only; `threadId` and `providerSessionId` no longer appear on harness events.
 - `./contracts` reads persisted session data for apps: `sessionConversationId`, `conversationSessionData`, `sessionConversationRef`, `sessionHasConversation`, `conversationRefId`, `sameConversationRef`, `subagentOfRef`, `subagentRef`, `isProviderSessionData` and `defaultsPermission`, so an app stores what a harness hands out without knowing each provider's shape.
