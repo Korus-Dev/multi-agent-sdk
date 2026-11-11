@@ -26,6 +26,7 @@ export function startRun(source: RunSource, onEnd: () => void): { run: Run; aban
   let turnId: string | undefined;
   let ended = false;
   let reading = true;
+  let iterated = false;
   let failure: Error | undefined;
   const held: RunEvent[] = [];
   const queue: RunEvent[] = [];
@@ -41,6 +42,8 @@ export function startRun(source: RunSource, onEnd: () => void): { run: Run; aban
   const end = (outcome: { result: RunResult } | { error: Error }) => {
     if (ended) return;
     ended = true; off(); onEnd();
+    // Nobody read the events while the turn ran: keep none of them, as an unread run should hold nothing.
+    if (!iterated) queue.length = 0;
     if ('error' in outcome) { failure = outcome.error; fail(outcome.error); } else settle(outcome.result);
     signal();
   };
@@ -73,7 +76,7 @@ export function startRun(source: RunSource, onEnd: () => void): { run: Run; aban
 
   let thrown = false;
   const events: AsyncIterableIterator<RunEvent> = {
-    [Symbol.asyncIterator]() { return this; },
+    [Symbol.asyncIterator]() { iterated = true; return this; },
     async next() {
       for (;;) {
         const event = queue.shift();

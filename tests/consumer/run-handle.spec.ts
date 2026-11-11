@@ -47,10 +47,11 @@ describe('run', () => {
   it('yields its turn and ends with it, reporting how it ended and what the agent said', async () => {
     const { harness, session, started, said, completed } = cursor();
     const run = harness.run(session, 'Hello?');
+    const reading = drain(run);
     expect(await run.admission).toMatchObject({ turnId: 'turn-1' });
     started('turn-1'); said('turn-1', 'm1', 'Hi there.'); completed('turn-1');
     said('turn-1', 'm2', 'too late');
-    const events = await drain(run);
+    const events = await reading;
     expect(turnEvents(events)).toEqual([['turn.started', 'turn-1'], ['turn.output', 'turn-1'], ['turn.completed', 'turn-1']]);
     expect(events.at(-1)?.type).toBe('turn.completed');
     const result = await run.result;
@@ -65,9 +66,10 @@ describe('run', () => {
       if (event.type === 'turn.completed') { const state = harness.readSession(session); seen.push({ busy: state.busy, status: state.turns.find(turn => turn.id === event.turnId)?.status }); }
     });
     const run = harness.run(session, 'Hello?');
+    const reading = drain(run);
     await run.admission;
     started('turn-1'); said('turn-1', 'm1', 'Hi'); said('turn-1', 'm1', 'Hi there.'); completed('turn-1');
-    const events = await drain(run);
+    const events = await reading;
     expect(seen).toEqual([{ busy: false, status: 'completed' }]);
     expect(events.filter(event => event.type === 'turn.output')).toHaveLength(1);
     // The closing state arrives before the end of the turn; full states are left to readSession.
@@ -78,10 +80,11 @@ describe('run', () => {
   it('ignores the end of another turn and waits out a turn the provider retries', async () => {
     const { harness, session, started, completed } = codex();
     const run = harness.run(session, 'Again');
+    const reading = drain(run);
     await run.admission;
     completed('turn-0');
     started('turn-1'); completed('turn-1', 'failed', true); completed('turn-1', 'failed');
-    expect(turnEvents(await drain(run))).toEqual([['turn.started', 'turn-1'], ['turn.completed', 'turn-1'], ['turn.completed', 'turn-1']]);
+    expect(turnEvents(await reading)).toEqual([['turn.started', 'turn-1'], ['turn.completed', 'turn-1'], ['turn.completed', 'turn-1']]);
     expect(await run.result).toMatchObject({ turnId: 'turn-1', status: 'failed' });
   });
 
@@ -90,11 +93,12 @@ describe('run', () => {
     const admission = deferred<unknown>();
     script.on('sendPrompt', () => admission.promise);
     const run = harness.run(session, 'Go');
+    const reading = drain(run);
     started('turn-7');
     admission.resolve({ providerSession: { kind: 'cursor', sessionId: 'session', folder: '/work' } });
     await run.admission;
     completed('turn-7');
-    expect(turnEvents(await drain(run))).toEqual([['turn.started', 'turn-7'], ['turn.completed', 'turn-7']]);
+    expect(turnEvents(await reading)).toEqual([['turn.started', 'turn-7'], ['turn.completed', 'turn-7']]);
     expect(await run.result).toMatchObject({ turnId: 'turn-7', status: 'completed' });
   });
 
@@ -118,6 +122,15 @@ describe('run', () => {
     await closed.admission;
     await second.harness.close();
     await expect(closed.result).rejects.toThrow('closed');
+  });
+
+  it('keeps no events once a run nobody reads has settled', async () => {
+    const { harness, session, started, said, completed } = cursor();
+    const run = harness.run(session, 'Go');
+    await run.admission;
+    started('turn-1'); said('turn-1', 'm1', 'Hi'); completed('turn-1');
+    await run.result;
+    expect(await drain(run)).toEqual([]);
   });
 
   it('still settles its result when the consumer stops reading its events', async () => {

@@ -62,7 +62,8 @@ export type Run = {
   readonly admission: Promise<Admission>;
   /**
    * The session's events for this turn, ending with the `turn.completed` that finishes it; events of other turns are left out.
-   * Iterate it once. It throws what `result` rejects with; stopping early stops collecting and `result` still settles.
+   * Iterate it once, from before the turn ends: a run nobody reads keeps no events once it settles. It throws what `result`
+   * rejects with; stopping early stops collecting and `result` still settles.
    */
   readonly events: AsyncIterable<RunEvent>;
   /** Settles when the turn finishes. Rejects when the prompt is not admitted, the session needs recovery, or it is released or the harness closed first. */
