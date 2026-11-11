@@ -254,7 +254,10 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
       return;
     }
     if (event.type === 'plan.readyForReview' || event.type === 'agentRequest.created' || event.type === 'agentRequest.resolved' || event.type === 'agent.statusChanged') return;
-    this.emit({ ...event, ...(session ? { session } : {}) } as HarnessEvent);
+    // Providers name the conversation in their own fields; consumers read one.
+    const { threadId, providerSessionId, ...notice } = event;
+    const conversationId = notice.conversationId ?? threadId ?? providerSessionId;
+    this.emit({ ...notice, ...(conversationId ? { conversationId } : {}), ...(session ? { session } : {}) } as HarnessEvent);
   }
   private newScope(parent: Session, cwd: string): Session {
     const p = this.get(parent);

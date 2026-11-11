@@ -80,3 +80,13 @@ it.each(['codex', 'claude', 'cursor', 'antigravity'] as const)('reads no activit
   expect(seen).toContain('recovery.required');
   expect(seen.filter(type => type.startsWith('turn.'))).toEqual([]);
 });
+
+it('names the conversation of a provider update in conversationId, whatever the provider called it', () => {
+  const { harness, script } = createScriptedHarness('codex');
+  const session = harness.open({ id: 'agent', folder: '/work' });
+  const seen: HarnessEvent[] = [];
+  harness.onEvent(event => seen.push(event));
+  script.emit({ type: 'conversation.goalCleared', agentId: 'agent', provider: 'codex', threadId: 'thread-1', payload: {} } as never);
+  expect(seen).toContainEqual({ type: 'conversation.goalCleared', agentId: 'agent', provider: 'codex', conversationId: 'thread-1', payload: {}, session });
+  expect(seen.some(event => 'threadId' in event || 'providerSessionId' in event)).toBe(false);
+});

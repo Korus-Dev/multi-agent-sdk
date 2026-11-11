@@ -102,7 +102,9 @@ export type SessionState = {
   plan: import('./contracts/index').ThreadPlan | null;
 };
 /** Provider updates in their neutral shape. Native conversation frames, and events with their own harness form, are not among them. */
-export type HarnessNotice = Exclude<import('./contracts/notices').ProviderNotice, { type: 'plan.readyForReview' | 'agentRequest.created' | 'agentRequest.resolved' | 'agent.statusChanged' }>;
+type WithoutNativeIds<T> = T extends unknown ? Omit<T, 'threadId' | 'providerSessionId'> : never;
+/** `conversationId` names the conversation an update belongs to, whichever provider sent it. */
+export type HarnessNotice = WithoutNativeIds<Exclude<import('./contracts/notices').ProviderNotice, { type: 'plan.readyForReview' | 'agentRequest.created' | 'agentRequest.resolved' | 'agent.statusChanged' }>>;
 export type HarnessEvent =
   | { type: 'session.changed'; session: Session; state: SessionState; revision: number }
   /** The same change as the `session.changed` that follows it, as a revisioned patch for consumers that replicate state elsewhere. */
