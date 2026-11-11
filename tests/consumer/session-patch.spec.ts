@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createScriptedHarness } from '../../src/testing';
-import { applySessionPatch, SessionPatchGapError } from '../../src/session-patch';
+import { applySessionPatch, SessionPatchGapError, SessionPatchInvalidError } from '../../src/session-patch';
 import type { HarnessEvent, Message, SessionPatch, SessionState } from '../../src';
 
 // A consumer that only receives patches rebuilds exactly the state the harness holds, revision by revision.
@@ -61,6 +61,21 @@ describe('incremental session state', () => {
     const resynced = harness.readSessionSnapshot(session);
     expect(resynced.revision).toBe(patches[1]!.revision);
     expect((resynced.state as SessionState).messages[0]?.parts[0]).toMatchObject({ text: 'Two' });
+  });
+});
+
+describe('patch validation', () => {
+  const base = { revision: 1, state: { messages: [message('m1', 'One')], busy: false, activeTurnId: null, turns: [], requests: [], error: null, title: null, goal: null, contextUsage: null, plan: null } } as never;
+  it.each([
+    ['an unknown op', { op: 'drop', key: 'busy' }],
+    ['a key that is not session state', { op: 'set', key: '__proto__', value: { polluted: true } }],
+    ['messages through set', { op: 'set', key: 'messages', value: [] }],
+    ['a splice outside the transcript', { op: 'spliceMessages', start: 2, deleteCount: 0, messages: [] }],
+    ['a negative or fractional splice', { op: 'spliceMessages', start: 0, deleteCount: -1, messages: [] }],
+    ['messages that are not a list', { op: 'spliceMessages', start: 0, deleteCount: 0, messages: {} }],
+  ])('refuses %s, so a consumer reads a fresh snapshot', (_case, op) => {
+    expect(() => applySessionPatch(base, { revision: 2, ops: [op as never] })).toThrow(SessionPatchInvalidError);
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
   });
 });
 

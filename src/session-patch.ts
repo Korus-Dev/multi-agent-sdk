@@ -20,11 +20,42 @@ export class SessionPatchGapError extends Error {
   }
 }
 
-/** Applies a patch to a snapshot, returning the next snapshot. Throws `SessionPatchGapError` when a revision was missed. */
+/** A patch that is not a valid change to session state, such as one from a peer on another version; read a fresh snapshot. */
+export class SessionPatchInvalidError extends Error {
+  constructor(readonly revision: number, detail: string) {
+    super(`Session patch ${revision} is invalid: ${detail}; read a fresh snapshot.`);
+    this.name = 'SessionPatchInvalidError';
+  }
+}
+
+const stateKeys = ['selection', 'permission', 'planMode', 'busy', 'activeTurnId', 'turns', 'answeredClientRequestIds', 'historyLoading',
+  'historyState', 'requests', 'error', 'title', 'goal', 'contextUsage', 'plan'] as const satisfies readonly Exclude<keyof SessionState, 'messages'>[];
+// Every session state field must be patchable: adding one without listing it here fails to compile.
+const allStateKeys: Exclude<keyof SessionState, 'messages'> extends (typeof stateKeys)[number] ? true : never = true;
+void allStateKeys;
+const patchableKeys = new Set<string>(stateKeys);
+const count = (value: unknown, max: number) => Number.isSafeInteger(value) && (value as number) >= 0 && (value as number) <= max;
+
+function validate(op: SessionPatchOp, revision: number, messages: number): void {
+  const fail = (detail: string) => { throw new SessionPatchInvalidError(revision, detail); };
+  if (op === null || typeof op !== 'object') fail('an op is not an object');
+  if (op.op === 'set') { if (!patchableKeys.has(op.key)) fail(`"${String(op.key)}" is not a session state field`); return; }
+  if (op.op !== 'spliceMessages') fail(`"${String((op as { op?: unknown }).op)}" is not an op`);
+  const splice = op as Extract<SessionPatchOp, { op: 'spliceMessages' }>;
+  if (!count(splice.start, messages) || !count(splice.deleteCount, messages - splice.start)) fail('the splice is outside the transcript');
+  if (!Array.isArray(splice.messages)) fail('the spliced messages are not a list');
+}
+
+/**
+ * Applies a patch to a snapshot, returning the next snapshot. Throws `SessionPatchGapError` when a revision was missed,
+ * and `SessionPatchInvalidError` when the patch is not a valid change to session state.
+ */
 export function applySessionPatch(snapshot: SessionSnapshot, patch: SessionPatch): SessionSnapshot {
   if (patch.revision !== snapshot.revision + 1) throw new SessionPatchGapError(snapshot.revision + 1, patch.revision);
+  if (!Array.isArray(patch.ops)) throw new SessionPatchInvalidError(patch.revision, 'ops are not a list');
   const state = { ...snapshot.state } as Record<string, unknown> & SessionState;
   for (const op of patch.ops) {
+    validate(op, patch.revision, state.messages.length);
     if (op.op === 'set') {
       if (op.value === undefined) delete (state as Record<string, unknown>)[op.key];
       else (state as Record<string, unknown>)[op.key] = structuredClone(op.value);

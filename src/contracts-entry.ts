@@ -1,5 +1,5 @@
 /** Data contracts, guards and capability tables with no runtime dependencies, for code that runs without Node. */
-export { applySessionPatch, SessionPatchGapError, type SessionPatch, type SessionPatchOp, type SessionSnapshot } from './session-patch';
+export { applySessionPatch, SessionPatchGapError, SessionPatchInvalidError, type SessionPatch, type SessionPatchOp, type SessionSnapshot } from './session-patch';
 export {
   antigravityHarnessCapabilities, claudeHarnessCapabilities, codexHarnessCapabilities, cursorHarnessCapabilities
 } from './capabilities';
