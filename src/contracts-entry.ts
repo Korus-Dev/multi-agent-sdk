@@ -14,7 +14,7 @@ export {
 export { harnessProviders, isHarnessProvider } from './contracts/shared';
 export {
   conversationRefId, defaultsPermission, isProviderSessionData, sameConversationRef, sessionConversationId, sessionConversationRef,
-  sessionHasConversation
+  sessionHasConversation, subagentOfRef, subagentRef
 } from './contracts/session-data';
 export {
   type AgentRequest, type AgentRequestOutcome, type AgentRequestResponse, agentResponseFromClientResponse,

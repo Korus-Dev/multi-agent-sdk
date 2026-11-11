@@ -35,9 +35,11 @@
   "sessionConversationRef",
   "sessionHasConversation",
   "subagentActivityKinds",
+  "subagentOfRef",
   "subagentOperationKinds",
   "subagentOperationLifecycles",
   "subagentOperationStatuses",
+  "subagentRef",
   "subagentStatuses",
   "toolOutputText"
 ]

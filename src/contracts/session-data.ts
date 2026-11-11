@@ -20,11 +20,29 @@ export function conversationRefId(ref: ProviderConversationRef): string {
   return ref.provider === 'codex' ? ref.threadId : ref.sessionId;
 }
 
-/** Whether two references name the same conversation, down to the same subagent transcript. */
+const folderOf = (ref: ProviderConversationRef) => 'folder' in ref ? ref.folder : null;
+const subagentIdOf = (ref: ProviderConversationRef) => ref.provider === 'claude' ? ref.subagentId : undefined;
+
+/** Whether two references name the same conversation in the same folder, down to the same subagent transcript. */
 export function sameConversationRef(left: ProviderConversationRef, right: ProviderConversationRef): boolean {
-  if (left.provider !== right.provider || conversationRefId(left) !== conversationRefId(right)) return false;
-  const subagent = (ref: ProviderConversationRef) => ref.provider === 'claude' ? ref.subagentId : undefined;
-  return subagent(left) === subagent(right);
+  return left.provider === right.provider && conversationRefId(left) === conversationRefId(right)
+    && folderOf(left) === folderOf(right) && subagentIdOf(left) === subagentIdOf(right);
+}
+
+/** The subagent a reference names within the root conversation `root`; undefined when it names none. */
+export function subagentOfRef(ref: ProviderConversationRef, root: ProviderConversationRef): string | undefined {
+  if (ref.provider !== root.provider) return undefined;
+  // Some providers keep a subagent's transcript inside the root conversation, others give it a conversation of its own.
+  if (ref.provider === 'claude') return ref.subagentId && sameConversationRef({ ...ref, subagentId: undefined }, root) ? ref.subagentId : undefined;
+  if (ref.provider === 'codex') return conversationRefId(ref) === conversationRefId(root) ? undefined : conversationRefId(ref);
+  return undefined;
+}
+
+/** The reference to subagent `subagentId` within the root conversation `root`; null when the provider keeps no subagent transcripts. */
+export function subagentRef(root: ProviderConversationRef, subagentId: string): ProviderConversationRef | null {
+  if (root.provider === 'claude') return { ...root, subagentId };
+  if (root.provider === 'codex') return { provider: 'codex', threadId: subagentId };
+  return null;
 }
 
 /** The reference to the conversation persisted session data continues, in `folder`. */
