@@ -404,7 +404,9 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
       this.emit({ ...identity, type: 'agent.statusChanged', payload: { type: 'awaitingInput', reason: event.payload.request.kind === 'confirm_tool' ? 'approval' : 'input' } });
     } else if (event.type === 'request.resolved') {
       const snapshot = this.sessions.get(event.agentId)?.snapshot;
-      if (snapshot?.busy && !snapshot.clientRequests.some(request => request.id !== event.payload.id)) this.emit({ ...identity, type: 'agent.statusChanged', payload: { type: 'working' } });
+      const pending = snapshot?.clientRequests.find(request => request.id !== event.payload.id);
+      if (pending) this.emit({ ...identity, type: 'agent.statusChanged', payload: { type: 'awaitingInput', reason: pending.kind === 'confirm_tool' ? 'approval' : 'input' } });
+      else if (snapshot?.busy) this.emit({ ...identity, type: 'agent.statusChanged', payload: { type: 'working' } });
     }
     else if (event.type === 'turn.started') this.emit({ ...identity, type: 'agent.statusChanged', payload: { type: 'working' } });
     else if (event.type === 'turn.completed') this.emit({ ...identity, type: 'agent.statusChanged', payload: event.payload.turn.status === 'failed' ? { type: 'error', message: event.payload.error ?? 'Antigravity turn failed.' } : { type: 'idle' } });
