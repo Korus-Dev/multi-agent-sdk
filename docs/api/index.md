@@ -52,13 +52,13 @@ For a custom Cursor executable, supply the same resolver through `cursor.resolve
 | Restoration | `getSessionData`, `restoreSession`, `getConversationRef`, `getRefData`, `restoreRef` |
 | Runtime/account | `getRuntimeStatus`, `authenticate`, `getAccountRateLimits`, `getCapabilities` |
 | Catalogs | `listModels`, `listSkills`, `listPlugins` |
-| Prompting | `sendPrompt`, `steerPrompt`, `interrupt`, `respondToRequest`, `setPermission` |
+| Prompting | `run`, `sendPrompt`, `steerPrompt`, `interrupt`, `respondToRequest`, `setPermission` |
 | History | `listConversations`, `resumeConversation`, `loadConversation`, `loadOlderHistory`, `loadTurnHistory`, `readConversationMessages`, `readConversationContent` |
 | Native mutations | `setConversationTitle`, `archiveConversation`, `deleteConversation`, `forkConversation`, `deleteTurn`, `editTurn`, `retryTurn` |
 | Goals | `setGoal`, `clearGoal` |
 | Auxiliary work | `executeScopedPrompt`, `disposeScopedSession`, `generateText`, `generateImage` |
 | Events | `onEvent` returns an unsubscribe function |
 
-Every session operation takes a handle owned by that driver. Methods unsupported by a provider reject. `sendPrompt` returns `Admission`, independently of terminal turn status. Request responses carry an ID and an explicit decision, answers, or cancellation outcome.
+Every session operation takes a handle owned by that driver. Methods unsupported by a provider reject. `run` returns a `Run`: its `events` and a `result` that settles when the turn ends. `sendPrompt` returns `Admission`, independently of terminal turn status. Request responses carry an ID and an explicit decision, answers, or cancellation outcome.
 
 See the [consumer contract](../consumer-contract.md) for detailed lifecycle rules and the published declarations for exact parameter/result types. Guides cover [state/events](../guide/events.md), [sessions](../guide/sessions.md), and [tools](../guide/tools.md).

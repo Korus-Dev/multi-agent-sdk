@@ -45,6 +45,32 @@ export type { CodexRealtimeSession as RealtimeSession } from './providers/codex/
 export type { DevicePairingStatus as RemoteControlStatus, DevicePairingSession, PairedDevice } from './contracts/remote-control';
 export type PromptOptions = Omit<SendPromptOptions, 'providerOptions' | 'recordUserMessage'>;
 export type Admission = { session: Session; turnId?: string; messageId?: string };
+/** How a run's turn ended. */
+export type RunResult = {
+  session: Session;
+  turnId: string;
+  status: import('./contracts/turn').TurnStatus;
+  error: import('./conversation-activity').HarnessError | null;
+  /** The turn's messages: those tagged with its id, or those new since the run started when the provider tags none. */
+  messages: Message[];
+};
+/** The events of a run's session, never another session's. */
+export type RunEvent = Extract<HarnessEvent, { session: Session }> | (HarnessNotice & { session: Session });
+/** One prompt followed to the end of its turn. */
+export type Run = {
+  readonly session: Session;
+  /** Resolves when the provider accepts the prompt, as `sendPrompt` does. */
+  readonly admission: Promise<Admission>;
+  /**
+   * The session's events for this turn, ending with the `turn.completed` that finishes it; events of other turns are left out.
+   * Iterate it once. It throws what `result` rejects with; stopping early stops collecting and `result` still settles.
+   */
+  readonly events: AsyncIterable<RunEvent>;
+  /** Settles when the turn finishes. Rejects when the prompt is not admitted, the session needs recovery, or it is released or the harness closed first. */
+  readonly result: Promise<RunResult>;
+  steer(prompt: string): Promise<Admission>;
+  interrupt(): Promise<Admission>;
+};
 export type ConversationSummary = Omit<NativeSummary, 'ref'> & { ref: ConversationRef };
 export type { Turn, TurnError, TurnExecutionUsage, TurnStatus, TokenUsage, RequestUsage, RequestUsageField, SafetyFindings, JsonValue } from './contracts/turn';
 export type HistoryState = {
@@ -156,9 +182,12 @@ export type Harness<P extends HarnessProvider = HarnessProvider> = {
   /** The full state with its revision: where a replica starts, or resyncs after missing a patch. Publishes any pending change as a `session.patch` first. */
   readSessionSnapshot(session: Session): import('./session-patch').SessionSnapshot;
   sendPrompt(session: Session, prompt: string, options?: PromptOptions): Promise<Admission>;
+  /** Sends a prompt and follows its turn: its events and how it ended. Built on `sendPrompt` and `onEvent`. */
+  run(session: Session, prompt: string, options?: PromptOptions): Run;
   interrupt(session: Session, expectedTurnId?: string): Promise<Admission>;
   respondToRequest(session: Session, response: Omit<AgentRequestResponse, 'agentId'>): Promise<void>;
-  setPermission(session: Session, id: import('./contracts/permissions').PermissionFor<P>): Promise<void>;
+  // Generic so a harness for one provider still widens to `Harness`; `Q` defaults to the harness's own provider.
+  setPermission<Q extends P = P>(session: Session, id: import('./contracts/permissions').PermissionFor<Q>): Promise<void>;
   /** Changes the model, reasoning effort, speed or permission used by the session's next calls. */
   updateDefaults(session: Session, defaults: Partial<HarnessDefaults>): void;
   /**

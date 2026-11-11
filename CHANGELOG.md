@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `harness.run(session, prompt, options)` sends a prompt and follows its turn. `run.events` yields the session's events for that turn and ends with its `turn.completed`; `run.result` gives the turn's status, error and messages. A turn the provider retries keeps the run going. The result rejects when the prompt is not admitted, the session needs recovery, or the session is released or the harness closed first. `run.steer` and `run.interrupt` act on the run's turn. `sendPrompt` and `onEvent` are unchanged.
 - `createHarness(provider, options)` is the only way to reach a provider. Each provider is one class behind a single registry, and shared code never branches on the provider. Options are typed per provider: a Codex harness takes no `claude` block.
 - The root entry is provider-neutral. `/codex`, `/claude`, `/cursor` and `/antigravity` export that provider's types only; `/native` and `/host-bridge` are removed, and provider hosts, transports and the Codex engine are internal.
 - `/renderer` is now `/contracts`: data contracts, guards, capability tables, request conversions and session patches for code that runs without Node. Its list of exports is frozen and only shrinks; native conversation replicas and transcript helpers are not on it.

@@ -25,24 +25,16 @@ import { createHarness } from '@korus-dev/multi-agent-sdk';
 
 const driver = createHarness('codex', { client: { name: 'my-app' } });
 const session = driver.open({ id: 'review', folder: process.cwd() });
-const unsubscribe = driver.onEvent(event => {
-  if (event.type === 'session.changed' && event.session === session) {
-    console.log(event.state.messages);
-    // Observe event.state.turns for completion, failure, or interruption.
-  }
-});
-
 try {
-  const admission = await driver.sendPrompt(session, 'Explain this project');
-  // Admission means the runtime accepted the prompt. Keep the driver open
-  // until the admitted turn reaches a terminal state in session.changed.
-  console.log(admission.turnId);
-} catch (error) {
-  unsubscribe();
+  const run = driver.run(session, 'Explain this project');
+  for await (const event of run.events) {
+    if (event.type === 'tool.updated') console.log(event.tool.kind, event.tool.status);
+  }
+  const { status, error, messages } = await run.result; // completed, failed or interrupted
+  console.log(status, error, messages);
+} finally {
   await driver.close();
-  throw error;
 }
-// At application shutdown: unsubscribe(); await driver.close();
 ```
 
 From the repository root, run the complete [chat example](https://korus-dev.github.io/multi-agent-sdk/guide/quick-start.html):

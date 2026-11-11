@@ -4,11 +4,12 @@ import type { ProviderCapabilities, ProviderConversationRef, ProviderDefaults, P
 import type { ProviderEvent } from './contracts/events';
 import type {
   Admission, ConversationRef, Harness, HarnessCapabilities, HarnessContext, HarnessDefaults, HarnessEvent, HarnessProvider,
-  Session, SessionSelection, SessionState, TurnActionResult,
+  Run, Session, SessionSelection, SessionState, TurnActionResult,
 } from './consumer-types';
 import { harnessContext } from './harness-options';
 import type { HarnessProjection } from './harness-projection';
 import { HarnessUnsupportedError } from './errors';
+import { startRun } from './run';
 import { conversationActivity, isConversationFrame } from './conversations/conversation-activity';
 import { diffSessionState, emptyPatchBase, type SessionPatchBase, type SessionSnapshot } from './session-patch';
 
@@ -40,6 +41,8 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
   private readonly byId = new Map<string, Session>();
   private readonly refs = new WeakMap<ConversationRef, ProviderConversationRef>();
   private readonly listeners = new Set<(event: HarnessEvent) => void>();
+  /** How to end each session's unfinished runs when the session or the harness goes away. */
+  private readonly runs = new Map<Session, Set<(reason: string) => void>>();
   private readonly unsubscribe: () => void;
   private readonly offUsage?: () => void;
   private readonly offRequests?: () => void;
@@ -381,6 +384,24 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
     // The same JSON path as patches, so a state rebuilt from patches matches it exactly.
     return { revision: binding.revision, state: JSON.parse(JSON.stringify(binding.state)) as SessionState };
   }
+  run(session: Session, prompt: string, options?: Parameters<Harness['run']>[2]): Run {
+    this.main(session);
+    const active = this.runs.get(session) ?? new Set<(reason: string) => void>();
+    this.runs.set(session, active);
+    const { run, abandon } = startRun({
+      session,
+      subscribe: listener => this.onEvent(listener),
+      admit: () => this.sendPrompt(session, prompt, options),
+      state: () => this.bindings.has(session) ? this.readSession(session) : undefined,
+      steer: next => this.steerPrompt(session, next),
+      interrupt: turnId => this.interrupt(session, turnId),
+    }, () => { active.delete(abandon); if (!active.size && this.runs.get(session) === active) this.runs.delete(session); });
+    active.add(abandon);
+    return run;
+  }
+  private abandonRuns(session: Session, reason: string): void {
+    for (const abandon of [...this.runs.get(session) ?? []]) abandon(reason);
+  }
   async sendPrompt(session: Session, prompt: string, options?: Parameters<Harness['sendPrompt']>[2]) { return this.admitted(session, await this.native.sendPrompt(this.main(session).context, prompt, options)); }
   async interrupt(session: Session, expectedTurnId?: string) { return this.admitted(session, await this.native.interrupt(this.interactive(session).context, expectedTurnId)); }
   async respondToRequest(session: Session, response: Parameters<Harness['respondToRequest']>[1]) {
@@ -506,6 +527,7 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
       }
       await this.native.releaseConversation(b.context.id);
       this.byId.delete(b.context.id); this.bindings.delete(session);
+      this.abandonRuns(session, 'The session was released before its run ended.');
     } finally { b.operation = undefined; }
   }
   async release(session: Session) {
@@ -515,10 +537,13 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
     b.operation = 'releasing';
     try {
       await this.native.releaseConversation?.(b.context.id); this.byId.delete(b.context.id); this.bindings.delete(session);
+      this.abandonRuns(session, 'The session was released before its run ended.');
     } finally { b.operation = undefined; }
   }
   onEvent(listener: (event: HarnessEvent) => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
   async close() {
-    try { await this.native.close(); } finally { this.unsubscribe(); this.offUsage?.(); this.offRequests?.(); this.listeners.clear(); this.bindings.clear(); this.byId.clear(); }
+    try { await this.native.close(); } finally {
+      for (const session of [...this.runs.keys()]) this.abandonRuns(session, 'The harness closed before the run ended.');
+      this.unsubscribe(); this.offUsage?.(); this.offRequests?.(); this.listeners.clear(); this.bindings.clear(); this.byId.clear(); }
   }
 }

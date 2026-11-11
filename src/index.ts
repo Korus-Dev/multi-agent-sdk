@@ -12,7 +12,7 @@ export type {
 export type {
   Admission, Authentication, AuthenticationAction, ConversationRef, ConversationRefData, ConversationSummary, Harness,
   HarnessCapabilities, HarnessContext, HarnessDefaults, HarnessEvent, HarnessNotice, HistoryState, ModelOption, PluginSummary, PromptOptions,
-  RuntimeStatus, Session, SessionData, SessionSelection, SessionState, SessionStatus, SkillSummary, TurnActionResult
+  Run, RunEvent, RunResult, RuntimeStatus, Session, SessionData, SessionSelection, SessionState, SessionStatus, SkillSummary, TurnActionResult
 } from './consumer-types';
 export type { ProviderContext as Agent } from './context';
 export type { ProviderApprovalDecision, ProviderApprovalRequest, ProviderApprovalScope, ProviderRequestedPermission } from './contracts/approvals';

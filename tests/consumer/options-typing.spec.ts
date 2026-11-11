@@ -18,6 +18,9 @@ const typed = () => {
   // A harness whose provider is only known at runtime takes any id and checks it against its capabilities.
   const any = createHarness('cursor' as import('../../src').HarnessProvider, { client: { name: 'x' } });
   void any.setPermission(session, 'whatever' as string);
+  // A harness for one provider is still a Harness.
+  const general: import('../../src').Harness = codex;
+  void general;
 };
 
 it('types options per provider', () => { expect(typed).toBeTypeOf('function'); });
