@@ -1886,7 +1886,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
     if (input.type === 'toolInput.requested' || input.type === 'approval.requested') {
       this.emit({
         agentId: input.agentId, provider: 'claude', type: 'agentRequest.created',
-        payload: { request: requestFromClientRequest(input.payload, {
+        payload: { request: requestFromClientRequest(withConfirmedItem(input.payload, replica.getSnapshot()), {
           conversationId: input.providerSessionId ?? replica.getSnapshot().sessionId ?? input.agentId,
           turnId: input.turnId,
         }) },
@@ -2137,4 +2137,13 @@ function isClaudeAuthenticationError(message: string): boolean {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+/** The tool call a confirmation is about, so the request and its transcript tool part are shown once. */
+function withConfirmedItem<R extends { id: string; itemId?: string }>(request: R, snapshot: ClaudeConversationSnapshot): R {
+  if (request.itemId) return request;
+  for (const message of snapshot.messages) for (const part of message.parts) {
+    if (part.type === 'tool' && part.metadata?.confirmationRequestId === request.id) return { ...request, itemId: part.id };
+  }
+  return request;
 }

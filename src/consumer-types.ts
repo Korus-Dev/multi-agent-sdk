@@ -61,6 +61,8 @@ export type SessionState = {
   selection?: SessionSelection;
   /** Provider-confirmed permission ID; absent or null means unknown. */
   permission?: string | null;
+  /** Whether the session plans before acting; absent when the provider does not report it. */
+  planMode?: boolean;
   messages: Message[]; busy: boolean; activeTurnId: string | null;
   turns: Turn[];
   /** Undefined until the native provider supplies evidence. */

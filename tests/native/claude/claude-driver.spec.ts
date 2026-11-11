@@ -638,6 +638,10 @@ describe('ClaudeBackendDriver', () => {
       },
     }));
 
+    // The request names the transcript tool part it confirms, so an app shows the two as one.
+    expect(events).toContainEqual(expect.objectContaining({ type: 'agentRequest.created',
+      payload: { request: expect.objectContaining({ id: 'tool-edit-1', kind: 'toolConfirmation', itemId: 'approval-tool-edit-1' }) } }));
+
     transport.respondToPermissionRequest.mockResolvedValueOnce(undefined);
     await driver.respondToAgentRequest({
       id: 'tool-edit-1',

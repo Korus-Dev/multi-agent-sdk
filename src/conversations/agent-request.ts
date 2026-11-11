@@ -43,8 +43,8 @@ export function approvalOutcome(decision: 'approve' | 'deny' | null, scope: 'onc
     : { kind: 'completed', ...(reason ? { reason } : {}) };
 }
 
-export function requestFromClientRequest(request: ClientRequest, identity: { conversationId: string; turnId?: string }): AgentRequest {
-  if (request.kind === 'confirm_tool') return { ...identity, id: request.id, kind: 'toolConfirmation', confirmation: request.payload.confirmation };
+export function requestFromClientRequest(request: ClientRequest & { itemId?: string }, identity: { conversationId: string; turnId?: string }): AgentRequest {
+  if (request.kind === 'confirm_tool') return { ...identity, id: request.id, kind: 'toolConfirmation', ...(request.itemId ? { itemId: request.itemId } : {}), confirmation: request.payload.confirmation };
   const question = request.payload.request;
   return {
     ...identity, id: request.id, kind: 'question',
