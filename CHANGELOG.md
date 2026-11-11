@@ -14,7 +14,7 @@
 - `session.patch` events carry each change to a session as plain JSON ops with a revision, so a session's state can cross a wire incrementally. `readSessionSnapshot` returns the state at a revision to start from, `applySessionPatch` applies a patch, and a missed revision throws `SessionPatchGapError` and an invalid patch throws `SessionPatchInvalidError`, so the consumer reads a fresh snapshot. `session.changed` carries the same revision.
 - `SessionState.planMode` reports whether the session plans before acting, for providers that track it.
 - Tool confirmation requests carry the `itemId` of the transcript tool call they confirm, so an app can show the two as one.
-- `harness.onEvent` forwards provider events, including those without a session, as `provider.event`.
+- `harness.onEvent` hands consumers neutral events only. Conversation activity arrives as `turn.started`, `turn.completed` (status, error, retry), `session.error`, `tool.updated`, `turn.output`, `diff.updated` and `file.activity`, the same for every harness. Plans every harness proposes arrive as `plan.readyForReview`. Provider updates such as models, skills, settings, goals, subagents and rate limits arrive typed as `HarnessNotice`. Native conversation frames never leave the SDK, and `provider.event` is removed.
 - Persisted and wire names use `provider` instead of `backend`.
 - `/testing` provides `createScriptedHarness`, `createScriptedCodexHarness` and `createScriptedClaudeHarness`: Harnesses whose provider is scripted by the test.
 - `/runtime` finds provider executables and builds their search path.

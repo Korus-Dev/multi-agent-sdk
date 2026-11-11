@@ -9,6 +9,7 @@ import type {
 import { harnessContext } from './harness-options';
 import type { HarnessProjection } from './harness-projection';
 import { HarnessUnsupportedError } from './errors';
+import { conversationActivity, isConversationFrame } from './conversations/conversation-activity';
 import { diffSessionState, emptyPatchBase, type SessionPatchBase, type SessionSnapshot } from './session-patch';
 
 const emptyState = (): SessionState => ({ messages: [], busy: false, activeTurnId: null, turns: [], requests: [], error: null, title: null, goal: null, contextUsage: null, plan: null });
@@ -163,7 +164,7 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
   }
   private receive(event: ProviderEvent): void {
     const session = event.agentId ? this.byId.get(event.agentId) : undefined;
-    this.emit({ type: 'provider.event', session, event });
+    this.publish(event, session);
     if (!session) return;
     const b = this.get(session);
     const snapshotFrame = event.type.endsWith('.conversationSnapshotChanged');
@@ -220,6 +221,21 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
         ...('message' in payload && typeof payload.message === 'string' ? { message: payload.message } : {}),
         native: payload } });
     } else if (event.type === 'conversation.contextUsageUpdated') { b.state.contextUsage = structuredClone(event.payload.contextUsage); this.changed(session); }
+  }
+  /** Hands consumers what a provider event means: activity for a native conversation frame, the notice itself otherwise. */
+  private publish(event: ProviderEvent, session: Session | undefined): void {
+    if (isConversationFrame(event)) {
+      if (!session) return;
+      for (const activity of conversationActivity(event)) {
+        if (activity.type === 'plan.proposed') {
+          const { type: _proposed, conversationId: _conversation, ...plan } = activity;
+          this.emit({ type: 'plan.readyForReview', session, ...plan });
+        } else this.emit({ ...activity, session });
+      }
+      return;
+    }
+    if (event.type === 'plan.readyForReview' || event.type === 'agentRequest.created' || event.type === 'agentRequest.resolved' || event.type === 'agent.statusChanged') return;
+    this.emit({ ...event, ...(session ? { session } : {}) } as HarnessEvent);
   }
   private newScope(parent: Session, cwd: string): Session {
     const p = this.get(parent);

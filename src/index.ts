@@ -1,5 +1,6 @@
 export { createHarness } from './create-harness';
 export { HarnessUnsupportedError } from './errors';
+export type { ConversationActivity, HarnessError } from './conversation-activity';
 export { applySessionPatch, SessionPatchGapError, SessionPatchInvalidError, type SessionPatch, type SessionPatchOp, type SessionSnapshot } from './session-patch';
 export { TypedEventBus, type EventListener } from './core/typed-event-bus';
 export { TtlCache, type TtlCacheOptions, type TtlCacheRecord, type TtlCacheEvictionContext, type TtlCacheScheduler, type TtlCacheTimer } from './core/ttl-cache';
@@ -10,7 +11,7 @@ export type {
 // Provider-neutral types. Provider-specific types live on the types-only ./codex, ./claude, ./cursor and ./antigravity entries.
 export type {
   Admission, Authentication, AuthenticationAction, ConversationRef, ConversationRefData, ConversationSummary, Harness,
-  HarnessCapabilities, HarnessContext, HarnessDefaults, HarnessEvent, HistoryState, ModelOption, PluginSummary, PromptOptions,
+  HarnessCapabilities, HarnessContext, HarnessDefaults, HarnessEvent, HarnessNotice, HistoryState, ModelOption, PluginSummary, PromptOptions,
   RuntimeStatus, Session, SessionData, SessionSelection, SessionState, SessionStatus, SkillSummary, TurnActionResult
 } from './consumer-types';
 export type { ProviderContext as Agent } from './context';

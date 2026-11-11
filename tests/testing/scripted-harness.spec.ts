@@ -23,7 +23,7 @@ it('pushes provider events to a session by id, as the provider would', async () 
   const { harness, script } = createScriptedHarness('cursor');
   const session = harness.open({ id: 'chat', folder: '/work' });
   const seen: string[] = [];
-  harness.onEvent(event => { if (event.type === 'provider.event') seen.push(event.event.type); });
+  harness.onEvent(event => seen.push(event.type));
   script.emit({ type: 'provider.statusChanged', provider: 'cursor', payload: { provider: 'cursor', status: 'running' } } as never);
   expect(seen).toEqual(['provider.statusChanged']);
   void session;

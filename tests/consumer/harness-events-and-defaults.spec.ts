@@ -17,19 +17,19 @@ function fixture() {
   return { harness, native, seen, deliver: (event: ProviderEvent) => deliver(event) };
 }
 
-it('forwards provider events to listeners, with the session they belong to when there is one', () => {
+it('hands listeners neutral events only: notices with the session they belong to, never a native conversation frame', () => {
   const { harness, deliver } = fixture();
   const session = harness.open({ id: 'chat', folder: '/work' });
   const events: HarnessEvent[] = []; harness.onEvent(event => events.push(event));
   const frame = { type: 'cursor.conversationSnapshotChanged', provider: 'cursor', agentId: 'chat', payload: { revision: 1, snapshot: {} } } as unknown as ProviderEvent;
   deliver(frame);
-  deliver({ ...frame, agentId: 'someone-else' } as ProviderEvent);
+  const models = { type: 'models.changed', provider: 'cursor', agentId: 'chat', payload: { models: [] } } as unknown as ProviderEvent;
+  deliver(models);
   const unowned = { type: 'provider.authenticationChanged', provider: 'cursor', payload: { connected: false } } as unknown as ProviderEvent;
   deliver(unowned);
-  expect(events.filter(event => event.type === 'provider.event')).toEqual([
-    { type: 'provider.event', session, event: frame },
-    { type: 'provider.event', session: undefined, event: { ...frame, agentId: 'someone-else' } },
-    { type: 'provider.event', session: undefined, event: unowned },
+  expect(events.filter(event => event.type.endsWith('.conversationSnapshotChanged') || event.type.endsWith('.conversationEventReceived'))).toEqual([]);
+  expect(events.filter(event => event.type === 'models.changed' || event.type === 'provider.authenticationChanged')).toEqual([
+    { ...models, session }, unowned,
   ]);
 });
 

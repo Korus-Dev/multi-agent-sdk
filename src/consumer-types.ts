@@ -74,6 +74,8 @@ export type SessionState = {
   contextUsage: import('./contracts/index').AgentContextUsage | null;
   plan: import('./contracts/index').ThreadPlan | null;
 };
+/** Provider updates in their neutral shape. Native conversation frames, and events with their own harness form, are not among them. */
+export type HarnessNotice = Exclude<import('./contracts/notices').ProviderNotice, { type: 'plan.readyForReview' | 'agentRequest.created' | 'agentRequest.resolved' | 'agent.statusChanged' }>;
 export type HarnessEvent =
   | { type: 'session.changed'; session: Session; state: SessionState; revision: number }
   /** The same change as the `session.changed` that follows it, as a revisioned patch for consumers that replicate state elsewhere. */
@@ -83,8 +85,10 @@ export type HarnessEvent =
   | { type: 'request.created'; session: Session; request: AgentRequest }
   | { type: 'request.resolved'; session: Session; id: string; outcome: import('./conversations/agent-request').AgentRequestOutcome }
   | { type: 'status.changed'; session: Session; status: SessionStatus }
-  /** Raw provider conversation event for consumers that maintain their own replicas. Prefer `session.changed` for state. */
-  | { type: 'provider.event'; session?: Session; event: import('./contracts/events').ProviderEvent }
+  /** What happened in the session's conversation: turns starting and finishing, errors, tools, output, diffs and file activity. */
+  | (import('./conversation-activity').ConversationActivity & { session: Session })
+  /** Session and provider updates every harness reports in the same shape; `session` is absent for provider-wide ones. */
+  | (HarnessNotice & { session?: Session })
   | { type: 'usage.observed'; observation: import('./contracts/usage').ExecutionObservation }
   | { type: 'requestUsage.observed'; observation: import('./contracts/usage').RequestObservation };
 /** A provider harness. `P` narrows provider-specific inputs such as permission ids when the provider is known. */
