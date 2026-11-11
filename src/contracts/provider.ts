@@ -109,6 +109,8 @@ export type ProviderCapabilities = {
   review?: boolean;
   /** `getBankedResets` and `useBankedReset` are available. */
   bankedResets?: boolean;
+  /** Turns can stop on safety findings, and `continueInterruptedTurn` takes a safety review to resume them. */
+  safetyReview?: boolean;
   /** `deleteConversation` removes a conversation from the provider. */
   conversationDelete?: boolean;
   /** `setConversationTitle` renames a conversation in the provider. */

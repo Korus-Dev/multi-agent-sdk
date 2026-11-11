@@ -12,7 +12,7 @@ const permissionModes = (ids: readonly string[]) => ids.map(id => ({ id, ...(unr
 
 export const codexHarnessCapabilities: ProviderCapabilities = {
   mcpRequiredServers: true, mcpAutoApproval: true,
-  turnContinuation: true, conversationContent: true, turnHistory: true, conversationStorage: true,
+  turnContinuation: true, conversationContent: true, turnHistory: true, conversationStorage: true, safetyReview: true,
   accountUsage: true,
   textGeneration: true, structuredOutput: true, imageGeneration: true, review: true, bankedResets: true, conversationDelete: true, conversationTitle: true, scopedExecution: true,
   reportsTokens: true,

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `capabilities.safetyReview` says whether a harness stops turns on safety findings and resumes them from a safety review.
 - Provider updates name their conversation in `conversationId` only; `threadId` and `providerSessionId` no longer appear on harness events.
 - `./contracts` reads persisted session data for apps: `sessionConversationId`, `conversationSessionData`, `sessionConversationRef`, `sessionHasConversation`, `conversationRefId`, `sameConversationRef`, `subagentOfRef`, `subagentRef`, `isProviderSessionData` and `defaultsPermission`, so an app stores what a harness hands out without knowing each provider's shape.
 - Each harness reads its own conversation frames into neutral activity, so shared code never interprets a provider's events. The realtime types come from one neutral module, and the root no longer exports `ContinueCodexSafetyReviewOptions` or `StartCodexRealtimeOptions` (use `RealtimeOptions`).
