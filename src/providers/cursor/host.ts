@@ -39,6 +39,7 @@ import { CursorSession, isCursorAuthenticationFailure } from './session';
 import { executionSelectionForAgent, resolveExecutionSelection } from '../../execution-selection';
 import { cursorAttachments } from './attachments';
 import { getCursorAccountUsage } from './account-usage';
+import { finalAnswerText } from '../../conversations/final-answer';
 
 type CursorSubmission = { providerSession: ProviderSessionData; turnId: string; completion: Promise<void>; session: CursorSession };
 type RunningScope = { replacement?: Promise<CursorSubmission> };
@@ -181,8 +182,7 @@ export class CursorHost<Context extends ProviderContext = ProviderContext> imple
       }
       const snapshot = started.session.snapshot;
       if (snapshot.turns.find(turn => turn.id === started.turnId)?.status !== 'completed') throw new Error(snapshot.error ?? 'Cursor execution was interrupted.');
-      const text = snapshot.messages.filter(message => message.turnId === started.turnId && message.role === 'assistant')
-        .flatMap(message => message.parts.flatMap(part => part.type === 'text' ? [part.text] : [])).join('\n');
+      const text = finalAnswerText(snapshot.messages, started.turnId);
       return { text, session: started.providerSession };
     } finally { if (this.runningScopes.get(agent.id) === execution) this.runningScopes.delete(agent.id); }
   }

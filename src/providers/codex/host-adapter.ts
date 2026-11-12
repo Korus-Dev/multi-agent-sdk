@@ -92,6 +92,7 @@ import {
   invokeCodexConversationBridgeOperation,
   subscribeCodexConversationReplicaBridge,
 } from '../../core/codex-host-bridge';
+import { finalAnswerText } from '../../conversations/final-answer';
 
 type AdapterListener = (event: ProviderEvent) => void;
 type ThreadProviderEvent<Event extends ProviderEvent = ProviderEvent> = Event extends ProviderEvent
@@ -1887,11 +1888,7 @@ function conversationSummary(
 
 
 function sessionFinalAnswerText(messages: readonly ConversationMessage[], turnId: string): string {
-  return messages.filter((message) => (
-    message.role === 'assistant' && message.turnId === turnId && message.status === 'complete'
-  )).flatMap((message) => message.parts.flatMap((part) => (
-    part.type === 'text' && part.phase === 'final_answer' ? [part.text] : []
-  ))).join('\n').trim();
+  return finalAnswerText(messages.filter(message => message.status === 'complete'), turnId);
 }
 
 

@@ -46,6 +46,7 @@ import { antigravityModels, listAcpSessions } from './catalog';
 import { parseQuota } from './quota';
 import { acpAttachments } from './attachments';
 import { AcpPromptJournal } from './prompt-journal';
+import { finalAnswerText } from '../../conversations/final-answer';
 
 export class AntigravityHost<Context extends ProviderContext = ProviderContext> implements ProviderDriver<Context, ProviderEvent> {
   readonly provider = 'antigravity' as const;
@@ -197,8 +198,7 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
     await completion;
     input.signal?.throwIfAborted();
     if (session.snapshot.turns.find(candidate => candidate.id === turnId)?.status !== 'completed') throw new Error(session.snapshot.error ?? 'Antigravity execution was interrupted.');
-    const text = session.snapshot.messages.filter(message => message.turnId === turnId && message.role === 'assistant')
-      .flatMap(message => message.parts.flatMap(part => part.type === 'text' ? [part.text] : [])).join('\n');
+    const text = finalAnswerText(session.snapshot.messages, turnId);
     return { text, session: this.reference(session) };
   }
 

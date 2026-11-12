@@ -101,6 +101,7 @@ import {
   type ClaudeSdkContentBlock,
   type ClaudeSdkMessage,
 } from './protocol';
+import { finalAnswerText } from '../../conversations/final-answer';
 
 type StreamedClaudeTool = {
   id: string;
@@ -286,11 +287,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
         : null;
       if (!sessionId) throw new Error('Claude did not create a scope conversation.');
       const snapshot = this.conversationReplicasByAgentId.get(agent.id)?.getSnapshot();
-      const text = snapshot?.messages
-        .filter((message) => message.turnId === targetTurnId && message.role === 'assistant')
-        .flatMap((message) => message.parts.flatMap((part) => part.type === 'text' ? [part.text] : []))
-        .join('\n')
-        .trim() ?? '';
+      const text = snapshot ? finalAnswerText(snapshot.messages, targetTurnId) : '';
       return {
         text,
         session: { kind: 'claude', conversationId: sessionId, transport: 'stdio' },
