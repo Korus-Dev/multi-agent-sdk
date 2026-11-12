@@ -21,10 +21,13 @@ export type CodexHostAdapterOptions<Context extends Agent = Agent> = {
   retainedSessions?: (context: Context) => readonly ProviderSessionData[];
   approvalPresetFromDefaults?: (defaults: import('../../contracts').ProviderDefaults | undefined) => ApprovalPreset;
   formatPrompt?: typeof defaultFormatPrompt;
+  /** The app's own MCP server; its tools run without approval prompts. */
+  trustedMcpServerName?: string;
   images?: import('./image-generation').CodexImageGenerationOptions;
 };
 function defaultFormatPrompt(prompt: string, content?: SendPromptOptions['content'], _native?: boolean): string { return content === undefined ? prompt : promptContentDispatchText(content, prompt); }
-function scopedMcpServers(scope: HarnessPromptScope) { return (scope.mcpServers ?? []).map(server => ({ name: server.name, transport: { type: 'http' as const, url: server.url }, ...(server.enabledTools ? { enabledTools: [...server.enabledTools] } : {}), ...(server.approval === 'auto' ? { toolApprovalMode: 'auto' as const } : {}), ...(server.required === undefined ? {} : { required: server.required }) })); }
+/** A scope's MCP servers for Codex. The app's own server runs without approval prompts, as it does outside a scope. */
+function scopedMcpServers(scope: HarnessPromptScope, trusted?: string) { return (scope.mcpServers ?? []).map(server => ({ name: server.name, transport: { type: 'http' as const, url: server.url }, ...(server.enabledTools ? { enabledTools: [...server.enabledTools] } : {}), ...(server.name === trusted ? { toolApprovalMode: 'approve' as const } : server.approval === 'auto' ? { toolApprovalMode: 'auto' as const } : {}), ...(server.required === undefined ? {} : { required: server.required }) })); }
 function nativeApprovalPreset(defaults: import('../../contracts').ProviderDefaults | undefined): ApprovalPreset | undefined {
   if (defaults?.kind !== 'codex') return undefined;
   // Missing caller policy inherits the native thread; it is not an approval override.
@@ -158,7 +161,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
   }
 
   private extensionContext(context: Context, scope?: import('../../driver').HarnessPromptScope): unknown { return this.options.extensionContext?.(context, scope) ?? context; }
-  private conversationConfiguration(context: Context, scope?: HarnessPromptScope) { return this.options.conversationConfiguration?.(context, scope) ?? { ...agentCwd(context), extensionContext: this.extensionContext(context, scope), mcpServers: scope ? scopedMcpServers(scope) : undefined }; }
+  private conversationConfiguration(context: Context, scope?: HarnessPromptScope) { return this.options.conversationConfiguration?.(context, scope) ?? { ...agentCwd(context), extensionContext: this.extensionContext(context, scope), mcpServers: scope ? scopedMcpServers(scope, this.options.trustedMcpServerName) : undefined }; }
   private syncTitle(context: Context): boolean { return this.options.shouldSyncTitle?.(context) ?? Boolean(context.name?.trim()); }
   private displayName(context: Context): string { return this.options.displayName?.(context) ?? context.name?.trim() ?? context.id; }
   private approvalPreset(defaults: import('../../contracts').ProviderDefaults | undefined): ApprovalPreset | undefined { return this.options.approvalPresetFromDefaults?.(defaults) ?? nativeApprovalPreset(defaults); }
@@ -441,7 +444,9 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
     }
     const requestedAgent = { ...agent, folder: input.cwd, providerSession: input.session };
     const scopedExtensionContext = this.extensionContext(requestedAgent, input.scope);
-    const session = await this.ensureSession(requestedAgent, scopedExtensionContext);
+    // A conversation created for this scope starts with the scope's servers; an existing one is reloaded with them.
+    const created = !input.session && !this.sessionsByAgentId.has(agent.id) && !this.sessionInitializations.has(agent.id);
+    const session = await this.ensureSession(requestedAgent, scopedExtensionContext, scopedMcpServers(input.scope, this.options.trustedMcpServerName));
     input.signal?.throwIfAborted();
     const current = session.handle.getSnapshot();
     if (current.busy || current.activeTurnId || current.queuedPrompts.length || current.approvals.length || current.clientRequests.length) throw new Error('Codex already has active work for this context.');
@@ -458,7 +463,8 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
       else completedBeforeTarget.set(event.turnId, event.payload.status);
     });
     try {
-      await conversation.load(this.conversationConfiguration(requestedAgent, input.scope));
+      // A new conversation has nothing saved to reload yet.
+      if (!created) await conversation.load(this.conversationConfiguration(requestedAgent, input.scope));
       input.signal?.throwIfAborted();
       const beforeTurnIds = conversation.getSnapshot().turnIds;
       const promptOptions = { ...scopedPromptOptions(agent), ...hostPromptOptions(input.options) };
@@ -483,7 +489,9 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
       };
     } finally {
       unsubscribe();
-      if (!input.signal?.aborted) await conversation.load(this.conversationConfiguration(agent));
+      // Restoring the normal servers is housekeeping: a conversation that was archived or released meanwhile has
+      // nothing to restore, and that must not replace the run's own result or error.
+      if (!input.signal?.aborted) await conversation.load(this.conversationConfiguration(agent)).catch(() => undefined);
     }
   }
 
@@ -771,13 +779,26 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
   async archiveAgentConversation(agent: Context): Promise<void> {
     const threadId = codexThreadId(agent);
     if (!threadId) return;
-    await this.host.archiveConversation(threadId);
+    try { await this.host.archiveConversation(threadId); }
+    catch (error) { if (!(await this.isArchived(threadId))) throw error; }
   }
 
   async deleteAgentConversation(agent: Context): Promise<void> {
     const threadId = codexThreadId(agent);
     if (!threadId) return;
-    await this.host.deleteConversation(threadId);
+    try { await this.host.deleteConversation(threadId); }
+    catch (error) {
+      // Codex deletes only active conversations; one that was archived meanwhile is brought back first.
+      if (!(await this.isArchived(threadId))) throw error;
+      await this.host.unarchiveConversation(threadId);
+      await this.host.deleteConversation(threadId);
+    }
+  }
+
+  /** Whether Codex already holds the conversation in its archive, where archiving it again fails. */
+  private async isArchived(threadId: string): Promise<boolean> {
+    try { return (await this.host.listConversations({ archived: true })).some(conversation => conversation.id === threadId); }
+    catch { return false; }
   }
 
   async reconcileConversations(agents: Context[]): Promise<void> {
@@ -977,6 +998,8 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
   private async ensureSession(
     agent: Context,
     extensionContext: unknown = this.extensionContext(agent),
+    /** The servers a conversation created by this call starts with, in place of the host's own. */
+    mcpServers?: ReturnType<typeof scopedMcpServers>,
   ): Promise<AgentConversation<Context>> {
     const requestedThreadId = codexThreadId(agent);
     const pending = this.sessionInitializations.get(agent.id);
@@ -986,7 +1009,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
         session.agent = agent;
         return session;
       }
-      return this.ensureSession(agent, extensionContext);
+      return this.ensureSession(agent, extensionContext, mcpServers);
     }
     const existing = this.sessionsByAgentId.get(agent.id);
     if (existing && (!requestedThreadId || existing.handle.id === requestedThreadId)) {
@@ -999,7 +1022,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
     let initialization!: Promise<AgentConversation<Context>>;
     initialization = this.createAgentConversation(agent, extensionContext, () => (
       !this.closed && this.sessionInitializations.get(agent.id) === initialization
-    ));
+    ), mcpServers);
     this.sessionInitializations.set(agent.id, initialization);
     try {
       return await initialization;
@@ -1014,6 +1037,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
     agent: Context,
     extensionContext: unknown,
     isCurrent: () => boolean,
+    mcpServers?: ReturnType<typeof scopedMcpServers>,
   ): Promise<AgentConversation<Context>> {
     await this.start();
     if (!isCurrent()) throw new Error('Codex conversation initialization was cancelled.');
@@ -1029,7 +1053,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
       ...(defaults?.model ? { model: defaults.model } : {}),
       ...(defaults?.reasoningEffort ? { reasoningEffort: defaults.reasoningEffort } : {}),
       ...(defaults?.serviceTier !== undefined ? { serviceTier: defaults.serviceTier } : {}),
-    }, { extensionContext });
+    }, { extensionContext, ...(mcpServers ? { mcpServers } : {}) });
     const threadId = snapshot.activeConversationId;
     if (!threadId) throw new Error('Codex did not create a conversation.');
     if (!isCurrent()) {
@@ -1106,6 +1130,12 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
       this.publishInitial(existing, snapshot);
       return existing;
     }
+
+    // Another session of this app may be running this conversation, as a review does in its scope. Binding would
+    // release that session, and the turn would then look orphaned and be interrupted.
+    const ownerId = this.agentIdsByThreadId.get(threadId);
+    const owner = ownerId && ownerId !== agent.id ? this.sessionsByAgentId.get(ownerId)?.handle.getSnapshot() : undefined;
+    if (owner && (owner.busy || owner.activeTurnId)) throw new Error('Codex is running this conversation in another session. Wait for it to finish.');
 
     await this.start();
     mark('bind.driver-connected');

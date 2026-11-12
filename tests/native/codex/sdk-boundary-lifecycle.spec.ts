@@ -163,6 +163,19 @@ describe(`Codex SDK → ${product.name} backend lifecycle`, () => {
     expect(host.deleteConversation).toHaveBeenCalledOnce();
   });
 
+  it('treats a conversation that is already archived as archived, and deletes it out of the archive', async () => {
+    const { driver, host } = setup();
+    const archived = [{ id: 'conversation-a' }] as never;
+    host.listConversations.mockImplementation(async (input?: { archived?: boolean }) => input?.archived ? archived : []);
+    // Codex has nothing left to archive: the rollout already moved.
+    host.archiveConversation.mockRejectedValueOnce(new Error('no rollout found for thread id conversation-a'));
+    await expect(driver.archiveAgentConversation(sdkAgent())).resolves.toBeUndefined();
+    host.deleteConversation.mockRejectedValueOnce(new Error('session conversation-a is archived. Run `codex unarchive conversation-a` to unarchive it first.'));
+    await expect(driver.deleteAgentConversation(sdkAgent())).resolves.toBeUndefined();
+    expect(host.unarchiveConversation).toHaveBeenCalledExactlyOnceWith('conversation-a');
+    expect(host.deleteConversation).toHaveBeenCalledTimes(2);
+  });
+
   it('does not detach an attached conversation when archive fails', async () => {
     const { driver, host, conversation } = setup();
     await driver.loadConversation(sdkAgent());
@@ -179,6 +192,20 @@ describe(`Codex SDK → ${product.name} backend lifecycle`, () => {
     session.setSnapshot({ activeTurnId: 'old-turn', busy: true, ...(activeGoal ? { goal: { threadId: 'conversation-a', objective: 'finish', status: 'active', tokenBudget: null, tokensUsed: 0, timeUsedSeconds: 0, createdAt: 0, updatedAt: 0 } } : {}) });
     await driver.loadConversation(sdkAgent());
     expect(session.handle.interrupt).toHaveBeenCalledTimes(activeGoal ? 0 : 1);
+  });
+
+  it('never takes over or interrupts a conversation another session of this app is running, such as a review in its scope', async () => {
+    const { driver, conversation } = setup();
+    const session = conversation('conversation-a');
+    // A scope loads the conversation and starts a turn in it.
+    await driver.loadConversation(sdkAgent('reviewer:scope:1'));
+    session.setSnapshot({ activeTurnId: 'review-turn', busy: true });
+    // The agent's own session is then asked to load the same conversation, as when its record adopts the scope's.
+    await expect(driver.loadConversation(sdkAgent('reviewer'))).rejects.toThrow(/running/i);
+    expect(session.handle.interrupt).not.toHaveBeenCalled();
+    // Once the turn is over the conversation can change hands.
+    session.setSnapshot({ activeTurnId: null, busy: false });
+    await expect(driver.loadConversation(sdkAgent('reviewer'))).resolves.toBeDefined();
   });
 
   it('reuses fresh snapshots, refreshes expired idle history, and retains live history', async () => {

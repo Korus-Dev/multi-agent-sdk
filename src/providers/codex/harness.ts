@@ -97,6 +97,7 @@ export class CodexHarness extends ProviderHarness<'codex'> {
       ...options.codex?.adapter,
       extensionContext: (context, scope) => ({ context, scope } satisfies CodexBinding<Context>),
       formatPrompt: options.formatPrompt ?? options.codex?.adapter?.formatPrompt,
+      ...(options.trustedMcpServerName ? { trustedMcpServerName: options.trustedMcpServerName } : {}),
     });
     return new CodexHostController(adapter);
   }

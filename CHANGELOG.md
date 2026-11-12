@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Codex runs the tools of the app's own MCP server (`trustedMcpServerName`) without approval prompts when the server is passed through `mcpServers`, as the other harnesses do.
+- Codex runs the tools of the app's own MCP server (`trustedMcpServerName`) without approval prompts when the server is passed through `mcpServers` or a scope's `mcpServers`, as the other harnesses do.
 - Claude ties an approval for a built-in tool to that tool's call instead of adding a second tool part, and an approval shown as its own part ends when it is answered. A Claude turn announces its conversation, settings and running runtime when they change, not on every message.
 - Session patches send what changed inside a message: `appendPartText` for streamed text, `spliceParts` for a part that was added or replaced, and `setMessageFields` for the message's own fields. `spliceMessages` is used only when messages are added, removed or replaced, so a streaming answer no longer resends the text already sent.
 - `bindSession` is removed. An app re-states what it has stored for a session with `syncSession`, which an operation already in flight sees the next time it looks.
