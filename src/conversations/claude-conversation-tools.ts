@@ -154,6 +154,13 @@ export function applyApprovalRequest(
     return;
   }
 
+  // A built-in tool's call is already in the transcript: the approval is about that part, not a new one.
+  const builtIn = findPendingBuiltInToolPart(snapshot, agentId, turnId, confirmation.toolName);
+  if (builtIn) {
+    builtIn.metadata = { ...(builtIn.metadata ?? {}), confirmationRequestId: request.id };
+    return;
+  }
+
   upsertAssistantToolPart(snapshot, agentId, turnId, {
     type: 'tool',
     id: `approval-${request.id}`,
@@ -201,6 +208,13 @@ export function applyToolInputRequest(
       question: question?.question,
     },
   }, createdAt);
+}
+
+/** The running call of a built-in tool that no approval has claimed yet. */
+function findPendingBuiltInToolPart(snapshot: ClaudeConversationSnapshot, agentId: string, turnId: string, tool: string): ToolPart | undefined {
+  return findAssistantMessages(snapshot, agentId, turnId).flatMap(message => message.parts).find((part): part is ToolPart =>
+    part.type === 'tool' && part.status === 'running' && isRecord(part.metadata)
+    && part.metadata.claudeToolName === tool && part.metadata.confirmationRequestId === undefined);
 }
 
 function findPendingMcpToolPart(snapshot: ClaudeConversationSnapshot, agentId: string, turnId: string, server: string, tool: string): ToolPart | undefined {

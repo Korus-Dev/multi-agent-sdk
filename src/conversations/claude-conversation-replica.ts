@@ -29,6 +29,10 @@ export function createClaudeConversationReplica(
         if (!next.answeredClientRequestIds.includes(event.payload.id)) {
           next.answeredClientRequestIds.push(event.payload.id);
         }
+        // An approval that had no tool call to attach to shows as its own part; answering it ends that part.
+        for (const message of next.messages) for (const part of message.parts) {
+          if (part.type === 'tool' && part.id === `approval-${event.payload.id}` && part.status === 'running') part.status = 'completed';
+        }
         snapshot = next;
         return view(snapshot);
       }

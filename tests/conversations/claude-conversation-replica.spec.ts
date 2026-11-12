@@ -85,6 +85,34 @@ describe('Claude conversation replica', () => {
     });
   });
 
+  const confirmBash = (id: string) => event({
+    type: 'approval.requested', turnId: 'turn-1',
+    payload: { kind: 'confirm_tool', id, payload: { confirmation: {
+      integrationId: 'claude', integrationName: 'claude', toolName: 'Bash', summary: 'Create a file',
+      argumentsPreview: '{"command":"touch a"}', allowConversation: false, allowAlways: false,
+    } } },
+  });
+  const toolParts = (replica: ReturnType<typeof createClaudeConversationReplica>) =>
+    replica.getSnapshot().messages.flatMap(message => message.parts.flatMap(part => part.type === 'tool' ? [part] : []));
+
+  it('ties a built-in tool approval to the tool call it is about instead of adding a second tool part', () => {
+    const replica = createClaudeConversationReplica(emptySnapshot());
+    replica.apply(event({ type: 'turn.started', turnId: 'turn-1', payload: { turn: { id: 'turn-1', provider: 'claude' } } }));
+    replica.apply(event({ type: 'item.started', turnId: 'turn-1',
+      payload: { toolPart: { id: 'toolu_1', type: 'tool', kind: 'command', title: 'touch a', status: 'running', metadata: { claudeToolName: 'Bash' } } } }));
+    replica.apply(confirmBash('request-1'));
+    expect(toolParts(replica)).toMatchObject([{ id: 'toolu_1', kind: 'command', title: 'touch a', status: 'running', metadata: { claudeToolName: 'Bash', confirmationRequestId: 'request-1' } }]);
+  });
+
+  it('finishes the approval\'s own tool part once the request is answered, when no tool call was there to carry it', () => {
+    const replica = createClaudeConversationReplica(emptySnapshot());
+    replica.apply(event({ type: 'turn.started', turnId: 'turn-1', payload: { turn: { id: 'turn-1', provider: 'claude' } } }));
+    replica.apply(confirmBash('request-1'));
+    expect(toolParts(replica)).toMatchObject([{ id: 'approval-request-1', status: 'running' }]);
+    replica.apply(event({ type: 'clientRequest.resolved', payload: { id: 'request-1' } }));
+    expect(toolParts(replica)).toMatchObject([{ id: 'approval-request-1', status: 'completed' }]);
+  });
+
   it('tracks tools, requests, plans, errors, and resolved request ids inside the provider state', () => {
     const replica = createClaudeConversationReplica(emptySnapshot());
     replica.apply(event({

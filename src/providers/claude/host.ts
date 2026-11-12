@@ -136,6 +136,9 @@ type ActiveClaudeTurn = {
   resolveStart: (result: ProviderSendResult) => void;
   rejectStart: (error: Error) => void;
   startResolved: boolean;
+  /** The session and settings last announced for this turn, so each is reported once. */
+  announcedSessionId?: string;
+  announcedSettings?: string;
   error: Error | null;
   authenticationFailed?: boolean;
   rateLimit?: import('../../contracts/rate-limit').RateLimitDetails;
@@ -1659,33 +1662,42 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
     this.liveSessionIdsByAgentId.set(activeTurn.agentId, sessionId);
     this.contextUsageSessionIdsByAgentId.set(activeTurn.agentId, sessionId);
     this.rebindConversationSession(activeTurn.agentId, sessionId);
-    this.emit({
-      provider: this.provider,
-      type: 'provider.statusChanged',
-      payload: {
+    // Every message of a turn names its session; announce the conversation and its settings only when they change.
+    if (activeTurn.announcedSessionId !== sessionId) {
+      activeTurn.announcedSessionId = sessionId;
+      activeTurn.announcedSettings = undefined;
+      this.emit({
         provider: this.provider,
-        status: 'running',
-        capabilities: this.getCapabilities(),
-      },
-    });
-    this.emit({
-      agentId: activeTurn.agentId,
-      provider: this.provider,
-      providerSessionId: sessionId,
-      type: 'agent.conversationAttached',
-      conversationId: sessionId,
-      payload: {},
-    });
-
-    this.emit({
-      agentId: activeTurn.agentId, provider: this.provider, providerSessionId: sessionId,
-      type: 'conversation.settingsUpdated',
-      payload: { settings: {
-        ...(activeTurn.model ? { model: activeTurn.model } : {}),
-        ...(activeTurn.reasoningEffort ? { reasoningEffort: activeTurn.reasoningEffort } : {}),
-        serviceTier: activeTurn.serviceTier,
-      } },
-    });
+        type: 'provider.statusChanged',
+        payload: {
+          provider: this.provider,
+          status: 'running',
+          capabilities: this.getCapabilities(),
+        },
+      });
+      this.emit({
+        agentId: activeTurn.agentId,
+        provider: this.provider,
+        providerSessionId: sessionId,
+        type: 'agent.conversationAttached',
+        conversationId: sessionId,
+        payload: {},
+      });
+    }
+    const settings = {
+      ...(activeTurn.model ? { model: activeTurn.model } : {}),
+      ...(activeTurn.reasoningEffort ? { reasoningEffort: activeTurn.reasoningEffort } : {}),
+      serviceTier: activeTurn.serviceTier,
+    };
+    const announced = JSON.stringify(settings);
+    if (activeTurn.announcedSettings !== announced) {
+      activeTurn.announcedSettings = announced;
+      this.emit({
+        agentId: activeTurn.agentId, provider: this.provider, providerSessionId: sessionId,
+        type: 'conversation.settingsUpdated',
+        payload: { settings },
+      });
+    }
     if (!activeTurn.startResolved) {
       activeTurn.startResolved = true;
       activeTurn.resolveStart({

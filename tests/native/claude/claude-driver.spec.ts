@@ -38,6 +38,26 @@ describe('ClaudeBackendDriver', () => {
   });
 
 
+  it('announces a turn\'s conversation, settings and running runtime once, not on every message', async () => {
+    const transport = createConcurrentFakeTransport();
+    const driver = new ClaudeBackendDriver(transport);
+    const events: HarnessEvent[] = [];
+    driver.onEvent(event => events.push(event));
+    try {
+      const running = driver.sendPrompt(agent, 'Hello');
+      transport.emit(agent.id, { type: 'system', subtype: 'init', session_id: 'session-a', model: 'claude-haiku' });
+      await running;
+      for (let index = 0; index < 5; index++) transport.emit(agent.id, { type: 'assistant', session_id: 'session-a', uuid: `m${index}`, message: { content: [{ type: 'text', text: 'Hi' }] } });
+      const count = (type: string) => events.filter(event => event.type === type).length;
+      expect(count('agent.conversationAttached')).toBe(1);
+      expect(count('provider.statusChanged')).toBe(1);
+      // The model the turn runs with arrives with the first message, after the conversation is announced.
+      const settings = events.filter(event => event.type === 'conversation.settingsUpdated');
+      expect(settings.length).toBeLessThanOrEqual(2);
+      expect(settings.at(-1)).toMatchObject({ payload: { settings: { model: 'claude-haiku' } } });
+    } finally { await driver.close(); }
+  });
+
   it('reports nothing to fork for a running conversation without a completed boundary and leaves the source active', async () => {
     const transport = createConcurrentFakeTransport();
     const forkWorktreeSession = vi.fn();
