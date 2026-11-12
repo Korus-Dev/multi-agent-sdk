@@ -1,7 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.27.0 (2026-11-12)
 
+- Session data and conversation references name the conversation `conversationId` on every harness, replacing `sessionId` and Codex's `threadId`; Claude session data names its transcript `transcriptConversationId`, replacing `transcriptSessionId`. Data saved with the old names needs `conversationId` added before it is restored.
+- `capabilities.folderScopedConversations` says whether conversations belong to a working folder, and `capabilities.subagentTranscripts` (`'inline'`, `'separate'` or `'none'`) says where a subagent's transcript can be read. References carry a `folder` or a `subagentId` only where the capabilities say so.
+- `executeScopedPrompt` returns only the turn's final answer as `text` on every harness, never the commentary written along the way.
+- Saved model settings (model, reasoning effort and speed) apply once when a conversation is opened on every harness. While it stays open, only an explicit selection on a prompt or `updateDefaults` changes them.
 - Every harness stores and reports its permission in one field: `ProviderDefaults.permission`, `conversation.settingsUpdated` `settings.permission` and `conversation.modeUpdated` `permission`, each one of the ids in `capabilities.permissions`. Codex no longer keeps `approvalPreset`, `approvalPolicy`, `approvalsReviewer` or `sandboxMode` in stored defaults, and the other harnesses no longer keep `permissionMode`.
 - Sign-in results carry the signed-in account in neutral terms: `authenticate` returns `account` (a subscription, an API key or a cloud account, with its email, plan or team where the harness reports them), and the native state and sign-in change events carry the same `account`.
 - Runs whose prompts wait behind a running turn each follow their own turn, in the order the prompts were sent. A prompt sent with `sendPrompt` holds its place in that order, so a later run does not take its turn. A session whose identity was cleared with `syncSession` starts a new conversation on its next prompt on every harness. Antigravity `generateText` applies the thinking level it is asked for and rejects one the model does not offer.
