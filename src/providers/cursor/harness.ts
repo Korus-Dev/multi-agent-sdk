@@ -24,6 +24,9 @@ export class CursorHarness extends SessionHarness<'cursor'> {
 
   constructor(native: ProviderDriver<ProviderContext, ProviderEvent>, rules?: WorkPhaseRules) { super('cursor', native, rules); }
 
+  /** Cursor keeps a session on the conversation it holds unless told which other one to use, so a cleared session lets go of it first. */
+  protected override startingOver(context: ProviderContext) { return this.native.releaseConversation?.(context.id); }
+
   /** Maps app-facing options onto the Cursor runtime. */
   static mapOptions(options: HarnessOptions): CursorProviderOptions {
     return {

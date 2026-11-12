@@ -67,6 +67,7 @@ it('lets a provider operation in flight see what the app re-states meanwhile', a
 it.each([
   ['codex', (id: string) => ({ kind: 'codex' as const, threadId: id })],
   ['antigravity', (id: string) => ({ kind: 'antigravity' as const, sessionId: id })],
+  ['cursor', (id: string) => ({ kind: 'cursor' as const, sessionId: id, folder: '/work' })],
 ] as const)('starts a new %s conversation after the identity is cleared, instead of carrying on in the one it holds', async (provider, stored) => {
   const order: string[] = [];
   const native = { onEvent: () => () => {}, getCapabilities: () => ({}), close: async () => {},
