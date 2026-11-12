@@ -17,7 +17,7 @@ The package is ESM-only. Use `"type": "module"` in your application and configur
 | `cursor` | Cursor's `agent` or `cursor-agent` executable with ACP support. The adapter requires version 2026.10.08 or newer. |
 | `antigravity` | The Antigravity CLI (`agy`) 1.5.1 or later, signed in. |
 
-The package does not provision provider subscriptions or store application API keys. Check `harness.getRuntimeStatus()` for discovery status and use `await harness.authenticate({ action: 'check' })` for native account status. Authentication actions and account details differ by provider.
+The package does not provision provider subscriptions or store application API keys. Check `harness.getRuntimeStatus()` for discovery status and use `await harness.authenticate({ action: 'check' })` for the sign-in state.
 
 ## Homes and working folders
 
@@ -33,5 +33,17 @@ const harness = createHarness('codex', {
 ```
 
 Use one home per harness. Switch by awaiting `close()` and creating a fresh harness. Claude's configuration home is process-wide: close the current Claude runtime before opening another profile. This interface does not provide concurrent multi-home isolation.
+
+`authenticate` reports the signed-in account in the same terms for every provider:
+
+```ts
+const { connected, account } = await harness.authenticate({ action: 'check' });
+if (connected && account) {
+  // kind is 'subscription', 'apiKey' or 'cloud'; email, plan and team are present when the provider reports them.
+  console.log(account.kind, account.email, account.plan, account.team);
+}
+```
+
+`account` is `null` when no one is signed in or the provider does not say. Login actions and their methods depend on `getCapabilities(session).login`.
 
 Continue with [your first conversation](quick-start.md).

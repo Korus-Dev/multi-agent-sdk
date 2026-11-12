@@ -4,7 +4,7 @@
 
 ## Restore a conversation
 
-After admission or loading, capture detached restoration data:
+After the conversation has started or loaded, capture detached restoration data:
 
 ```ts
 const sessionData = harness.getSessionData(session);
@@ -20,7 +20,39 @@ const restored = nextHarness.restoreSession({ id: 'main', folder: projectFolder 
 await nextHarness.loadConversation(restored);
 ```
 
-Restoration binds identity. Loading reads authoritative native state. The SDK does not serialize your application, choose a JSON format, or retain durable attachment bytes. Restoration data includes native IDs and paths: store it privately and associate it with the provider home it came from.
+Restoration binds identity. Loading reads the provider's current state. The SDK does not serialize your application, choose a JSON format, or retain durable attachment bytes. Restoration data includes provider IDs and paths: store it privately and associate it with the provider home it came from.
+
+### One name for the conversation
+
+Session data and conversation references name the conversation `conversationId` on every harness, so storage and lookup code is the same for all of them. The `/contracts` helpers read it without interpreting provider detail:
+
+```ts
+import { sameConversationRef, sessionConversationId, sessionConversationRef } from '@korus-dev/multi-agent-sdk/contracts';
+
+const id = sessionConversationId(sessionData.data);
+const sessionRef = sessionConversationRef(sessionData.data, projectFolder);
+const listed = refData ? sameConversationRef(sessionRef, refData.data) : false;
+```
+
+Claude can keep a conversation's transcript under another ID than the one it continues. Its session data then also carries `transcriptConversationId`, and `sessionConversationRef` already points at that transcript.
+
+Two capabilities describe how conversations are stored:
+
+| Capability | Meaning |
+| --- | --- |
+| `folderScopedConversations` | `true` when conversations belong to a working folder, so their references carry a `folder`. `false` when one conversation list spans all folders. |
+| `subagentTranscripts` | Where a subagent's transcript can be read: `'inline'` inside its parent conversation, `'separate'` as a conversation of its own, or `'none'` when the provider keeps none. |
+
+`subagentRef` and `subagentOfRef` follow `subagentTranscripts` for you:
+
+```ts
+import { subagentRef } from '@korus-dev/multi-agent-sdk/contracts';
+
+if (refData) {
+  const subagent = subagentRef(refData.data, subagentId); // null when the provider keeps no subagent transcripts
+  if (subagent) await harness.readConversationMessages(session, harness.restoreRef({ provider: refData.provider, data: subagent }));
+}
+```
 
 ## Browse and resume
 
@@ -32,7 +64,13 @@ Use `loadOlderHistory` and `loadTurnHistory` for provider-supported paging. `his
 
 ## Settings and lifecycle
 
-`SessionState.selection` and `permission` report native settings. Omitted defaults preserve a loaded conversation's native policy. Explicit host or prompt choices can override it. A different Claude model does not inherit a stale reasoning effort. Settings recovery does not require an SDK preference store.
+`SessionState.selection` and `permission` report the model, reasoning effort, speed and permission the conversation runs with. A loaded conversation keeps its own settings unless you choose others.
+
+Saved model settings (the `defaults` stored with the session data) apply once, when the conversation is opened. While it stays open, only an explicit selection on a prompt, or `updateDefaults`, changes them. A different Claude model does not inherit a stale reasoning effort.
+
+```ts
+harness.updateDefaults(session, { model: 'my-model', reasoningEffort: 'high' }); // sent with the next prompt
+```
 
 `release` detaches the binding. `archiveConversation` and `deleteConversation` are explicit native mutations and require the corresponding capabilities. `close` releases the provider runtime. Scoped sessions have their own continuation, cancellation, and disposal rules; see [tools and permissions](tools.md).
 

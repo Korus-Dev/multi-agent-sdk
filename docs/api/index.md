@@ -19,9 +19,17 @@ import type { HarnessEvent } from '@korus-dev/multi-agent-sdk';
 import { normalizePromptContent } from '@korus-dev/multi-agent-sdk/prompt';
 ```
 
-Browser code imports `applySessionPatch`, the capability tables (`codexHarnessCapabilities` and its siblings), `isHarnessProvider`, `isProviderConversationRef`,
-the session-data helpers (`sessionConversationId`, `sessionConversationRef`, `sameConversationRef`) and the request conversions from `/contracts`.
-This entry loads no provider code or Node modules.
+Browser code imports from `/contracts`, which loads no provider code or Node modules:
+
+| Group | Exports |
+| --- | --- |
+| Session patches | `applySessionPatch`, `SessionPatchGapError`, `SessionPatchInvalidError` |
+| Capabilities | `codexHarnessCapabilities`, `claudeHarnessCapabilities`, `cursorHarnessCapabilities`, `antigravityHarnessCapabilities` |
+| Providers | `harnessProviders`, `isHarnessProvider` |
+| Conversation identity | `sessionConversationId`, `sessionConversationRef`, `sessionHasConversation`, `conversationSessionData`, `conversationRefId`, `sameConversationRef`, `isProviderSessionData`, `isProviderConversationRef` |
+| Subagents | `subagentRef`, `subagentOfRef` and the `subagent*` kind and status lists |
+| Requests | `AgentRequest` conversions such as `requestFromClientRequest` and `clientResponseFromAgentResponse` |
+| Safety and tools | `isProviderSafetyReview`, `providerSafetyBlockMessage`, `toolOutputText` |
 
 ## Shared contracts
 
@@ -60,6 +68,25 @@ Each provider runs the CLI installed on the machine. To use another executable, 
 | Realtime and remote control | `startRealtime`, `getRemoteControl`, `setRemoteControl`, `startDevicePairing`, `checkDevicePairing`, `listPairedDevices`, `revokePairedDevice` |
 | Events | `onEvent` returns an unsubscribe function |
 
-Every session operation takes a handle owned by that harness. Every optional operation has a capability flag; an operation a provider does not support rejects with `HarnessUnsupportedError`. `run` returns a `Run`: its `events` and a `result` that settles when the turn ends. `sendPrompt` returns `Admission`, independently of terminal turn status. Request responses carry an ID and an explicit decision, answers, or cancellation outcome.
+Every session operation takes a handle owned by that harness. Every optional operation has a capability flag; an operation a provider does not support rejects with `HarnessUnsupportedError`. `run` returns a `Run`: its `events` and a `result` that settles when the turn ends. `sendPrompt` returns `Admission`, independently of terminal turn status. `executeScopedPrompt` returns only the turn's final answer as text. Request responses carry an ID and an explicit decision, answers, or cancellation outcome.
+
+## Capabilities
+
+`getCapabilities(session)` says what the session's harness supports, in the same shape for every provider. Among the fields:
+
+| Field | Meaning |
+| --- | --- |
+| `permissions` | The provider's own permission modes, each `{ id, dangerous? }`. `defaults.permission` holds one of them and `setPermission` changes it. |
+| `folderScopedConversations` | Whether conversations belong to a working folder, so their references carry a `folder`. |
+| `subagentTranscripts` | `'inline'`, `'separate'` or `'none'`: where a subagent's transcript can be read. |
+| `login` | The managed login methods `authenticate` can start. |
+
+## Conversation identity and account
+
+Session data and conversation references name the conversation `conversationId` on every harness; Claude session data may also carry `transcriptConversationId`. `authenticate` returns `account`, the signed-in account for every harness:
+
+```ts
+type Account = { kind: 'subscription' | 'apiKey' | 'cloud'; email?: string; plan?: string; team?: string };
+```
 
 See the [consumer contract](../consumer-contract.md) for detailed lifecycle rules and the published declarations for exact parameter/result types. Guides cover [state/events](../guide/events.md), [sessions](../guide/sessions.md), and [tools](../guide/tools.md).

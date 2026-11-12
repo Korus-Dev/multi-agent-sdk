@@ -45,9 +45,9 @@ node --experimental-strip-types examples/chat.ts codex 'Explain this project'
 
 | Need | Start here |
 | --- | --- |
-| Install and connect | [Setup](https://korus-dev.github.io/multi-agent-sdk/guide/installation.html) · [First conversation](https://korus-dev.github.io/multi-agent-sdk/guide/quick-start.html) |
+| Install, sign in and check the account | [Setup](https://korus-dev.github.io/multi-agent-sdk/guide/installation.html) · [First conversation](https://korus-dev.github.io/multi-agent-sdk/guide/quick-start.html) |
 | Restore chats and load history | [Sessions and history](https://korus-dev.github.io/multi-agent-sdk/guide/sessions.html) |
-| Approvals, MCP, and scoped work | [Tools and permissions](https://korus-dev.github.io/multi-agent-sdk/guide/tools.html) |
+| Permissions, approvals, MCP, and scoped work | [Tools and permissions](https://korus-dev.github.io/multi-agent-sdk/guide/tools.html) |
 | Streaming, requests, and accounting | [State and events](https://korus-dev.github.io/multi-agent-sdk/guide/events.html) |
 | Every operation, entry and type | [API reference](https://korus-dev.github.io/multi-agent-sdk/api/) |
 | Build a conversation UI | [Agent UI SDK](https://github.com/Korus-Dev/agent-ui-sdk) |
