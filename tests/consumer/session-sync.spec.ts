@@ -63,3 +63,40 @@ it('lets a provider operation in flight see what the app re-states meanwhile', a
   await harness.sendPrompt(session, 'hello');
   expect(during).toMatchObject({ providerSession: second, folder: '/moved' });
 });
+
+it('starts a new Codex conversation after the identity is cleared, instead of carrying on in the thread it holds', async () => {
+  const thread = (threadId: string) => ({ kind: 'codex' as const, threadId });
+  const order: string[] = [];
+  const native = { onEvent: () => () => {}, getCapabilities: () => ({}), close: async () => {},
+    releaseConversation: async (id: string) => { await Promise.resolve(); order.push(`release:${id}`); },
+    sendPrompt: async (context: ProviderContext) => { order.push(`prompt:${context.providerSession ? 'old' : 'new'}`); return { providerSession: thread('t2') }; } };
+  const harness = harnessForHost('codex', native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
+  const session = harness.restoreSession({ id: 'main', folder: '/work' }, { provider: 'codex', data: thread('t1'), role: 'main' });
+  harness.syncSession(session, { data: null });
+  await harness.sendPrompt(session, 'fresh');
+  expect(order).toStrictEqual(['release:main', 'prompt:new']);
+  // Nothing to let go of when no conversation was stored, or when the identity is back before the next prompt.
+  const other = harness.open({ id: 'other', folder: '/work' });
+  harness.syncSession(other, { data: null });
+  await harness.sendPrompt(other, 'first');
+  harness.syncSession(session, { data: null });
+  harness.syncSession(session, { data: thread('t2') });
+  await harness.sendPrompt(session, 'same conversation');
+  expect(order).toStrictEqual(['release:main', 'prompt:new', 'prompt:new', 'prompt:old']);
+});
+
+it('sends a changed selection with the next prompt once, under what that prompt asks for itself', async () => {
+  const sent: unknown[] = [];
+  const native = { onEvent: () => () => {}, getCapabilities: () => ({}), close: async () => {},
+    sendPrompt: async (_context: ProviderContext, _prompt: string, options?: { selection?: unknown }) => { sent.push(options?.selection); return { providerSession: first }; } };
+  const harness = harnessForHost('cursor', native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
+  const session = harness.restoreSession({ id: 'main', folder: '/work' }, { provider: 'cursor', data: first, role: 'main' });
+  await harness.sendPrompt(session, 'as is');
+  harness.updateDefaults(session, { model: 'new', reasoningEffort: 'high', serviceTier: 'fast' });
+  await harness.sendPrompt(session, 'changed', { selection: { reasoningEffort: 'low' } } as never);
+  await harness.sendPrompt(session, 'settled');
+  harness.syncSession(session, { defaults: { model: 'stored', reasoningEffort: 'high' } });
+  await harness.sendPrompt(session, 're-stated');
+  // A conversation keeps its own settings until the app changes them; the change travels with one prompt.
+  expect(sent).toStrictEqual([undefined, { model: 'new', reasoningEffort: 'low', serviceTier: 'fast' }, undefined, undefined]);
+});

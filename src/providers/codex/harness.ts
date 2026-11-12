@@ -38,6 +38,9 @@ export class CodexHarness extends ProviderHarness<'codex'> {
 
   constructor(native: ProviderDriver<ProviderContext, ProviderEvent>, rules?: import('../../conversations/work-phases').WorkPhaseRules) { super('codex', native, rules); }
 
+  /** Codex keeps a session on its thread unless told which other one to use, so a cleared session lets go of it first. */
+  protected override startingOver(context: ProviderContext) { return this.native.releaseConversation?.(context.id); }
+
   /** Maps app-facing options onto the Codex runtime. */
   static mapOptions(options: HarnessOptions): CodexProviderOptions {
     const context = (native: ProviderContext) => harnessContext(native, permissionOf);

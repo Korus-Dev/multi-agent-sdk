@@ -91,10 +91,17 @@ export function startRun(source: RunSource, onEnd: () => void): { run: Run; aban
     async return() { reading = false; queue.length = 0; signal(); return { value: undefined, done: true }; },
   };
 
+  // A run controls its own turn only: not one still to start, and nothing once it has ended.
+  const own = async (): Promise<string> => {
+    if (!ended) await admission;
+    if (ended) throw new Error('This run has ended.');
+    if (!turnId) throw new Error('This run\'s turn has not started.');
+    return turnId;
+  };
   const run: Run = {
     session, admission, events, result,
-    steer: prompt => source.steer(prompt),
-    interrupt: () => source.interrupt(turnId),
+    steer: async prompt => { await own(); return source.steer(prompt); },
+    interrupt: async () => source.interrupt(await own()),
   };
   return { run, abandon: reason => end({ error: new Error(reason) }) };
 }

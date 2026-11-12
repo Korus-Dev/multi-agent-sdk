@@ -52,6 +52,18 @@ describe(`Codex SDK → ${product.name} backend lifecycle`, () => {
     await expect(driver.sendPrompt(sdkAgent(), 'Identical prompt')).resolves.toMatchObject({ turnId: 'another-turn', messageId: 'other-client-id' });
   });
 
+  it('names no turn for a prompt queued behind a running one, and still names the running turn when steering it', async () => {
+    const { driver, conversation } = setup();
+    const native = conversation('conversation-a');
+    const running = { turnIds: ['running'], activeTurnId: 'running', busy: true };
+    native.setSnapshot(running);
+    native.handle.sendMessage.mockResolvedValue(sdkSnapshot('conversation-a', { ...running, queuedPrompts: [{ id: 'queued', text: 'Next' }] as never }));
+    // The queued prompt has no turn yet: naming the running one would tie its run to someone else's work.
+    expect((await driver.sendPrompt(sdkAgent(), 'Next')).turnId).toBeUndefined();
+    native.handle.steerMessage.mockResolvedValue(sdkSnapshot('conversation-a', running));
+    expect((await driver.steerPrompt!(sdkAgent(), 'Also this')).turnId).toBe('running');
+  });
+
   it('creates a user conversation in the assigned folder and sends prepared options to that handle', async () => {
     const { driver, host, conversation } = setup();
     const agent = { ...sdkAgent(), providerSession: undefined };

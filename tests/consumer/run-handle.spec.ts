@@ -153,4 +153,23 @@ describe('run', () => {
     expect(script.calls('steerPrompt')[0]?.args[1]).toBe('Also check the tests.');
     expect(script.calls('interrupt')[0]?.args[1]).toBe('turn-1');
   });
+
+  it('controls nothing once it has ended, and never a turn that is not its own', async () => {
+    const { harness, script, session, started, completed } = cursor();
+    const run = harness.run(session, 'Go');
+    await run.admission;
+    started('turn-1'); completed('turn-1');
+    await run.result;
+    started('turn-2');
+    await expect(run.steer('late instruction')).rejects.toThrow('This run has ended.');
+    await expect(run.interrupt()).rejects.toThrow('This run has ended.');
+    // A run still waiting for its turn leaves the one in progress alone.
+    script.on('sendPrompt', async () => ({ providerSession: { kind: 'cursor', sessionId: 'session', folder: '/work' } }));
+    const waiting = harness.run(session, 'Next');
+    await waiting.admission;
+    await expect(waiting.steer('not mine')).rejects.toThrow('This run\'s turn has not started.');
+    await expect(waiting.interrupt()).rejects.toThrow('This run\'s turn has not started.');
+    expect(script.calls('steerPrompt')).toHaveLength(0);
+    expect(script.calls('interrupt')).toHaveLength(0);
+  });
 });

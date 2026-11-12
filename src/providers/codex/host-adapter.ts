@@ -509,9 +509,11 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
       if (typeof options.planMode === 'boolean' && options.planMode !== session.handle.getSnapshot().planMode) {
         await session.handle.updateSettings({ planMode: options.planMode });
       }
-      const beforeTurnIds = session.handle.getSnapshot().turnIds;
+      const before = session.handle.getSnapshot();
       const snapshot = await session.handle.sendMessage((this.options.formatPrompt ?? defaultFormatPrompt)(prompt, options.content, true), hostPromptOptions(options));
-      const turnId = resultTurnId(snapshot, beforeTurnIds);
+      // A prompt queued behind a running turn has no turn yet: the one in progress is someone else's work.
+      const queued = before.turnIds.includes(snapshot.activeTurnId ?? '') && snapshot.queuedPrompts.length > before.queuedPrompts.length;
+      const turnId = queued ? undefined : resultTurnId(snapshot, before.turnIds);
       const messages = snapshot.messages.filter(message => message.role === 'user' && message.turnId === turnId && message.kind !== 'steer');
       return { threadId: session.handle.id, turnId, ...(messages.length === 1 ? { messageId: messages[0]!.id } : {}) };
     });

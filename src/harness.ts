@@ -20,6 +20,10 @@ type Binding = {
   /** Each tool's last reported status in the running turn; `tool.updated` is published when it changes. */
   toolStatuses?: Map<string, string>;
   kind: 'main' | 'scope';
+  /** A selection the app changed, to send with the next prompt: a conversation keeps its own settings until told otherwise. */
+  changedSelection?: NonNullable<import('./contracts/index').SendPromptOptions['selection']>;
+  /** The app cleared the session's conversation; the next prompt must start a new one. */
+  cleared?: boolean;
   parent?: Session;
   operation?: 'executing' | 'disposing' | 'releasing' | 'hydrating';
   nativeDisposed?: boolean;
@@ -73,6 +77,8 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
   /** Applies a permission option natively, updating the context, and returns the option the provider confirmed. */
   protected abstract applyPermission(context: ProviderContext, id: string): Promise<string | null | undefined>;
   /** A fresh projection from native conversation events to session state. */
+  /** The app cleared the session's conversation and now sends a prompt: a provider that would carry on in the old one lets go of it here. */
+  protected startingOver(_context: ProviderContext): void | Promise<void> {}
   protected abstract createProjection(): HarnessProjection;
   /** The neutral activity one native frame carries, read the way this provider writes its frames. */
   protected abstract activityOf(frame: ProviderEvent): FrameActivity[];
@@ -429,7 +435,19 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
   private abandonRuns(session: Session, reason: string): void {
     for (const abandon of [...this.runs.get(session) ?? []]) abandon(reason);
   }
-  async sendPrompt(session: Session, prompt: string, options?: Parameters<Harness['sendPrompt']>[2]) { return this.admitted(session, await this.native.sendPrompt(this.main(session).context, prompt, options)); }
+  async sendPrompt(session: Session, prompt: string, options?: Parameters<Harness['sendPrompt']>[2]) {
+    const b = this.main(session);
+    if (b.cleared) {
+      b.cleared = false;
+      // Still cleared when the prompt is sent: this prompt starts a new conversation.
+      if (!b.context.providerSession) await this.startingOver(b.context);
+    }
+    const changed = b.changedSelection;
+    const sent = changed ? { ...options, selection: { ...changed, ...options?.selection } } as typeof options : options;
+    const result = await this.native.sendPrompt(b.context, prompt, sent);
+    if (b.changedSelection === changed) b.changedSelection = undefined;
+    return this.admitted(session, result);
+  }
   async interrupt(session: Session, expectedTurnId?: string) { return this.admitted(session, await this.native.interrupt(this.interactive(session).context, expectedTurnId)); }
   async respondToRequest(session: Session, response: Parameters<Harness['respondToRequest']>[1]) {
     const b = this.interactive(session);
@@ -445,14 +463,18 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
   syncSession(session: Session, state: Parameters<Harness['syncSession']>[1]) {
     const b = this.get(session);
     if (state.data) this.validate({ provider: this.provider, data: state.data }, 'session');
+    if (state.data !== undefined) b.cleared = state.data === null && (b.cleared || Boolean(b.context.providerSession));
     if (state.data !== undefined) b.context.providerSession = state.data ?? undefined;
     if (state.folder !== undefined) b.context.folder = state.folder;
     if (state.name !== undefined) b.context.name = state.name;
-    if (state.defaults !== undefined) { b.context.providerDefaults = { kind: this.provider } as ProviderDefaults; this.updateDefaults(session, state.defaults); }
+    // Re-stating what is stored changes nothing for a conversation in progress, so no selection travels with the next prompt.
+    if (state.defaults !== undefined) b.context.providerDefaults = this.mergeDefaults({ kind: this.provider } as ProviderDefaults, state.defaults);
   }
   updateDefaults(session: Session, defaults: Partial<HarnessDefaults>) {
     const b = this.get(session);
     b.context.providerDefaults = this.mergeDefaults(b.context.providerDefaults ?? { kind: this.provider } as ProviderDefaults, defaults);
+    const selection = Object.fromEntries((['model', 'reasoningEffort', 'serviceTier'] as const).flatMap(key => defaults[key] === undefined ? [] : [[key, defaults[key]]]));
+    if (Object.keys(selection).length) b.changedSelection = { ...b.changedSelection, ...selection };
   }
   loadConversation(session: Session) {
     const load = this.native.loadConversation?.bind(this.native);
