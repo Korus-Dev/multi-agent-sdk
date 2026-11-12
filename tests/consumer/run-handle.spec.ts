@@ -169,6 +169,21 @@ describe('run', () => {
     expect((await third.result).turnId).toBe('turn-c');
   });
 
+  it('leaves a turn to the prompt that was sent before the run, however that prompt was sent', async () => {
+    const { harness, script, session, started, completed } = cursor();
+    started('turn-a');
+    script.on('sendPrompt', async () => ({ providerSession: { kind: 'cursor', sessionId: 'session', folder: '/work' } }));
+    // B is sent without a run and waits behind the running turn; C's run waits behind B.
+    await harness.sendPrompt(session, 'B');
+    const third = harness.run(session, 'C');
+    await third.admission;
+    completed('turn-a'); started('turn-b'); completed('turn-b');
+    await expect(Promise.race([third.result, Promise.resolve('waiting')])).resolves.toBe('waiting');
+    await expect(third.interrupt()).rejects.toThrow('This run\'s turn has not started.');
+    started('turn-c'); completed('turn-c');
+    expect((await third.result).turnId).toBe('turn-c');
+  });
+
   it('controls nothing once it has ended, and never a turn that is not its own', async () => {
     const { harness, script, session, started, completed } = cursor();
     const run = harness.run(session, 'Go');

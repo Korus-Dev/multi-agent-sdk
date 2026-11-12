@@ -50,7 +50,23 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
   private readonly listeners = new Set<(event: HarnessEvent) => void>();
   /** How to end each session's unfinished runs when the session or the harness goes away. */
   private readonly runs = new Map<Session, Set<(reason: string) => void>>();
-  private readonly runTurns = new Map<Session, { waiting: object[]; taken: Set<string> }>();
+  /**
+   * Prompts a session accepted without naming a turn, in the order they were sent. Each takes one turn as turns start:
+   * a run takes its own, and a prompt sent without a run takes its turn out of a later run's reach.
+   */
+  private readonly awaitedTurns = new Map<Session, { waiting: Array<{ run: boolean }>; taken: Set<string> }>();
+  private awaited(session: Session) {
+    let turns = this.awaitedTurns.get(session);
+    if (!turns) this.awaitedTurns.set(session, turns = { waiting: [], taken: new Set() });
+    return turns;
+  }
+  /** A turn started: when the prompt waiting longest was sent without a run, the turn is that prompt's. */
+  private turnStarted(session: Session, turnId: string): void {
+    const turns = this.awaitedTurns.get(session);
+    if (!turns || turns.taken.has(turnId) || turns.waiting[0]?.run !== false) return;
+    turns.waiting.shift(); turns.taken.add(turnId);
+    if (!turns.waiting.length && !this.runs.has(session)) this.awaitedTurns.delete(session);
+  }
   private readonly unsubscribe: () => void;
   private readonly offUsage?: () => void;
   private readonly offRequests?: () => void;
@@ -265,6 +281,7 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
           this.emit({ ...activity, session });
         } else {
           if (activity.type === 'turn.completed' && !activity.willRetry) this.get(session).toolStatuses = undefined;
+          if (activity.type === 'turn.started') this.turnStarted(session, activity.turnId);
           this.emit({ ...activity, session });
         }
       }
@@ -423,15 +440,14 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
     const active = this.runs.get(session) ?? new Set<(reason: string) => void>();
     this.runs.set(session, active);
     // Runs whose prompt names no turn take the turns that start, one each, in the order the prompts were sent.
-    const turns = this.runTurns.get(session) ?? { waiting: [] as object[], taken: new Set<string>() };
-    this.runTurns.set(session, turns);
-    const ticket = {};
+    const turns = this.awaited(session);
+    const ticket = { run: true };
     turns.waiting.push(ticket);
     const leave = () => { const at = turns.waiting.indexOf(ticket); if (at >= 0) turns.waiting.splice(at, 1); };
     const { run, abandon } = startRun({
       session,
       subscribe: listener => this.onEvent(listener),
-      admit: () => this.sendPrompt(session, prompt, options),
+      admit: () => this.submitPrompt(session, prompt, options),
       state: () => this.bindings.has(session) ? this.readSession(session) : undefined,
       steer: next => this.steerPrompt(session, next),
       interrupt: turnId => this.interrupt(session, turnId),
@@ -442,15 +458,30 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
       },
     }, () => {
       leave(); active.delete(abandon);
-      if (!active.size && this.runs.get(session) === active) { this.runs.delete(session); this.runTurns.delete(session); }
+      if (!active.size && this.runs.get(session) === active) { this.runs.delete(session); if (!turns.waiting.length) this.awaitedTurns.delete(session); }
     });
     active.add(abandon);
     return run;
   }
   private abandonRuns(session: Session, reason: string): void {
     for (const abandon of [...this.runs.get(session) ?? []]) abandon(reason);
+    // Whatever was waiting for a turn is no longer followed.
+    this.awaitedTurns.delete(session);
   }
   async sendPrompt(session: Session, prompt: string, options?: Parameters<Harness['sendPrompt']>[2]) {
+    this.main(session);
+    // Until the prompt is accepted it holds its place among the prompts waiting for a turn.
+    const turns = this.awaited(session);
+    const ticket = { run: false };
+    turns.waiting.push(ticket);
+    const leave = () => { const at = turns.waiting.indexOf(ticket); if (at >= 0) turns.waiting.splice(at, 1); };
+    try {
+      const admission = await this.submitPrompt(session, prompt, options);
+      if (admission.turnId) { leave(); turns.taken.add(admission.turnId); }
+      return admission;
+    } catch (error) { leave(); throw error; }
+  }
+  private async submitPrompt(session: Session, prompt: string, options?: Parameters<Harness['sendPrompt']>[2]) {
     const b = this.main(session);
     if (b.cleared) {
       b.cleared = false;
