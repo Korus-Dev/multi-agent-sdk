@@ -85,7 +85,7 @@ export class CodexHarness extends ProviderHarness<'codex'> {
           const instructions = binding.scope?.developerInstructions ?? app?.developerInstructions ?? options.instructions?.(binding.context);
           return {
             ...(app?.config ? { config: app.config } : {}),
-            ...(!binding.scope && options.mcpServers ? { config: { ...app?.config, ...mcpServerConfig(mcpEndpoints(options, 'codex', codexHarnessCapabilities, binding.context).map(server => ({ name: server.name, transport: { type: 'http', url: server.url }, ...(server.enabledTools ? { enabledTools: [...server.enabledTools] } : {}), ...(server.approval === 'auto' ? { toolApprovalMode: 'auto' as const } : {}), ...(server.required === undefined ? {} : { required: server.required }) }))) } } : {}),
+            ...(!binding.scope && options.mcpServers ? { config: { ...app?.config, ...mcpServerConfig(mcpEndpoints(options, 'codex', codexHarnessCapabilities, binding.context).map(server => ({ name: server.name, transport: { type: 'http', url: server.url }, ...(server.enabledTools ? { enabledTools: [...server.enabledTools] } : {}), ...(server.name === options.trustedMcpServerName ? { toolApprovalMode: 'approve' as const } : server.approval === 'auto' ? { toolApprovalMode: 'auto' as const } : {}), ...(server.required === undefined ? {} : { required: server.required }) }))) } } : {}),
             ...(instructions === undefined ? {} : { developerInstructions: instructions }),
           };
         };

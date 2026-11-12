@@ -34,6 +34,12 @@ it('omits native Codex trust and startup policy by default', () => {
   expect(server).not.toHaveProperty('default_tools_approval_mode');
   expect(server).not.toHaveProperty('required');
 });
+it('runs the app\'s own trusted server without approval prompts on Codex, as on Claude', () => {
+  createProviderHost('codex', { client: { name: 'test' }, trustedMcpServerName: 'app', mcpServers: () => [endpoint({ name: 'app' }), endpoint()] });
+  const config = captured.codex.extensions.at(-1).configureConversation({ extensionContext: { context } }).config;
+  expect(config['mcp_servers.app']).toMatchObject({ default_tools_approval_mode: 'approve' });
+  expect(config['mcp_servers.tools']).not.toHaveProperty('default_tools_approval_mode');
+});
 it('maps explicit Codex auto approval and required independently', () => {
   const server = configure('codex', [endpoint({ approval: 'auto', required: false })]).config['mcp_servers.tools'];
   expect(server).toMatchObject({ default_tools_approval_mode: 'auto', required: false });
