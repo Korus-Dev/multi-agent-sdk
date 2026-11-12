@@ -26,27 +26,29 @@ import authorshipFixture from './fixtures/authorship-capability.json';
 
 let root: string;
 const sessions: AcpSession[] = [];
-const fixtureRuntime = () => ({ command: path.join(root, 'runtime'), harness: path.join(root, 'harness'), args: [] });
+const fixtureRuntime = () => ({ command: path.join(root, 'runtime'), args: [] });
 vi.mock('../../../src/runtime/discovery', async importOriginal => ({
   ...await importOriginal<typeof import('../../../src/runtime/discovery')>(),
   withDiscoveredRuntimePath: () => ({ ...process.env }),
 }));
 beforeEach(async () => {
   root = await mkdtemp(path.join(tmpdir(), 'korus-acp-session-'));
-  vi.stubEnv('ANTIGRAVITY_HARNESS_PATH', path.join(root, 'harness'));
-  vi.stubEnv('GEMINI_HOME', path.join(root, 'home'));
   vi.stubEnv('APP_HOME', path.join(root, 'app'));
-  await writeFile(path.join(root, 'harness'), '', { mode: 0o700 });
   await writeFile(path.join(root, 'runtime'), `#!/usr/bin/env node
+// The CLI answers its usage command in print mode, without a session.
+if(process.argv.includes('/usage')) {require('node:fs').appendFileSync(require('node:path').join(__dirname,'quota-reads'),'x');process.stdout.write('{"status":"SUCCESS","command":{"name":"usage","data":{"groups":[{"name":"Gemini Models","buckets":[{"id":"gemini-weekly","window":"weekly","remaining_fraction":0.97,"reset_time":"2026-11-19T00:54:02Z"}]},{"name":"Claude and GPT models","buckets":[{"id":"3p-weekly","window":"weekly","remaining_fraction":1,"reset_time":"2026-11-19T14:16:23Z"}]}]}}}');process.exit(0);}
 const rl=require('node:readline').createInterface({input:process.stdin});
 const send=v=>process.stdout.write(JSON.stringify({jsonrpc:'2.0',...v})+'\\n');
-const fs=require('node:fs'), catalogFile=require('node:path').join(process.env.GEMINI_HOME,'catalog.json');
-fs.mkdirSync(process.env.GEMINI_HOME,{recursive:true});
+const fs=require('node:fs'), homeFlag=process.argv.indexOf('--gemini-dir');
+// The CLI takes its home as a path from the user's home.
+const home=require('node:path').resolve(require('node:os').homedir(),homeFlag<0?'.gemini':process.argv[homeFlag+1]);
+const catalogFile=require('node:path').join(home,'catalog.json');
+fs.mkdirSync(home,{recursive:true});
 const usageFile=require('node:path').join(process.cwd(),'usage-fixture.json');
 const usageFixture=()=>fs.existsSync(usageFile)?JSON.parse(fs.readFileSync(usageFile,'utf8')):undefined;
 const authorshipFixture=${JSON.stringify(authorshipFixture)};
 const catalog=()=>fs.existsSync(catalogFile)?fs.readFileSync(catalogFile,'utf8').trim().split('\\n').map(JSON.parse):[];
-let sessionId=require('node:crypto').randomUUID(), promptId, mcpServers=[], planPhase, utility, permissionFixture, cancelPermissionFixture;
+let sessionId=require('node:crypto').randomUUID(), mode='default', promptId, mcpServers=[], planPhase, utility, permissionFixture, cancelPermissionFixture;
 const update=update=>send({method:'session/update',params:{sessionId,update}});
 async function review(text,reply) {
  const server=mcpServers.find(server=>server.name==='korus');
@@ -74,16 +76,17 @@ async function review(text,reply) {
 }
 rl.on('line',line=>{
  const v=JSON.parse(line), reply=result=>send({id:v.id,result});
- if(v.method==='initialize') {fs.writeFileSync(require('node:path').join(process.cwd(),'fixture-initialize.json'),JSON.stringify(v.params));reply({protocolVersion:2,agentInfo:{name:'antigravity-acp',version:'1.4.5'}});}
+ if(v.method==='initialize') {fs.writeFileSync(require('node:path').join(process.cwd(),'fixture-initialize.json'),JSON.stringify(v.params));reply({protocolVersion:1,agentInfo:{name:'Antigravity ACP Server',version:'1.5.6'}});}
  else if(v.method==='authenticate') reply({});
  else if(v.method==='session/new') {mcpServers=v.params.mcpServers;fs.writeFileSync(require('node:path').join(process.cwd(),'fixture-session.json'),JSON.stringify(v.params));fs.appendFileSync(catalogFile,JSON.stringify({sessionId,cwd:v.params.cwd,title:'Saved conversation'})+'\\n');reply({sessionId,...(usageFixture()?.configuration??{}),models:usageFixture()?.configuration.models??{currentModelId:'gemini-low',availableModels:[{modelId:'gemini-low',name:'Gemini Low'},{modelId:'opaque-oss-id',name:'GPT-OSS 120B (Medium)'}]}});}
+ else if(v.method==='session/set_mode') {mode=v.params.modeId;fs.appendFileSync(require('node:path').join(process.cwd(),'fixture-modes'),mode+'\\n');reply({});}
  else if(v.method==='session/set_config_option') {fs.writeFileSync(require('node:path').join(process.cwd(),'fixture-model.json'),JSON.stringify(v.params));reply({});}
  else if(v.method==='session/list') reply({sessions:[...catalog(),{sessionId:'stored-session',cwd:process.cwd(),title:'Create a file'},{sessionId:'other-folder',cwd:'/another-workspace',title:'Private'}]});
  else if(v.method==='session/load') {
    sessionId=v.params.sessionId;
    mcpServers=v.params.mcpServers;
    for(const item of usageFixture()?.updates??[]) update(item);
-   const saved=require('node:path').join(process.env.GEMINI_HOME,sessionId+'.jsonl');
+   const saved=require('node:path').join(home,sessionId+'.jsonl');
    if(fs.existsSync(saved)) {
      for(const line of fs.readFileSync(saved,'utf8').trim().split('\\n')) {const prompt=JSON.parse(line);update({...authorshipFixture.historyUpdate,content:{...authorshipFixture.historyUpdate.content,text:prompt.replace(/^\\/plan\\s*/,'')}});update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Recovered.'}});}
      reply({});return;
@@ -113,10 +116,9 @@ rl.on('line',line=>{
      update({sessionUpdate:'tool_call',...permissionFixture.toolCall,status:'pending'});
      send({id:v.id,method:'session/request_permission',params:{sessionId,...permissionFixture}});return;
    }
-   if(text==='/usage') {fs.appendFileSync(require('node:path').join(process.env.GEMINI_HOME,'quota-reads'),'x');update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:'### Quota Limits\\n- **Gemini Models**\\n  - **Weekly Limit Remaining:** 97% remaining (resets Nov 12, 2026, 19:59 UTC)'}});reply({stopReason:'end_turn'});return;}
    if(text.endsWith('utility-fixture')) {utility=true;send({id:211,method:'fs/write_text_file',params:{sessionId,path:require('node:path').join(process.cwd(),'unwanted-write'),content:'bad'}});return;}
-   fs.appendFileSync(require('node:path').join(process.env.GEMINI_HOME,sessionId+'.jsonl'),JSON.stringify(text)+'\\n');
-   if(text.startsWith('/plan ')) {
+   fs.appendFileSync(require('node:path').join(home,sessionId+'.jsonl'),JSON.stringify(text)+'\\n');
+   if(mode==='plan') {
      planPhase='question';
      send({id:v.id,method:'session/request_permission',params:{sessionId,toolCall:{toolCallId:'interaction_plan',title:'Use the minimal plan?'},options:[{optionId:'minimal-plan',name:'Minimal',kind:'allow_once'}]}});return;
    }
@@ -139,8 +141,11 @@ rl.on('line',line=>{
      permissionFixture=undefined;send({id:promptId,result:{stopReason:cancelPermissionFixture?'cancelled':'end_turn'}});cancelPermissionFixture=false;return;
    }
    if(utility) {utility=false;update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:v.error?'Tools denied; text result.':'Unexpected write'}});send({id:promptId,result:{stopReason:'end_turn'}});return;}
-   if(planPhase==='question') {planPhase='write';send({id:900,method:'fs/write_text_file',params:{sessionId,path:require('node:path').join(process.cwd(),'PLAN.md'),content:'# Native plan\\n\\n1. Make the scoped change.\\n2. Verify it.'}});return;}
-   if(planPhase==='write') {planPhase=undefined;update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:'The plan is ready.'}});send({id:promptId,result:{stopReason:'end_turn'}});return;}
+   if(planPhase==='question') {
+     // The CLI keeps the plan among the conversation's own files.
+     const brain=require('node:path').join(home,'antigravity-cli','brain',sessionId);fs.mkdirSync(brain,{recursive:true});
+     fs.writeFileSync(require('node:path').join(brain,'implementation_plan.md'),'# Native plan\\n\\n1. Make the scoped change.\\n2. Verify it.');
+     planPhase=undefined;update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:'The plan is ready.'}});send({id:promptId,result:{stopReason:'end_turn'}});return;}
    update({sessionUpdate:'tool_call_update',toolCallId:'live-id',status:v.result.outcome.optionId==='native-deny-9'?'failed':'completed',rawOutput:v.result.outcome.optionId});
    send({id:promptId,result:{stopReason:'end_turn'}});
  } else reply({});
@@ -198,15 +203,17 @@ describe('Antigravity native session', () => {
     ]);
   });
 
-  it("reads account quota through an ephemeral /usage turn and reuses it briefly", async () => {
-    const host = new AntigravityHost({ resolveRuntime: fixtureRuntime, home: () => path.join(root, 'home'), stateDirectory: () => path.join(root, 'app'), client: { name: 'cpa-workbench', metadataDirectory: 'korus-sessions', trustedMcpServerName: product.mcpServerName } });
-    const reads = async () => (await readFile(path.join(root, 'home', 'quota-reads'), 'utf8').catch(() => '')).length;
+  it("reads account quota from the CLI's usage command, without a session, and reuses it briefly", async () => {
+    const host = new AntigravityHost({ resolveRuntime: fixtureRuntime, home: () => path.join(root, 'home'), stateDirectory: () => path.join(root, 'app') });
+    const reads = async () => (await readFile(path.join(root, 'quota-reads'), 'utf8').catch(() => '')).length;
     try {
       const [first, second] = await Promise.all([host.getAccountRateLimits(), host.getAccountRateLimits()]);
-      expect(first).toMatchObject({ primary: { label: 'Gemini', usedPercent: 3, windowDurationMins: 10_080 }, secondary: null });
+      expect(first).toMatchObject({ primary: { label: 'Gemini', windowDurationMins: 10_080, resetsAt: Date.parse('2026-11-19T00:54:02Z') / 1000 }, secondary: { label: 'Claude and GPT', usedPercent: 0 } });
+      expect(first!.primary!.usedPercent).toBeCloseTo(3);
       expect(second).toStrictEqual(first);
       expect(await host.getAccountRateLimits()).toStrictEqual(first);
       expect(await reads()).toBe(1);
+      await expect(readFile(path.join(root, 'fixture-initialize.json'), 'utf8')).rejects.toThrow();
     } finally { await host.close(); }
   });
 
@@ -214,6 +221,15 @@ describe('Antigravity native session', () => {
     await open();
     expect(JSON.parse(await readFile(path.join(root, 'fixture-session.json'), 'utf8'))).toMatchObject({ _meta: { antigravity: { disabledTools: ['run_workflow'] } } });
     await expect(readFile(path.join(root, 'skills/system/run-workflow/SKILL.md'), 'utf8')).rejects.toThrow();
+  });
+
+  it("keeps the CLI's running thoughts out of the transcript", async () => {
+    await writeFile(path.join(root, 'usage-fixture.json'), JSON.stringify({ configuration: { models: { currentModelId: 'gemini-low', availableModels: [{ modelId: 'gemini-low' }] } },
+      updates: [{ sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'Weighing how to approach the refactor before answering.\n\n\n' } }],
+      completion: { stopReason: 'end_turn' }, lateUpdate: { sessionUpdate: 'usage_update', used: 1, size: 2 } }));
+    const { session } = await open();
+    await session.prompt('usage-fixture:thoughts').completion;
+    expect(session.snapshot.messages.filter(message => message.role === 'assistant').flatMap(message => message.parts)).toStrictEqual([{ type: 'text', text: 'Public ACP response.' }]);
   });
 
   it("reports per-turn token categories and the selected model from PromptResponse.usage", async () => {
@@ -254,7 +270,7 @@ describe('Antigravity native session', () => {
   });
 
   it.each([
-    { sessionId: undefined, mode: 'auto_edit', tool: 'set_status' },
+    { sessionId: undefined, mode: 'accept-edits', tool: 'set_status' },
     { sessionId: 'stored-session', mode: 'default', tool: 'finish_turn' },
     { sessionId: undefined, mode: 'default', tool: 'report_finding' },
   ])('pre-authorizes the supplied Korus server in $mode for $tool (session $sessionId)', async ({ sessionId, mode, tool }) => {

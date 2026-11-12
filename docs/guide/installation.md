@@ -15,7 +15,7 @@ The package is ESM-only. Use `"type": "module"` in your application and configur
 | `codex` | A Codex CLI with app-server support, authenticated in the selected Codex home. The adapter uses `@korus-dev/codex-sdk` for transport and discovery. |
 | `claude` | Claude Code and the bundled Claude Agent SDK transport, using native authentication and configuration. |
 | `cursor` | Cursor's `agent` or `cursor-agent` executable with ACP support. The adapter requires version 2026.10.08 or newer. |
-| `antigravity` | A compatible Antigravity runtime and native account setup. Runtime discovery and configuration are available through the provider entry point. |
+| `antigravity` | The Antigravity CLI (`agy`) 1.5.1 or later, signed in. |
 
 The package does not provision provider subscriptions or store application API keys. Check `driver.getRuntimeStatus()` for discovery status and use `await driver.authenticate({ action: 'check' })` for native account status. Authentication actions and account details differ by provider.
 

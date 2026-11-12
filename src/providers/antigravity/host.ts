@@ -24,6 +24,9 @@ import { normalizePromptContent, promptContentText, promptContentDispatchText } 
 import type { ExecutionObservation } from '../../contracts/usage';
 import { mkdir, realpath } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
+import { execFile } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { promisify } from 'node:util';
 import path from 'node:path';
 import type { AccountRateLimits, ProviderConversationRef, ProviderModelOption, ProviderRuntimeStatus, ProviderSessionData, ConversationListInput, ConversationSummary, ConversationResumeTarget, SendPromptOptions } from '../../contracts/index';
 
@@ -37,13 +40,12 @@ import { antigravityHarnessCapabilities } from '../../capabilities';
 
 import { AcpRuntime, NativeLoginRequired } from './acp-runtime';
 import { AcpSession } from './session';
-import { antigravityHome, resolveAcpRuntime } from './runtime';
-import { record } from '../../acp/acp-connection';
+import { acpEnvironment, antigravityHome, resolveAcpRuntime } from './runtime';
 import { sessionMcpServer } from '../../acp/mcp-bridge';
-import { listAcpSessions } from './catalog';
+import { antigravityModels, listAcpSessions } from './catalog';
+import { parseQuota } from './quota';
 import { acpAttachments } from './attachments';
 import { AcpPromptJournal } from './prompt-journal';
-import { parseQuotaMessage } from './quota';
 
 export class AntigravityHost<Context extends ProviderContext = ProviderContext> implements ProviderDriver<Context, ProviderEvent> {
   readonly provider = 'antigravity' as const;
@@ -54,19 +56,19 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
   private readonly executionScopes = new Map<string, HarnessPromptScope>();
   private readonly resuming = new Map<string, Promise<void>>();
   private readonly auxiliary = new Set<AcpSession>();
+  private quota?: { at: number; limits: AccountRateLimits | null };
+  private quotaRead?: Promise<AccountRateLimits | null>;
   private readonly listeners = new Set<(event: ProviderEvent) => void>();
   private readonly usageListeners = new Set<(event: ExecutionObservation) => void>();
   onUsage(listener: (event: ExecutionObservation) => void) { this.usageListeners.add(listener); return () => { this.usageListeners.delete(listener); }; }
   private observeUsage(event: ExecutionObservation) { for (const listener of this.usageListeners) { try { listener(event); } catch { /* Observer isolation. */ } } }
   private authentication?: AcpRuntime;
   private auth?: { action: ProviderAuthenticationAction['action']; abort: AbortController; done: Promise<ProviderAuthentication> };
-  private quota?: { at: number; limits: AccountRateLimits | null };
-  private quotaRead?: Promise<AccountRateLimits | null>;
   private closed = false;
   constructor(private readonly options: AntigravityHostOptions<Context> = {}) {}
 
   getRuntimeStatus(): ProviderRuntimeStatus {
-    return { provider: this.provider, status: !(this.options.resolveRuntime ? this.options.resolveRuntime() : resolveAcpRuntime(this.options.stateDirectory?.())) ? 'notConfigured' : this.sessions.size ? 'running' : 'starting' };
+    return { provider: this.provider, status: !(this.options.resolveRuntime ? this.options.resolveRuntime() : resolveAcpRuntime()) ? 'notConfigured' : this.sessions.size ? 'running' : 'starting' };
   }
   getCapabilities() { return antigravityHarnessCapabilities; }
   onEvent(listener: (event: ProviderEvent) => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
@@ -122,7 +124,7 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
     return { providerSession: submitted.providerSession, turnId: submitted.turnId };
   }
   private async submitPrompt(agent: Context, prompt: string, options?: SendPromptOptions, scope?: HarnessPromptScope, admissionGuard?: () => void) {
-    if (options?.selection?.reasoningEffort != null || options?.selection?.serviceTier != null) throw new Error('Antigravity does not support reasoning effort or service tiers.');
+    if (options?.selection?.serviceTier != null) throw new Error('Antigravity does not support service tiers.');
     admissionGuard?.();
     const content = options?.content === undefined ? undefined : normalizePromptContent(options.content);
     const attachments = await acpAttachments(options?.attachments ?? []);
@@ -133,24 +135,32 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
     const model = options?.selection?.model ?? (agent.providerDefaults?.kind === this.provider ? agent.providerDefaults.model : undefined);
     if (model) await session.setModel(model);
     admissionGuard?.();
+    // A thinking level applies only to a model that offers it; the CLI rejects it on any other.
+    const wanted = options?.selection?.reasoningEffort ?? (agent.providerDefaults?.kind === this.provider ? agent.providerDefaults.reasoningEffort : undefined);
+    const offered = antigravityModels(session.configuration).find(candidate => candidate.isDefault)?.supportedReasoningEfforts ?? [];
+    const effort = wanted && offered.some(level => level.reasoningEffort === wanted) ? wanted : undefined;
+    if (effort) await session.setReasoningEffort(effort);
+    admissionGuard?.();
     const permission = options?.providerOptions?.kind === this.provider ? options.providerOptions.permissionMode
       : agent.providerDefaults?.kind === this.provider ? agent.providerDefaults.permissionMode : undefined;
-    if (permission) await session.setMode(permission);
-    // Readers learn what the conversation runs with from the conversation, as on every harness.
-    if (model || permission) this.emit({ type: 'conversation.settingsUpdated', provider: this.provider, agentId: agent.id, payload: { settings: { ...(model ? { model } : {}), ...(permission ? { permissionMode: permission } : {}) } } });
-    admissionGuard?.();
+    // Planning is a mode of its own, in place of the permission mode for that turn; the next turn leaves it again.
     const planning = options?.planMode === true || /^\/plan(?:\s|$)/.test(prompt);
+    const mode = planning ? 'plan' : permission ?? (session.mode === 'plan' ? 'default' : undefined);
+    if (mode) await session.setMode(mode);
+    // Readers learn what the conversation runs with from the conversation, as on every harness.
+    if (model || effort || permission) this.emit({ type: 'conversation.settingsUpdated', provider: this.provider, agentId: agent.id, payload: { settings: {
+      ...(model ? { model } : {}), ...(effort ? { reasoningEffort: effort } : {}), ...(permission ? { permissionMode: permission } : {}) } } });
+    admissionGuard?.();
     const instructions = scope?.developerInstructions ?? this.options.instructions?.(agent, { planMode: planning }) ?? '';
-    const dispatched = this.options.formatPrompt?.(prompt, content) ?? (content === undefined ? prompt : promptContentDispatchText(content, prompt));
-    const body = `${planning && !prompt.startsWith('/plan') ? '/plan ' : ''}${dispatched}`;
+    const body = this.options.formatPrompt?.(prompt, content) ?? (content === undefined ? prompt : promptContentDispatchText(content, prompt));
     const wireText = instructions ? `${body}\n\n<context id="${randomUUID()}">\n${instructions}\n</context>` : body;
     const { turnId, completion } = session.prompt(content === undefined ? prompt : promptContentText(content), [{ type: 'text', text: wireText }, ...attachments],
       (options?.attachments ?? []).map(attachment => ({ type: 'attachment', attachment: {
         kind: attachment.type, name: attachment.name ?? path.basename(attachment.path), path: attachment.path, mimeType: attachment.mimeType,
       } })), content === undefined ? undefined : { promptContent: content });
-    if (planning) void completion.then(() => {
+    if (planning) void completion.then(async () => {
       if (this.sessions.get(agent.id) !== session || session.snapshot.turns.find(turn => turn.id === turnId)?.status !== 'completed') return;
-      const markdown = session.writtenPlan ?? session.snapshot.messages.filter(message => message.turnId === turnId && message.role === 'assistant')
+      const markdown = await session.writtenPlan() ?? session.snapshot.messages.filter(message => message.turnId === turnId && message.role === 'assistant')
         .flatMap(message => message.parts.flatMap(part => part.type === 'text' ? [part.text] : [])).join('\n');
       if (markdown.trim()) this.emit({ type: 'plan.readyForReview', provider: this.provider, agentId: agent.id, conversationId: session.sessionId, turnId, payload: { markdown } });
     });
@@ -192,7 +202,7 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
     return { text, session: this.reference(session) };
   }
 
-  /** The runtime answers `/usage` without a model turn; every read opens a short-lived hidden session, so reads are shared and briefly reused. */
+  /** The account's quota, from the CLI's own `usage` command: no session and no model turn. Reads are shared and briefly reused. */
   getAccountRateLimits(): Promise<AccountRateLimits | null> {
     if (this.closed) return Promise.reject(new Error('Antigravity host is closed.'));
     if (this.quota && Date.now() - this.quota.at < 120_000) return Promise.resolve(this.quota.limits);
@@ -201,16 +211,10 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
   }
 
   private async readQuota(): Promise<AccountRateLimits | null> {
-    const cwd = path.join((this.options.stateDirectory?.() ?? defaultRuntimeDirectory()), 'antigravity-quota');
-    await mkdir(cwd, { recursive: true, mode: 0o700 });
-    const session = await this.openSession({ agentId: `quota-${randomUUID()}`, cwd, mcpServers: [], tools: false, ephemeral: true, changed: () => {} });
-    this.auxiliary.add(session);
-    try {
-      await session.prompt('/usage').completion;
-      if (session.snapshot.turns[0]?.status !== 'completed') throw new Error(session.snapshot.error ?? 'Antigravity quota is unavailable.');
-      return parseQuotaMessage(session.snapshot.messages.filter(message => message.role === 'assistant')
-        .flatMap(message => message.parts.flatMap(part => part.type === 'text' ? [part.text] : [])).join('\n'));
-    } finally { this.auxiliary.delete(session); await session.close(); }
+    const runtime = this.options.resolveRuntime ? this.options.resolveRuntime() : resolveAcpRuntime();
+    if (!runtime) throw new Error('Install the Antigravity CLI (agy) to use Antigravity.');
+    const { stdout } = await promisify(execFile)(runtime.command, ['--print', '/usage', '--output-format', 'json'], { cwd: tmpdir(), env: acpEnvironment(tmpdir()), timeout: 30_000 });
+    return parseQuota(stdout);
   }
 
   async generateText(agent: Context, input: HarnessTextGenerationInput): Promise<{ text: string }> {
@@ -226,7 +230,7 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
     try {
       input.signal?.throwIfAborted();
       if (this.closed) throw new Error('Antigravity host is closed.');
-      const selection = input.selectModel?.(antigravityModels(session.configuration.models)) ?? input.selection;
+      const selection = input.selectModel?.(antigravityModels(session.configuration)) ?? input.selection;
       if (selection?.model) await session.setModel(selection.model);
       await session.setMode('default');
       // The prompt is the consumer's; this provider adds no wording of its own.
@@ -302,7 +306,7 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
         .filter(entry => !query || `${entry.title} ${entry.sessionId}`.toLocaleLowerCase().includes(query))
         .slice(0, input?.limit ?? 100)
         .map(entry => ({ id: entry.sessionId, sessionId: entry.sessionId, title: entry.title,
-          updatedAt: '', messageCount: 0, storageState: 'active',
+          updatedAt: entry.updatedAt, messageCount: 0, storageState: 'active',
           ref: { provider: this.provider, folder: agent.folder, sessionId: entry.sessionId } }));
     } catch (error) { if (error instanceof NativeLoginRequired) this.authState(false); throw error; }
     finally { await runtime.close(); }
@@ -330,7 +334,7 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
     // Read the adopted session; a cancelled resume must not reopen the caller's old reference.
     const session = resuming ? this.sessions.get(agent.id) : await this.ensure(agent);
     if (!session || session.isClosed) throw new Error('Antigravity session was released during model loading.');
-    return antigravityModels(session.configuration.models);
+    return antigravityModels(session.configuration);
   }
 
   async setPermissionMode(agent: Context, mode: string) {
@@ -427,12 +431,3 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
   private emit(event: ProviderEvent): void { for (const listener of this.listeners) listener(event); }
 }
 
-function antigravityModels(models: unknown): ProviderModelOption[] {
-  if (!record(models) || !Array.isArray(models.availableModels)) return [];
-  return models.availableModels.filter(record).filter(model => typeof model.modelId === 'string').map(model => ({
-    id: model.modelId as string, model: model.modelId as string,
-    displayName: typeof model.name === 'string' ? model.name : model.modelId as string,
-    ...(typeof model.description === 'string' ? { description: model.description } : {}),
-    isDefault: model.modelId === models.currentModelId,
-  }));
-}

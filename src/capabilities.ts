@@ -5,7 +5,7 @@ export const harnessPermissionIds = {
   codex: ['ask-for-approval', 'approve-for-me', 'full-access'],
   claude: ['default', 'acceptEdits', 'dontAsk', 'auto', 'bypassPermissions'],
   cursor: ['default', 'full-access'],
-  antigravity: ['default', 'auto_edit'],
+  antigravity: ['default', 'accept-edits', 'auto'],
 } as const;
 const unrestricted = new Set<string>(['full-access', 'bypassPermissions']);
 const permissionModes = (ids: readonly string[]) => ids.map(id => ({ id, ...(unrestricted.has(id) ? { dangerous: true } : {}) }));
@@ -100,7 +100,7 @@ export const antigravityHarnessCapabilities: ProviderCapabilities = {
   reportsTokens: true, questions: true, plugins: false,
   conversationArchive: false, conversationResume: true,
   remoteControl: false, attachments: true, models: true, skills: false,
-  reasoningEffort: false, serviceTier: false, thinkingBudget: false,
+  reasoningEffort: true, serviceTier: false, thinkingBudget: false,
   planMode: 'native', goals: false, steerPrompt: false, interrupt: true, history: true,
   conversationFork: false, deleteTurn: false, editTurn: false, retryTurn: false,
   approvals: true, approvalPresets: [],

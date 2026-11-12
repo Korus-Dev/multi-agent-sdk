@@ -70,9 +70,8 @@ export type HarnessOptions = {
     steeringFallback?: () => boolean;
   };
   antigravity?: {
-    /** Overrides the ACP runtime executable and its companion harness. */
+    /** The Antigravity CLI to run, in place of the `agy` found on the machine. */
     command?: string;
-    harnessPath?: string;
   };
 };
 

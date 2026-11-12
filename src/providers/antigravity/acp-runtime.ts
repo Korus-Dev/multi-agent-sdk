@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { AcpConnection, record } from '../../acp/acp-connection';
-import { acpEnvironment, acpVersion, antigravityHome, resolveAcpRuntime } from './runtime';
+import { acpEnvironment, acpHomeArguments, antigravityHome, antigravityMinimumVersion, antigravityVersion, resolveAcpRuntime } from './runtime';
 
 export class NativeLoginRequired extends Error {
   constructor() { super('Sign in to Antigravity with Google in Settings.'); }
@@ -38,19 +38,19 @@ export class AcpRuntime {
     onClose: ConstructorParameters<typeof AcpConnection>[0]['onClose'];
   }): Promise<AcpRuntime> {
     const runtime = options.runtime ?? resolveAcpRuntime();
-    if (!runtime) throw new Error('Install the Antigravity ACP runtime and matching harness in Settings.');
+    if (!runtime) throw new Error('Install the Antigravity CLI (agy) to use Antigravity.');
     const home = options.home ?? antigravityHome();
     await mkdir(home, { recursive: true, mode: 0o700 });
     const temporaryRoot = path.join(home, options.client?.temporaryDirectory ?? 'tmp');
     await mkdir(temporaryRoot, { recursive: true, mode: 0o700 });
     const temp = await mkdtemp(path.join(temporaryRoot, 'acp-'));
     if (options.signal?.aborted) { await rm(temp, { recursive: true, force: true }); throw new Error('Antigravity authentication cancelled.'); }
-    const env = (options.environment ?? acpEnvironment)(home, runtime.harness, temp);
+    const env = (options.environment ?? acpEnvironment)(temp);
     // Python's native webbrowser honors this command. It receives the URL as an
     // ignored argument and succeeds, preventing fallback to the user's browser.
     if (!options.interactive) env.BROWSER = `${quoteBrowserArgument(process.execPath)} -e 'process.exit(0)' %s`;
     let instance: AcpRuntime;
-    instance = new AcpRuntime(temp, { ...options, ...runtime, env,
+    instance = new AcpRuntime(temp, { ...options, ...runtime, args: [...runtime.args, ...acpHomeArguments(home)], env,
       onLoginRequired: options.interactive ? undefined : () => { void instance.connection.close(); },
     });
     const abort = () => { void instance.close(); };
@@ -58,13 +58,14 @@ export class AcpRuntime {
     try {
       instance.connection.start();
       const initialization = await instance.connection.request('initialize', {
-        protocolVersion: 2,
+        protocolVersion: 1,
         clientInfo: { name: options.client?.name ?? 'multi-agent-sdk', ...(options.client?.title ? { title: options.client.title } : {}), version: options.client?.version ?? '1' },
         clientCapabilities: { fs: { readTextFile: options.filesystem !== false, writeTextFile: options.filesystem !== false && options.filesystem !== 'read-only' }, terminal: false },
       });
-      if (!record(initialization) || initialization.protocolVersion !== 2 || !record(initialization.agentInfo)
-        || initialization.agentInfo.version !== acpVersion || initialization.agentInfo.name !== 'antigravity-acp') {
-        throw new Error(`Antigravity requires the qualified ACP ${acpVersion} runtime (protocol 2).`);
+      // The CLI updates itself, so any version from the first supported one on is accepted.
+      const version = record(initialization) && record(initialization.agentInfo) ? antigravityVersion(initialization.agentInfo.version) : null;
+      if (!record(initialization) || initialization.protocolVersion !== 1 || version === null || version < antigravityVersion(antigravityMinimumVersion)!) {
+        throw new Error(`Antigravity requires the Antigravity CLI ${antigravityMinimumVersion} or later. Update it with \`agy update\`.`);
       }
       return instance;
     } catch (error) { await instance.close(); throw error; }

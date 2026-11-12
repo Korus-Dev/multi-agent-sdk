@@ -53,7 +53,8 @@ export class AcpTranscript {
       case 'agent_message_chunk':
       case 'agent_thought_chunk':
         if (!this.replica.getSnapshot().busy && replay) this.start();
-        if (record(update.content) && typeof update.content.text === 'string') this.text('assistant', update.content.text, update.sessionUpdate === 'agent_thought_chunk');
+        // The CLI streams its thinking as running prose, not as a summary of the work, so it stays out of the transcript.
+        if (update.sessionUpdate === 'agent_message_chunk' && record(update.content) && typeof update.content.text === 'string') this.text('assistant', update.content.text);
         return;
       case 'tool_call':
       case 'tool_call_update': this.tool(update); return;
@@ -65,13 +66,10 @@ export class AcpTranscript {
     }
   }
 
-  private text(role: 'user' | 'assistant', text: string, thought = false): void {
+  private text(role: 'user' | 'assistant', text: string): void {
     const message = this.current(role);
     const last = message.parts.at(-1);
-    if (thought) {
-      if (last?.type === 'reasoning') last.summary += text;
-      else message.parts.push({ type: 'reasoning', summary: text, itemId: randomUUID(), summaryIndex: 0 });
-    } else if (last?.type === 'text') last.text += text;
+    if (last?.type === 'text') last.text += text;
     else message.parts.push({ type: 'text', text });
     this.event({ type: 'message.upsert', payload: { message } });
   }

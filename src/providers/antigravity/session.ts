@@ -1,9 +1,10 @@
+import { readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import type { AgentRequestResponse } from '../../conversations/agent-request';
 import type { AntigravityConversationEvent, AntigravityConversationSnapshot } from '../../contracts/antigravity-conversation';
 import { AcpRuntime } from './acp-runtime';
 import { record } from '../../acp/acp-connection';
-import { antigravityHome } from './runtime';
+import { antigravityConversationDirectory, antigravityHome } from './runtime';
 import { AcpTranscript } from './transcript';
 import { permissionRequest } from './permissions';
 import { handleAcpFileRequest } from './filesystem';
@@ -45,6 +46,8 @@ export class AcpSession {
   private config: Record<string, unknown> = {};
   private journal!: AcpPromptJournal;
   private planMarkdown?: string;
+  private turnStartedAt = 0;
+  private currentMode?: string;
   private constructor(private readonly options: SessionOptions) {}
 
   static async open(options: SessionOptions): Promise<AcpSession> {
@@ -66,6 +69,7 @@ export class AcpSession {
       const id = options.sessionId ?? result.sessionId;
       if (typeof id !== 'string' || !id || (result.sessionId !== undefined && result.sessionId !== id)) throw new Error('Antigravity session identity mismatch.');
       session.config = result;
+      if (record(result.modes) && typeof result.modes.currentModeId === 'string') session.currentMode = result.modes.currentModeId;
       const home = options.home ?? options.runtimeOptions?.home ?? antigravityHome();
       session.journal = options.ephemeral ? await AcpPromptJournal.ephemeral(home, id, options.client?.metadataDirectory) : await AcpPromptJournal.open(home, id, options.client?.metadataDirectory);
       session.transcript = new AcpTranscript(options.agentId, id, event => {
@@ -87,7 +91,28 @@ export class AcpSession {
   get sessionId(): string { return this.snapshot.sessionId; }
   get isClosed(): boolean { return this.disposed; }
   get cwd(): string { return this.options.cwd; }
-  get writtenPlan(): string | undefined { return this.planMarkdown; }
+  /** The mode the session is in: a permission mode, or `plan` while it plans. */
+  get mode(): string | undefined { return this.currentMode; }
+  /** The modes this CLI offers; one that names none takes the modes every version has. */
+  private get modes(): string[] {
+    const offered = record(this.config.modes) && Array.isArray(this.config.modes.availableModes) ? this.config.modes.availableModes.flatMap(mode => record(mode) && typeof mode.id === 'string' ? [mode.id] : []) : [];
+    return offered.length ? offered : ['default', 'accept-edits', 'plan'];
+  }
+  /**
+   * The plan the last turn wrote. The CLI keeps a conversation's files, a plan among them, in its own folder; an
+   * older one may hand the plan to the client to write instead.
+   */
+  async writtenPlan(): Promise<string | undefined> {
+    if (this.planMarkdown) return this.planMarkdown;
+    const directory = antigravityConversationDirectory(this.options.home ?? antigravityHome(), this.sessionId);
+    const names = await readdir(directory).catch(() => [] as string[]);
+    const written = (await Promise.all(names.filter(name => name.toLowerCase().endsWith('.md')).map(async name => {
+      const file = path.join(directory, name);
+      const modified = await stat(file).then(value => value.mtimeMs, () => 0);
+      return { file, modified };
+    }))).filter(candidate => candidate.modified >= this.turnStartedAt).sort((a, b) => b.modified - a.modified)[0];
+    return written ? readFile(written.file, 'utf8').catch(() => undefined) : undefined;
+  }
 
   prompt(text: string, content: unknown[] = [{ type: 'text', text }], parts: MessagePart[] = [], metadata?: import('../../contracts/index').Message['metadata']): { turnId: string; completion: Promise<void> } {
     if (this.disposed) throw new Error('Antigravity session is closed.');
@@ -95,6 +120,7 @@ export class AcpSession {
     this.interrupted = false;
     this.promptSent = false;
     this.planMarkdown = undefined;
+    this.turnStartedAt = Date.now();
     const turnId = this.transcript.start(text, parts, metadata);
     const wireText = record(content[0]) && typeof content[0].text === 'string' ? content[0].text : text;
     let startedAt: number | undefined;
@@ -179,8 +205,17 @@ export class AcpSession {
 
   async setMode(modeId: string): Promise<void> {
     this.assertIdle();
-    if (!['default', 'auto_edit'].includes(modeId)) throw new Error('Unsupported Antigravity permission mode.');
+    if (!this.modes.includes(modeId)) throw new Error('Unsupported Antigravity permission mode.');
+    if (modeId === this.currentMode) return;
     await this.runtime.connection.request('session/set_mode', { sessionId: this.sessionId, modeId });
+    this.currentMode = modeId;
+  }
+
+  /** How hard the model thinks, where the selected model offers a choice. */
+  async setReasoningEffort(level: string): Promise<void> {
+    this.assertIdle();
+    const result = await this.runtime.connection.request('session/set_config_option', { sessionId: this.sessionId, configId: 'thought_level', value: level });
+    if (record(result)) this.config = { ...this.config, ...result };
   }
 
   async close(): Promise<void> {
@@ -208,6 +243,7 @@ export class AcpSession {
     if (this.disposed) return;
     this.transcript.update(params.update, this.loading);
     if (params.update.sessionUpdate === 'config_option_update') this.config = { ...this.config, configOptions: params.update.configOptions };
+    if (params.update.sessionUpdate === 'current_mode_update' && typeof params.update.currentModeId === 'string') this.currentMode = params.update.currentModeId;
   }
 
   private async request(method: string, params: unknown): Promise<unknown> {
@@ -242,7 +278,7 @@ export class AcpSession {
     }
     if (!this.active) throw new Error('Antigravity file request has no active turn.');
     const result = await handleAcpFileRequest(method, params, [this.options.cwd,
-      path.join(this.options.home ?? antigravityHome(), 'antigravity-acp', 'brain', this.sessionId)]);
+      antigravityConversationDirectory(this.options.home ?? antigravityHome(), this.sessionId)]);
     if (method === 'fs/write_text_file' && typeof params.path === 'string' && /^(?:PLAN|implementation_plan)\.md$/i.test(path.basename(params.path)) && typeof params.content === 'string') this.planMarkdown = params.content;
     return result;
   }
