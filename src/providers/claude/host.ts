@@ -1994,8 +1994,11 @@ function claudeTurnParams(
   const claudeOptions = options.providerOptions?.kind === 'claude' ? options.providerOptions : undefined;
   const defaults = agent.providerDefaults?.kind === 'claude' ? agent.providerDefaults : undefined;
   const restored = agent.providerSession?.kind === 'claude' ? agent.providerSession : undefined;
-  const model = options.selection?.model ?? defaults?.model ?? restored?.model ?? null;
+  // Saved settings start a conversation; one that already ran keeps the model it ran with, and only an explicit change is sent.
+  const own = existingSessionId ? restored : undefined;
+  const model = options.selection?.model ?? own?.model ?? defaults?.model ?? restored?.model ?? null;
   const restoredEffort = model === restored?.model ? restored?.reasoningEffort : undefined;
+  const ownEffort = own?.model !== undefined && model === own.model ? own.reasoningEffort : undefined;
   const tier = options.selection?.serviceTier !== undefined ? options.selection?.serviceTier : defaults?.serviceTier;
   if (tier != null && !['normal', 'default', 'fast'].includes(tier)) throw new Error('Unsupported Claude service tier.');
   const mcpServerUrl = configuration.mcpServerUrl ?? null;
@@ -2006,7 +2009,7 @@ function claudeTurnParams(
     sessionId: existingSessionId ?? undefined,
     title: configuration.title ?? agent.name?.trim() ?? 'Claude',
     model,
-    effort: claudeEffort(options.selection?.reasoningEffort ?? defaults?.reasoningEffort ?? restoredEffort),
+    effort: claudeEffort(options.selection?.reasoningEffort ?? ownEffort ?? defaults?.reasoningEffort ?? restoredEffort),
     fastMode: tier === 'fast',
     permissionMode: options.planMode ? 'plan' : claudeOptions?.permissionMode ?? defaults?.permission ?? null,
     appendSystemPrompt: configuration.appendSystemPrompt,

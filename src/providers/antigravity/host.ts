@@ -51,6 +51,8 @@ import { finalAnswerText } from '../../conversations/final-answer';
 export class AntigravityHost<Context extends ProviderContext = ProviderContext> implements ProviderDriver<Context, ProviderEvent> {
   readonly provider = 'antigravity' as const;
   private readonly sessions = new Map<string, AcpSession>();
+  /** Opened conversations that already received the saved settings. */
+  private readonly settled = new WeakSet<AcpSession>();
   private readonly opening = new Map<string, Promise<AcpSession>>();
   private readonly generations = new Map<string, number>();
   private readonly revisions = new Map<string, number>();
@@ -132,15 +134,17 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
     admissionGuard?.();
     const session = await this.ensure(agent, scope);
     admissionGuard?.();
-    admissionGuard?.();
-    const model = options?.selection?.model ?? (agent.providerDefaults?.kind === this.provider ? agent.providerDefaults.model : undefined);
+    // Saved settings apply once to each opened conversation; while it stays open, only an explicit change is sent.
+    const saved = !this.settled.has(session) && agent.providerDefaults?.kind === this.provider ? agent.providerDefaults : undefined;
+    const model = options?.selection?.model ?? saved?.model;
     if (model) await session.setModel(model);
     admissionGuard?.();
     // A thinking level applies only to a model that offers it; the CLI rejects it on any other.
-    const wanted = options?.selection?.reasoningEffort ?? (agent.providerDefaults?.kind === this.provider ? agent.providerDefaults.reasoningEffort : undefined);
+    const wanted = options?.selection?.reasoningEffort ?? saved?.reasoningEffort;
     const offered = antigravityModels(session.configuration).find(candidate => candidate.isDefault)?.supportedReasoningEfforts ?? [];
     const effort = wanted && offered.some(level => level.reasoningEffort === wanted) ? wanted : undefined;
     if (effort) await session.setReasoningEffort(effort);
+    this.settled.add(session);
     admissionGuard?.();
     const permission = options?.providerOptions?.kind === this.provider ? options.providerOptions.permissionMode
       : agent.providerDefaults?.kind === this.provider ? agent.providerDefaults.permission : undefined;

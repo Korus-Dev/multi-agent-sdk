@@ -385,6 +385,21 @@ describe('ClaudeBackendDriver', () => {
     } finally { await driver.close(); }
   });
 
+  it('keeps the model a conversation ran with over saved settings, until a change is sent', async () => {
+    const transport = createFakeTransport();
+    const driver = new ClaudeBackendDriver(transport);
+    const running: Agent = { ...agent, providerDefaults: { kind: 'claude', model: 'sonnet', reasoningEffort: 'low' },
+      providerSession: { kind: 'claude', conversationId: 'claude-session-existing', transport: 'stdio', model: 'opus', reasoningEffort: 'high' } };
+    try {
+      await driver.sendPrompt(running, 'Continue');
+      expect(transport.startTurn.mock.calls[0]?.[0]).toMatchObject({ model: 'opus', effort: 'high' });
+      await driver.interrupt(running);
+      await driver.sendPrompt(running, 'Switch', { selection: { model: 'sonnet' } });
+      expect(transport.startTurn.mock.calls[1]?.[0]).toMatchObject({ model: 'sonnet', effort: 'low' });
+      await driver.interrupt(running);
+    } finally { await driver.close(); }
+  });
+
   it('resumes persisted Claude sessions and interrupts active turns', async () => {
     const transport = createFakeTransport();
     const driver = new ClaudeBackendDriver(transport);

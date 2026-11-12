@@ -140,3 +140,37 @@ it('applies the thinking level a generation asks for, where the model offers it'
     await expect(host.generateText!(agent, { cwd: root, prompt: 'Summarize', selection: { model: 'gemini', reasoningEffort: 'max' } })).rejects.toThrow('Antigravity does not offer this thinking level for the selected model.');
   } finally { await host.close(); await rm(root, { recursive: true, force: true }); }
 });
+
+it('opens a conversation with the saved model and thinking level, then leaves them to the conversation while it stays open', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'antigravity-saved-'));
+  await writeAntigravityRuntimeFixture(root);
+  const runtime = { command: path.join(root, 'runtime'), args: [] };
+  const home = path.join(root, 'native-home');
+  await writeFile(path.join(root, 'usage-fixture.json'), JSON.stringify({ configuration: {
+    models: { currentModelId: 'gemini-high', availableModels: [{ modelId: 'gemini-high' }, { modelId: 'gemini-low' }] },
+    configOptions: [{ id: 'model', currentValue: 'gemini', options: [{ value: 'gemini', name: 'Gemini' }] },
+      { id: 'thought_level', currentValue: 'high', options: [{ value: 'low', name: 'Low' }, { value: 'high', name: 'High' }] }],
+  } }));
+  const host = new AntigravityHost({ home: () => home, stateDirectory: () => root, resolveRuntime: () => runtime, runtimeOptions: () => ({ runtime, home }) });
+  const agent: ProviderContext = { id: 'saved', provider: 'antigravity', folder: root, providerDefaults: { kind: 'antigravity', model: 'gemini', reasoningEffort: 'low' } };
+  const events: ProviderEvent[] = [];
+  host.onEvent(event => events.push(event));
+  const configured = async () => JSON.parse(await readFile(path.join(root, 'fixture-config.jsonl'), 'utf8').then(text => `[${text.trim().split('\n').join(',')}]`, () => '[]')) as Array<{ configId: string; value: string }>;
+  const completed = () => events.filter(event => event.type === 'antigravity.conversationEventReceived' && (event.payload as { event: { type: string } }).event.type === 'turn.completed').length;
+  try {
+    agent.providerSession = (await host.sendPrompt(agent, 'First')).providerSession;
+    await expect.poll(completed).toBe(1);
+    expect((await configured()).map(call => [call.configId, call.value])).toStrictEqual([['model', 'gemini'], ['thought_level', 'low']]);
+    await host.sendPrompt(agent, 'Second');
+    await expect.poll(completed).toBe(2);
+    expect(await configured()).toHaveLength(2);
+    await host.sendPrompt(agent, 'Third', { selection: { reasoningEffort: 'high' } });
+    await expect.poll(completed).toBe(3);
+    expect((await configured()).map(call => [call.configId, call.value]).slice(2)).toStrictEqual([['thought_level', 'high']]);
+    // A conversation opened again starts from the saved settings once more.
+    await host.releaseConversation(agent.id);
+    await host.sendPrompt(agent, 'Fourth');
+    await expect.poll(completed).toBe(4);
+    expect((await configured()).map(call => [call.configId, call.value]).slice(3)).toStrictEqual([['model', 'gemini'], ['thought_level', 'low']]);
+  } finally { await host.close(); await rm(root, { recursive: true, force: true }); }
+});

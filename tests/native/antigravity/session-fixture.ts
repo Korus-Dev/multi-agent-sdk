@@ -56,7 +56,7 @@ rl.on('line',line=>{
    const saved=require('node:path').join(home,sessionId+'.jsonl');
    if(fs.existsSync(saved)) {
      for(const line of fs.readFileSync(saved,'utf8').trim().split('\\n')) {const prompt=JSON.parse(line);update({...authorshipFixture.historyUpdate,content:{...authorshipFixture.historyUpdate.content,text:prompt.replace(/^\\/plan\\s*/,'')}});update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Recovered.'}});}
-     reply({});return;
+     reply({...(usageFixture()?.configuration??{})});return;
    }
    update({sessionUpdate:'user_message_chunk',content:{type:'text',text:'Create a file'}});
    update({sessionUpdate:'tool_call',toolCallId:'replay-id',title:'Create file',kind:'edit',status:'completed'});

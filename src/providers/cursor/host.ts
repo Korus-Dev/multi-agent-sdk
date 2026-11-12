@@ -49,6 +49,8 @@ export class CursorHost<Context extends ProviderContext = ProviderContext> imple
   private readonly runningScopes = new Map<string, RunningScope>();
   private readonly executionScopes = new Map<string, HarnessPromptScope>();
   private readonly sessions = new Map<string, CursorSession>();
+  /** Opened conversations that already received the saved settings. */
+  private readonly settled = new WeakSet<CursorSession>();
   private readonly opening = new Map<string, { abort: AbortController; done: Promise<CursorSession> }>();
   private readonly resuming = new Set<string>();
   private readonly readers = new Map<string, { abort: AbortController; done: Promise<Message[]> }>();
@@ -110,8 +112,7 @@ export class CursorHost<Context extends ProviderContext = ProviderContext> imple
     if (this.steering.has(agent.id) && !admissionGuard) throw new Error('Finish the current Cursor steering operation first.');
     if (this.resuming.has(agent.id)) throw new Error('Finish the current Cursor history operation first.');
     if (options?.providerOptions) throw new Error('Cursor backend options are not available.');
-    const selection=resolveExecutionSelection(executionSelectionForAgent(agent),options?.selection);
-    if (selection.serviceTier!==null) throw new Error('Cursor service tiers are not supported.');
+    if (options?.selection?.serviceTier != null || (agent.providerDefaults?.kind === this.provider && agent.providerDefaults.serviceTier != null)) throw new Error('Cursor service tiers are not supported.');
     const generation = this.generations.get(agentId) ?? 0;
     const previous = this.queues.get(agentId);
     let release!: () => void;
@@ -126,6 +127,9 @@ export class CursorHost<Context extends ProviderContext = ProviderContext> imple
       admissionGuard?.();
       const session = await this.ensure(agent, scope);
       admissionGuard?.();
+      // Saved settings apply once to each opened conversation; while it stays open, only an explicit change is sent.
+      const saved = this.settled.has(session) ? { provider: this.provider, model: null, reasoningEffort: null, serviceTier: null } : executionSelectionForAgent(agent);
+      const selection=resolveExecutionSelection(saved,options?.selection);
       const model=selection.model;
       if (model) {
         if (!session.models.some(option => option.id === model)) throw new Error('Unknown Cursor model. Refresh the model catalog.');
@@ -138,6 +142,7 @@ export class CursorHost<Context extends ProviderContext = ProviderContext> imple
       admissionGuard?.();
       admissionGuard?.();
       session.assertSelection(selection.model,selection.reasoningEffort,options?.planMode === true);
+      this.settled.add(session);
       // Readers learn what the conversation runs with from the conversation, as on every harness.
       this.emit({ type: 'conversation.settingsUpdated', provider: this.provider, agentId: agent.id, payload: { settings: {
         ...(selection.model ? { model: selection.model } : {}), ...(selection.reasoningEffort !== null ? { reasoningEffort: selection.reasoningEffort } : {}), permission: this.permissionMode(agent) } } });

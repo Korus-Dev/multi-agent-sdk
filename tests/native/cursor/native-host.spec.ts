@@ -344,6 +344,12 @@ describe('Cursor ACP host transport boundary', () => {
     await expect(host.sendPrompt(agent,'must-not-run',{selection:{serviceTier:'fast'}})).rejects.toThrow(/tier/i);
     expect((await wire()).filter(call=>call.method==='session/prompt')).toHaveLength(prompts);
   });
+  it('starts a conversation with the saved model, then leaves the model to the conversation', async () => {
+    await writeFile(path.join(root,'rich-models'),'');
+    await host.sendPrompt({...agent,providerDefaults:{kind:'cursor' as const,model:'fixture-alpha'}},'hello'); await vi.waitFor(()=>expect(completions()).toHaveLength(1));
+    await host.sendPrompt({...agent,providerDefaults:{kind:'cursor' as const,model:'fixture-beta'}},'hello'); await vi.waitFor(()=>expect(completions()).toHaveLength(2));
+    expect((await wire()).filter(call=>call.fixture==='prompt-admission').map(call=>call.model)).toStrictEqual(['fixture-alpha','fixture-alpha']);
+  });
   it('clears inherited effort on model changes and honors explicit null without resetting native thought settings', async () => {
     await writeFile(path.join(root,'rich-models'),'');
     const defaults={...agent,providerDefaults:{kind:'cursor' as const,model:'fixture-alpha',reasoningEffort:'extra-high'}};
@@ -351,8 +357,9 @@ describe('Cursor ACP host transport boundary', () => {
     await host.sendPrompt(defaults,'hello',{selection:{reasoningEffort:null}}); await vi.waitFor(()=>expect(completions()).toHaveLength(2));
     await host.sendPrompt(defaults,'hello',{selection:{model:'fixture-beta'}}); await vi.waitFor(()=>expect(completions()).toHaveLength(3));
     await writeFile(path.join(root,'native-thinking-change'),'');
+    // A conversation that already ran keeps its own settings: a change of saved model reaches it as an explicit selection.
     const dual={...agent,providerDefaults:{kind:'cursor' as const,model:'fixture-dual'}};
-    await host.sendPrompt(dual,'hello'); await vi.waitFor(()=>expect(completions()).toHaveLength(4));
+    await host.sendPrompt(dual,'hello',{selection:{model:'fixture-dual'}}); await vi.waitFor(()=>expect(completions()).toHaveLength(4));
     await host.sendPrompt(dual,'hello',{selection:{reasoningEffort:null}}); await vi.waitFor(()=>expect(completions()).toHaveLength(5));
     expect((await wire()).filter(call=>call.fixture==='prompt-admission').map(call=>({model:call.model,thoughts:call.thoughts}))).toStrictEqual([
       {model:'fixture-alpha',thoughts:{reasoning:'extra-high'}},{model:'fixture-alpha',thoughts:{reasoning:'extra-high'}},{model:'fixture-beta',thoughts:{reasoning_effort:'medium'}},
