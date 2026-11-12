@@ -35,13 +35,13 @@ describe('incremental session state', () => {
     expect(local.state.messages.map(m => m.id)).toStrictEqual(['m1', 'm2']);
   });
 
-  it('sends only the message that changed while text streams', () => {
+  it('sends only the text a streaming message gained', () => {
     const { patches, snapshot } = setup();
     snapshot([message('m0', 'Earlier'), message('m1', 'Hel')]);
     patches.length = 0;
     snapshot([message('m0', 'Earlier'), message('m1', 'Hello')]);
     expect(patches).toHaveLength(1);
-    expect(patches[0]!.ops).toStrictEqual([{ op: 'spliceMessages', start: 1, deleteCount: 1, messages: [message('m1', 'Hello')] }]);
+    expect(patches[0]!.ops).toStrictEqual([{ op: 'appendPartText', index: 1, part: 0, field: 'text', text: 'lo' }]);
   });
 
   it('inserts older history at the start without resending the rest', () => {
