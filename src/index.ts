@@ -16,7 +16,7 @@ export type {
 } from './consumer-types';
 export type { ProviderContext as Agent } from './context';
 export type { ProviderApprovalDecision, ProviderApprovalRequest, ProviderApprovalScope, ProviderRequestedPermission } from './contracts/approvals';
-export type { AuthenticationLogin, AuthenticationLoginMethod, ProviderAuthentication, ProviderAuthenticationAction } from './contracts/authentication';
+export type { Account, AuthenticationLogin, AuthenticationLoginMethod, ProviderAuthentication, ProviderAuthenticationAction } from './contracts/authentication';
 export type { BankedResetResult, BankedResets, UseBankedResetInput } from './contracts/banked-resets';
 export type {
   AgentContextUsage, AgentFileActivity, AgentHistoryLoadResult, AgentQueuedPrompt, AgentSubagentTree, AskUserAnswers,

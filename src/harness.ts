@@ -96,6 +96,11 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
   /** A fresh projection from native conversation events to session state. */
   /** The app cleared the session's conversation and now sends a prompt: a provider that would carry on in the old one lets go of it here. */
   protected startingOver(_context: ProviderContext): void | Promise<void> {}
+  /** The signed-in account in neutral terms, read from this harness's own sign-in state; null when it names none. */
+  protected accountOf(_native: import('./contracts/authentication').ProviderAuthentication): import('./contracts/authentication').Account | null { return null; }
+  private withAccount(native: import('./contracts/authentication').ProviderAuthentication): import('./contracts/authentication').ProviderAuthentication {
+    return { ...native, account: native.connected ? this.accountOf(native) : null };
+  }
   protected abstract createProjection(): HarnessProjection;
   /** The neutral activity one native frame carries, read the way this provider writes its frames. */
   protected abstract activityOf(frame: ProviderEvent): FrameActivity[];
@@ -289,7 +294,9 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
     }
     if (event.type === 'plan.readyForReview' || event.type === 'agentRequest.created' || event.type === 'agentRequest.resolved' || event.type === 'agent.statusChanged') return;
     // Providers name the conversation in their own fields; consumers read one.
-    const { threadId, providerSessionId, ...notice } = event;
+    const { threadId, providerSessionId, ...rest } = event;
+    // Sign-in changes carry the account in neutral terms, as `authenticate` does.
+    const notice = rest.type === 'provider.authenticationChanged' ? { ...rest, payload: this.withAccount(rest.payload) } : rest;
     const conversationId = notice.conversationId ?? threadId ?? providerSessionId;
     this.emit({ ...notice, ...(conversationId ? { conversationId } : {}), ...(session ? { session } : {}) } as HarnessEvent);
   }
@@ -307,8 +314,8 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
 
   getRuntimeStatus() { const { detail, capabilities: _capabilities, ...status } = this.native.getRuntimeStatus(); return { ...status, ...(typeof detail === 'string' ? { detail } : {}) }; }
   async authenticate(action: Parameters<Harness['authenticate']>[0]) {
-    const state = await (this.native.authenticate?.(action) ?? unavailable('Authentication'));
-    return { connected: state.connected, ...(state.login ? { login: state.login } : {}), native: state };
+    const native = this.withAccount(await (this.native.authenticate?.(action) ?? unavailable('Authentication')));
+    return { connected: native.connected, ...(native.login ? { login: native.login } : {}), account: native.account ?? null, native };
   }
   async getBankedResets() { return this.native.getBankedResets?.() ?? unavailable('Banked resets'); }
   async useBankedReset(input: Parameters<Harness['useBankedReset']>[0]) { return this.native.useBankedReset?.(input) ?? unavailable('Banked resets'); }

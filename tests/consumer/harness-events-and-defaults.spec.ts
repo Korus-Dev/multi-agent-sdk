@@ -29,7 +29,8 @@ it('hands listeners neutral events only: notices with the session they belong to
   deliver(unowned);
   expect(events.filter(event => event.type.endsWith('.conversationSnapshotChanged') || event.type.endsWith('.conversationEventReceived'))).toEqual([]);
   expect(events.filter(event => event.type === 'models.changed' || event.type === 'provider.authenticationChanged')).toEqual([
-    { ...models, session }, unowned,
+    // A sign-in change carries the account in neutral terms; nobody is signed in here.
+    { ...models, session }, { ...unowned, payload: { connected: false, account: null } },
   ]);
 });
 

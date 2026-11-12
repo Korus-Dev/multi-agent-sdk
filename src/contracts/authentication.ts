@@ -8,7 +8,13 @@ export type AuthenticationLoginMethod = 'browser' | 'deviceCode';
 export type AuthenticationLogin =
   | { method: 'browser'; id: string; url: string }
   | { method: 'deviceCode'; id: string; url: string; code: string };
-export type ProviderAuthentication = ProviderAuthenticationState & { login?: AuthenticationLogin };
+/**
+ * The signed-in account, the same for every harness: a subscription (with its plan or team where the harness names
+ * them), an API key billed per use, or a cloud provider's credentials. Absent fields are not reported by that harness.
+ */
+export type Account = { kind: 'subscription' | 'apiKey' | 'cloud'; email?: string; plan?: string; team?: string };
+/** `account` is the neutral reading of the native state, for apps that should not interpret it. */
+export type ProviderAuthentication = ProviderAuthenticationState & { login?: AuthenticationLogin; account?: Account | null };
 type ProviderAuthenticationState =
   | { kind: 'codex'; connected: boolean; state: CodexAuthentication }
   | { kind: 'claude'; connected: boolean; state: ClaudeAuthentication }

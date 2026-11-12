@@ -12,8 +12,8 @@ export type SkillSummary = import('./contracts/index').ProviderSkillSummary;
 export type PluginSummary = Omit<import('./contracts/index').ProviderPluginSummary, 'displayName'> & { displayName?: string };
 export type RuntimeStatus = Omit<import('./contracts/index').ProviderRuntimeStatus, 'detail' | 'capabilities'> & { detail?: string };
 /** Provider-specific account/login detail is an explicit native escape hatch. */
-export type Authentication = { connected: boolean; /** Present after `authenticate({ action: 'login' })` starts a managed login. */ login?: AuthenticationLogin; native: import('./contracts/authentication').ProviderAuthentication };
-export type { AuthenticationLogin, AuthenticationLoginMethod } from './contracts/authentication';
+export type Authentication = { connected: boolean; /** Present after `authenticate({ action: 'login' })` starts a managed login. */ login?: AuthenticationLogin; /** The signed-in account; null when none is signed in or the harness does not say. */ account: import('./contracts/authentication').Account | null; native: import('./contracts/authentication').ProviderAuthentication };
+export type { Account, AuthenticationLogin, AuthenticationLoginMethod } from './contracts/authentication';
 export type SessionStatus = { type: 'idle' | 'working' | 'awaitingInput' | 'error'; reason?: 'approval' | 'input'; detail?: string; message?: string; native?: import('./contracts/status').AgentStatus };
 export type AuthenticationAction = import('./contracts/authentication').ProviderAuthenticationAction;
 type AuthenticationLogin = import('./contracts/authentication').AuthenticationLogin;

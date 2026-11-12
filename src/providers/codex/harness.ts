@@ -38,6 +38,15 @@ export class CodexHarness extends ProviderHarness<'codex'> {
 
   constructor(native: ProviderDriver<ProviderContext, ProviderEvent>, rules?: import('../../conversations/work-phases').WorkPhaseRules) { super('codex', native, rules); }
 
+  /** A ChatGPT sign-in is a subscription; an API key is billed per use; Bedrock is a cloud account. */
+  protected override accountOf(native: import('../../contracts/authentication').ProviderAuthentication) {
+    const account = native.kind === 'codex' ? native.state.account : null;
+    if (!account) return null;
+    if (account.type === 'apiKey') return { kind: 'apiKey' as const };
+    if (account.type === 'chatgpt') return { kind: 'subscription' as const, ...(account.email ? { email: account.email } : {}), ...(account.planType ? { plan: account.planType } : {}) };
+    return { kind: 'cloud' as const };
+  }
+
   /** Codex keeps a session on its thread unless told which other one to use, so a cleared session lets go of it first. */
   protected override startingOver(context: ProviderContext) { return this.native.releaseConversation?.(context.id); }
 

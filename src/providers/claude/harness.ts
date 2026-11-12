@@ -29,6 +29,12 @@ export class ClaudeHarness extends SessionHarness<'claude'> {
 
   constructor(native: ProviderDriver<ProviderContext, ProviderEvent>, rules?: WorkPhaseRules) { super('claude', native, rules); }
 
+  protected override accountOf(native: import('../../contracts/authentication').ProviderAuthentication) {
+    const account = native.kind === 'claude' ? native.state.account : undefined;
+    if (!account) return null;
+    return { kind: account.type, ...(account.email ? { email: account.email } : {}), ...(account.subscription ? { plan: account.subscription } : {}) };
+  }
+
   /** Maps app-facing options onto the Claude runtime. */
   static mapOptions(options: HarnessOptions): ClaudeProviderOptions {
     const log = options.log;
