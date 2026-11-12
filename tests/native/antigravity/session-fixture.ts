@@ -47,7 +47,7 @@ rl.on('line',line=>{
  else if(v.method==='authenticate') reply({});
  else if(v.method==='session/new') {mcpServers=v.params.mcpServers;fs.writeFileSync(require('node:path').join(process.cwd(),'fixture-session.json'),JSON.stringify(v.params));fs.appendFileSync(catalogFile,JSON.stringify({sessionId,cwd:v.params.cwd,title:'Saved conversation'})+'\\n');reply({sessionId,...(usageFixture()?.configuration??{}),models:usageFixture()?.configuration.models??{currentModelId:'gemini-low',availableModels:[{modelId:'gemini-low',name:'Gemini Low'},{modelId:'opaque-oss-id',name:'GPT-OSS 120B (Medium)'}]}});}
  else if(v.method==='session/set_mode') {mode=v.params.modeId;fs.appendFileSync(require('node:path').join(process.cwd(),'fixture-modes'),mode+'\\n');reply({});}
- else if(v.method==='session/set_config_option') {fs.writeFileSync(require('node:path').join(process.cwd(),'fixture-model.json'),JSON.stringify(v.params));reply({});}
+ else if(v.method==='session/set_config_option') {fs.appendFileSync(require('node:path').join(process.cwd(),'fixture-config.jsonl'),JSON.stringify(v.params)+'\\n');fs.writeFileSync(require('node:path').join(process.cwd(),'fixture-model.json'),JSON.stringify(v.params));reply({});}
  else if(v.method==='session/list') reply({sessions:[...catalog(),{sessionId:'stored-session',cwd:process.cwd(),title:'Create a file'},{sessionId:'other-folder',cwd:'/another-workspace',title:'Private'}]});
  else if(v.method==='session/load') {
    sessionId=v.params.sessionId;

@@ -22,6 +22,9 @@ export class AntigravityHarness extends SessionHarness<'antigravity'> {
   /** A fresh session record for a conversation id. */
   static sessionData(id: string, folder: string | null): ProviderSessionData { return { kind: 'antigravity', sessionId: id, folder } as ProviderSessionData; }
 
+  /** Antigravity keeps a session on its live conversation unless told which other one to use, so a cleared session lets go of it first. */
+  protected override startingOver(context: ProviderContext) { return this.native.releaseConversation?.(context.id); }
+
   constructor(native: ProviderDriver<ProviderContext, ProviderEvent>, rules?: WorkPhaseRules) { super('antigravity', native, rules); }
 
   /** Maps app-facing options onto the Antigravity runtime. */

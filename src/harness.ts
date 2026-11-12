@@ -50,6 +50,7 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
   private readonly listeners = new Set<(event: HarnessEvent) => void>();
   /** How to end each session's unfinished runs when the session or the harness goes away. */
   private readonly runs = new Map<Session, Set<(reason: string) => void>>();
+  private readonly runTurns = new Map<Session, { waiting: object[]; taken: Set<string> }>();
   private readonly unsubscribe: () => void;
   private readonly offUsage?: () => void;
   private readonly offRequests?: () => void;
@@ -421,6 +422,12 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
     this.main(session);
     const active = this.runs.get(session) ?? new Set<(reason: string) => void>();
     this.runs.set(session, active);
+    // Runs whose prompt names no turn take the turns that start, one each, in the order the prompts were sent.
+    const turns = this.runTurns.get(session) ?? { waiting: [] as object[], taken: new Set<string>() };
+    this.runTurns.set(session, turns);
+    const ticket = {};
+    turns.waiting.push(ticket);
+    const leave = () => { const at = turns.waiting.indexOf(ticket); if (at >= 0) turns.waiting.splice(at, 1); };
     const { run, abandon } = startRun({
       session,
       subscribe: listener => this.onEvent(listener),
@@ -428,7 +435,15 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
       state: () => this.bindings.has(session) ? this.readSession(session) : undefined,
       steer: next => this.steerPrompt(session, next),
       interrupt: turnId => this.interrupt(session, turnId),
-    }, () => { active.delete(abandon); if (!active.size && this.runs.get(session) === active) this.runs.delete(session); });
+      claim: (turnId, named) => {
+        if (named) { leave(); turns.taken.add(turnId); return true; }
+        if (turns.taken.has(turnId) || turns.waiting[0] !== ticket) return false;
+        leave(); turns.taken.add(turnId); return true;
+      },
+    }, () => {
+      leave(); active.delete(abandon);
+      if (!active.size && this.runs.get(session) === active) { this.runs.delete(session); this.runTurns.delete(session); }
+    });
     active.add(abandon);
     return run;
   }

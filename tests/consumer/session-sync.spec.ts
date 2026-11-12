@@ -64,14 +64,16 @@ it('lets a provider operation in flight see what the app re-states meanwhile', a
   expect(during).toMatchObject({ providerSession: second, folder: '/moved' });
 });
 
-it('starts a new Codex conversation after the identity is cleared, instead of carrying on in the thread it holds', async () => {
-  const thread = (threadId: string) => ({ kind: 'codex' as const, threadId });
+it.each([
+  ['codex', (id: string) => ({ kind: 'codex' as const, threadId: id })],
+  ['antigravity', (id: string) => ({ kind: 'antigravity' as const, sessionId: id })],
+] as const)('starts a new %s conversation after the identity is cleared, instead of carrying on in the one it holds', async (provider, stored) => {
   const order: string[] = [];
   const native = { onEvent: () => () => {}, getCapabilities: () => ({}), close: async () => {},
     releaseConversation: async (id: string) => { await Promise.resolve(); order.push(`release:${id}`); },
-    sendPrompt: async (context: ProviderContext) => { order.push(`prompt:${context.providerSession ? 'old' : 'new'}`); return { providerSession: thread('t2') }; } };
-  const harness = harnessForHost('codex', native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
-  const session = harness.restoreSession({ id: 'main', folder: '/work' }, { provider: 'codex', data: thread('t1'), role: 'main' });
+    sendPrompt: async (context: ProviderContext) => { order.push(`prompt:${context.providerSession ? 'old' : 'new'}`); return { providerSession: stored('t2') }; } };
+  const harness = harnessForHost(provider, native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
+  const session = harness.restoreSession({ id: 'main', folder: '/work' }, { provider, data: stored('t1'), role: 'main' } as never);
   harness.syncSession(session, { data: null });
   await harness.sendPrompt(session, 'fresh');
   expect(order).toStrictEqual(['release:main', 'prompt:new']);
@@ -80,7 +82,7 @@ it('starts a new Codex conversation after the identity is cleared, instead of ca
   harness.syncSession(other, { data: null });
   await harness.sendPrompt(other, 'first');
   harness.syncSession(session, { data: null });
-  harness.syncSession(session, { data: thread('t2') });
+  harness.syncSession(session, { data: stored('t2') as never });
   await harness.sendPrompt(session, 'same conversation');
   expect(order).toStrictEqual(['release:main', 'prompt:new', 'prompt:new', 'prompt:old']);
 });

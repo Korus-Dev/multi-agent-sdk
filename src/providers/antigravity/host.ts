@@ -232,6 +232,12 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
       if (this.closed) throw new Error('Antigravity host is closed.');
       const selection = input.selectModel?.(antigravityModels(session.configuration)) ?? input.selection;
       if (selection?.model) await session.setModel(selection.model);
+      if (selection?.reasoningEffort) {
+        // Asked for by name: a level the model does not offer is refused, where a conversation's lingering default is only left out.
+        const offered = antigravityModels(session.configuration).find(candidate => candidate.isDefault)?.supportedReasoningEfforts ?? [];
+        if (!offered.some(level => level.reasoningEffort === selection.reasoningEffort)) throw new Error('Antigravity does not offer this thinking level for the selected model.');
+        await session.setReasoningEffort(selection.reasoningEffort);
+      }
       await session.setMode('default');
       // The prompt is the consumer's; this provider adds no wording of its own.
       const prompt = [input.developerInstructions, input.prompt].filter(Boolean).join('\n\n');

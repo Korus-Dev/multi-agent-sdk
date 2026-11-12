@@ -8,6 +8,8 @@ export type RunSource = {
   /** The session's current state; undefined once it is gone. */
   state(): SessionState | undefined;
   steer(prompt: string): Promise<Admission>;
+  /** Takes a turn that started for this run. False when the turn is another run's: an earlier one still waiting, or one that already has it. */
+  claim(turnId: string, named: boolean): boolean;
   interrupt(turnId: string | undefined): Promise<Admission>;
 };
 
@@ -49,7 +51,7 @@ export function startRun(source: RunSource, onEnd: () => void): { run: Run; aban
   };
   const accept = (event: RunEvent) => {
     const id = turnOf(event);
-    if (id && !turnId && event.type === 'turn.started') turnId = id;
+    if (id && !turnId && event.type === 'turn.started' && source.claim(id, false)) turnId = id;
     if (id && id !== turnId) return;
     if (reading) { queue.push(event); signal(); }
     if (event.type === 'recovery.required') end({ error: new Error(event.reason) });
@@ -71,6 +73,7 @@ export function startRun(source: RunSource, onEnd: () => void): { run: Run; aban
   admission.then(value => {
     if (ended) return;
     admitted = true; turnId = value.turnId;
+    if (turnId) source.claim(turnId, true);
     for (const event of held.splice(0)) if (!ended) accept(event);
   }, (error: unknown) => end({ error: asError(error) }));
 

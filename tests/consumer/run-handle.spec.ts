@@ -154,6 +154,21 @@ describe('run', () => {
     expect(script.calls('interrupt')[0]?.args[1]).toBe('turn-1');
   });
 
+  it('gives each queued run its own turn, in the order the prompts were sent', async () => {
+    const { harness, script, session, started, completed } = cursor();
+    started('turn-a');
+    // Both prompts wait behind the running turn, so neither admission names a turn.
+    script.on('sendPrompt', async () => ({ providerSession: { kind: 'cursor', sessionId: 'session', folder: '/work' } }));
+    const second = harness.run(session, 'B'), third = harness.run(session, 'C');
+    await Promise.all([second.admission, third.admission]);
+    completed('turn-a'); started('turn-b'); completed('turn-b');
+    expect((await second.result).turnId).toBe('turn-b');
+    await expect(Promise.race([third.result, Promise.resolve('waiting')])).resolves.toBe('waiting');
+    await expect(third.interrupt()).rejects.toThrow('This run\'s turn has not started.');
+    started('turn-c'); completed('turn-c');
+    expect((await third.result).turnId).toBe('turn-c');
+  });
+
   it('controls nothing once it has ended, and never a turn that is not its own', async () => {
     const { harness, script, session, started, completed } = cursor();
     const run = harness.run(session, 'Go');

@@ -119,3 +119,24 @@ it('offers each model once, with the thinking levels the CLI lists for it', () =
     { id: 'gpt-oss-120b-medium', model: 'gpt-oss-120b-medium', displayName: 'GPT-OSS 120B (Medium)', isDefault: false },
   ]);
 });
+
+it('applies the thinking level a generation asks for, where the model offers it', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'antigravity-generation-'));
+  await writeAntigravityRuntimeFixture(root);
+  const runtime = { command: path.join(root, 'runtime'), args: [] };
+  const home = path.join(root, 'native-home');
+  await writeFile(path.join(root, 'usage-fixture.json'), JSON.stringify({ configuration: {
+    models: { currentModelId: 'gemini-high', availableModels: [{ modelId: 'gemini-high' }, { modelId: 'gemini-low' }, { modelId: 'plain' }] },
+    configOptions: [{ id: 'model', currentValue: 'gemini', options: [{ value: 'gemini', name: 'Gemini' }, { value: 'plain', name: 'Plain' }] },
+      { id: 'thought_level', currentValue: 'high', options: [{ value: 'low', name: 'Low' }, { value: 'high', name: 'High' }] }],
+  } }));
+  const host = new AntigravityHost({ home: () => home, stateDirectory: () => root, resolveRuntime: () => runtime, runtimeOptions: () => ({ runtime, home }) });
+  const agent: ProviderContext = { id: 'writer', provider: 'antigravity', folder: root };
+  const configured = async () => JSON.parse(await readFile(path.join(root, 'fixture-config.jsonl'), 'utf8').then(text => `[${text.trim().split('\n').join(',')}]`, () => '[]')) as Array<{ configId: string; value: string }>;
+  try {
+    await host.generateText!(agent, { cwd: root, prompt: 'Summarize', selection: { model: 'gemini', reasoningEffort: 'low' } });
+    expect((await configured()).map(call => [call.configId, call.value])).toStrictEqual([['model', 'gemini'], ['thought_level', 'low']]);
+    // A level the model does not offer cannot be honoured, and saying nothing would hide that.
+    await expect(host.generateText!(agent, { cwd: root, prompt: 'Summarize', selection: { model: 'gemini', reasoningEffort: 'max' } })).rejects.toThrow('Antigravity does not offer this thinking level for the selected model.');
+  } finally { await host.close(); await rm(root, { recursive: true, force: true }); }
+});
