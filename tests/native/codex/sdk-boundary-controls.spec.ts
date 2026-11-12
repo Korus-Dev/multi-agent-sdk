@@ -106,7 +106,7 @@ describe(`Codex SDK → ${product.name} backend controls`, () => {
     expect(handle.deleteTurn).toHaveBeenCalledWith('turn');
     handle.forkTurn.mockResolvedValue({ conversationId: 'fork', conversation: host.conversation('fork'), snapshot: sdkSnapshot('fork') });
     const target = sdkAgent('fork-agent', 'fork');
-    await expect(driver.forkConversation(sdkAgent(), target, 'turn')).resolves.toMatchObject({ providerSession: { kind: 'codex', threadId: 'fork' } });
+    await expect(driver.forkConversation(sdkAgent(), target, 'turn')).resolves.toMatchObject({ providerSession: { kind: 'codex', conversationId: 'fork' } });
     expect(handle.forkTurn).toHaveBeenCalledWith('turn', { cwd: '/repo' }, { extensionContext: target });
     expect(conversation('fork').listenerCount()).toBe(1);
     handle.fork.mockResolvedValue({ conversationId: 'whole-fork', conversation: host.conversation('whole-fork'), snapshot: sdkSnapshot('whole-fork') });
@@ -147,8 +147,8 @@ describe(`Codex SDK → ${product.name} backend controls`, () => {
       await new Promise<void>(resolve => setImmediate(resolve));
       release();
       const [receipt, ownerReceipt] = await Promise.all([guestSending, ownerSending]);
-      expect(receipt).toStrictEqual({ providerSession: { kind: 'codex', threadId: 'conversation-a' }, turnId: 'turn', messageId: guest.id });
-      if (operation === 'steer') expect(ownerReceipt).toStrictEqual({ providerSession: { kind: 'codex', threadId: 'conversation-a' }, turnId: 'turn', messageId: owner.id });
+      expect(receipt).toStrictEqual({ providerSession: { kind: 'codex', conversationId: 'conversation-a' }, turnId: 'turn', messageId: guest.id });
+      if (operation === 'steer') expect(ownerReceipt).toStrictEqual({ providerSession: { kind: 'codex', conversationId: 'conversation-a' }, turnId: 'turn', messageId: owner.id });
       else expect(session.handle.respondToClientRequest).toHaveBeenCalledExactlyOnceWith({ id: request.id, payload: { answers: {} } });
     } finally { release(); await guestSending; }
   });
@@ -165,11 +165,11 @@ describe(`Codex SDK → ${product.name} backend controls`, () => {
       providerDefaults: { kind: 'codex' as const, model: 'worker-model', reasoningEffort: 'high', serviceTier: null } };
     const handle = conversation('conversation-a').handle;
     handle.forkTurn.mockResolvedValue({ conversationId: 'worker-thread', conversation: host.conversation('worker-thread'), snapshot: sdkSnapshot('worker-thread') });
-    await expect(driver.forkConversation(source, target)).resolves.toMatchObject({ providerSession: { kind: 'codex', threadId: 'worker-thread' }, forkedFromTurnId: 'discussion' });
+    await expect(driver.forkConversation(source, target)).resolves.toMatchObject({ providerSession: { kind: 'codex', conversationId: 'worker-thread' }, forkedFromTurnId: 'discussion' });
     expect(handle.forkTurn).toHaveBeenCalledWith('discussion', expect.objectContaining({ cwd: '/repo-worktree', model: 'worker-model', reasoningEffort: 'high', serviceTier: null }), { extensionContext: target });
     expect(handle.fork).not.toHaveBeenCalled();
     expect(source).toStrictEqual(original);
-    await driver.sendPrompt({ ...target, providerSession: { kind: 'codex', threadId: 'worker-thread' } }, 'Implement the agreed task');
+    await driver.sendPrompt({ ...target, providerSession: { kind: 'codex', conversationId: 'worker-thread' } }, 'Implement the agreed task');
     expect(conversation('worker-thread').handle.sendMessage).toHaveBeenCalled();
     expect(handle.sendMessage).not.toHaveBeenCalled();
   });

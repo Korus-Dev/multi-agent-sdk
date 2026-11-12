@@ -4,7 +4,7 @@ import type { ProviderContext } from '../../src/context';
 import type { ProviderDriver, ProviderEvent } from '../../src/driver';
 import { HarnessUnsupportedError } from '../../src';
 
-const data = { kind: 'codex' as const, threadId: 't1' };
+const data = { kind: 'codex' as const, conversationId: 't1' };
 const base = { onEvent: () => () => {}, getCapabilities: () => ({}), close: vi.fn(async () => {}) };
 const open = (native: object) => {
   const harness = harnessForHost('codex', { ...base, ...native } as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
@@ -12,12 +12,12 @@ const open = (native: object) => {
 };
 
 it('forks into another session, reports the turn it forked from, or reports there is nothing to fork', async () => {
-  const target = { kind: 'codex' as const, threadId: 'forked' };
+  const target = { kind: 'codex' as const, conversationId: 'forked' };
   const forkConversation = vi.fn(async () => ({ providerSession: target, forkedFromTurnId: 'turn-1' }));
   const { harness, session } = open({ forkConversation });
   const other = harness.open({ id: 'other', folder: '/work-2' });
   expect(await harness.forkConversation(session, other)).toMatchObject({ session: other, forkedFromTurnId: 'turn-1' });
-  expect(harness.getSessionData(other).data).toMatchObject({ threadId: 'forked' });
+  expect(harness.getSessionData(other).data).toMatchObject({ conversationId: 'forked' });
   const none = open({ forkConversation: async () => null });
   expect(await none.harness.forkConversation(none.session, none.harness.open({ id: 'x', folder: null }))).toBeNull();
 });
@@ -45,7 +45,7 @@ it('passes the history view to the provider when reading conversation messages',
   const { harness, session } = open({ readConversationMessages });
   const ref = harness.getConversationRef(session)!;
   await harness.readConversationMessages(session, ref, { view: 'last' });
-  expect(readConversationMessages).toHaveBeenCalledWith(expect.objectContaining({ threadId: 't1' }), 'main', { view: 'last' });
+  expect(readConversationMessages).toHaveBeenCalledWith(expect.objectContaining({ conversationId: 't1' }), 'main', { view: 'last' });
 });
 
 it('maps the read-only Codex option to the provider\'s read-only permission and no approval prompts', async () => {

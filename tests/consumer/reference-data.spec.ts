@@ -6,8 +6,8 @@ it('exposes new-chat references and restoration data without owning serializatio
   const native = {
     onEvent: () => () => {}, close: vi.fn(), releaseConversation: vi.fn(),
     getCapabilities: () => ({ permissionModes: [] }),
-    sendPrompt: vi.fn(async () => ({ providerSession: { kind: 'codex', threadId: 'created-chat' }, turnId: 'turn' })),
-    resumeConversation: vi.fn(async () => ({ providerSession: { kind: 'codex', threadId: 'created-chat' } })),
+    sendPrompt: vi.fn(async () => ({ providerSession: { kind: 'codex', conversationId: 'created-chat' }, turnId: 'turn' })),
+    resumeConversation: vi.fn(async () => ({ providerSession: { kind: 'codex', conversationId: 'created-chat' } })),
     readConversationMessages: vi.fn(async () => []),
   } as unknown as NativeDriver<import('../../src/context').ProviderContext, import('../../src/driver').ProviderEvent>;
   const driver = harnessForHost('codex', native);
@@ -27,7 +27,7 @@ it('exposes new-chat references and restoration data without owning serializatio
     const next = driver.restoreSession({ id: 'chat', folder: '/workspace' }, restored.exported);
     await driver.resumeConversation(next, { ref: driver.restoreRef(restored.refData), storageState: 'active' });
     expect(native.resumeConversation).toHaveBeenCalledWith(expect.objectContaining({ id: 'chat' }), {
-      ref: { provider: 'codex', threadId: 'created-chat' }, storageState: 'active',
+      ref: { provider: 'codex', conversationId: 'created-chat' }, storageState: 'active',
     });
   } finally { await driver.close(); }
 });

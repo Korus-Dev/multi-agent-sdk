@@ -1,5 +1,7 @@
 import type { ExecutionSelectionOverrides } from './execution';
 import type { PromptPart } from './prompt';
+import { isHarnessProvider } from './shared';
+import { defaultHarnessCapabilities } from '../capabilities';
 
 export type ThreadGoalStatus = 'active' | 'paused' | 'blocked' | 'usageLimited' | 'budgetLimited' | 'complete';
 
@@ -47,19 +49,12 @@ export type AgentContextUsage = {
   usedPercent: number | null;
 };
 
+/** A conversation an app can list, read or resume. `conversationId` names it on every harness. */
 export type ProviderConversationRef =
-  | { provider: 'cursor'; folder: string | null; sessionId: string }
-  | { provider: 'antigravity'; folder: string | null; sessionId: string }
-  | {
-    provider: 'codex';
-    threadId: string;
-  }
-  | {
-    provider: 'claude';
-    folder: string | null;
-    sessionId: string;
-    subagentId?: string;
-  };
+  | { provider: 'cursor'; folder: string | null; conversationId: string }
+  | { provider: 'antigravity'; folder: string | null; conversationId: string }
+  | { provider: 'codex'; conversationId: string }
+  | { provider: 'claude'; folder: string | null; conversationId: string; subagentId?: string };
 
 const nonEmptyString = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
 
@@ -67,10 +62,10 @@ const nonEmptyString = (value: unknown): value is string => typeof value === 'st
 export function isProviderConversationRef(value: unknown): value is ProviderConversationRef {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
   const ref = value as Record<string, unknown>;
-  if (ref.provider === 'codex') return nonEmptyString(ref.threadId);
-  if (ref.provider !== 'claude' && ref.provider !== 'cursor' && ref.provider !== 'antigravity') return false;
-  if (!nonEmptyString(ref.sessionId) || !(ref.folder === null || nonEmptyString(ref.folder))) return false;
-  return ref.provider !== 'claude' || ref.subagentId === undefined || nonEmptyString(ref.subagentId);
+  if (!isHarnessProvider(ref.provider) || !nonEmptyString(ref.conversationId)) return false;
+  const capabilities = defaultHarnessCapabilities(ref.provider);
+  if (capabilities.folderScopedConversations && !(ref.folder === null || nonEmptyString(ref.folder))) return false;
+  return ref.subagentId === undefined || (capabilities.subagentTranscripts === 'inline' && nonEmptyString(ref.subagentId));
 }
 
 /** What a provider's own review feature looks at. */

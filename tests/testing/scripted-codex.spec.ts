@@ -3,7 +3,7 @@ import { createScriptedCodexHarness, scriptedCodexSnapshot } from '../../src/tes
 
 it('derives session state from scripted engine events through the SDK adapter', async () => {
   const { harness, conversation } = createScriptedCodexHarness();
-  const session = harness.restoreSession({ id: 'agent', folder: '/repo' }, { provider: 'codex', data: { kind: 'codex', threadId: 'thread-1' }, role: 'main' });
+  const session = harness.restoreSession({ id: 'agent', folder: '/repo' }, { provider: 'codex', data: { kind: 'codex', conversationId: 'thread-1' }, role: 'main' });
   const seen: string[] = [];
   harness.onEvent(event => { if ('session' in event && event.session === session) seen.push(event.type); });
   await harness.loadConversation(session);

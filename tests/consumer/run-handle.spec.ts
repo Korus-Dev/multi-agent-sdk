@@ -95,7 +95,7 @@ describe('run', () => {
     const run = harness.run(session, 'Go');
     const reading = drain(run);
     started('turn-7');
-    admission.resolve({ providerSession: { kind: 'cursor', sessionId: 'session', folder: '/work' } });
+    admission.resolve({ providerSession: { kind: 'cursor', conversationId: 'session', folder: '/work' } });
     await run.admission;
     completed('turn-7');
     expect(turnEvents(await reading)).toEqual([['turn.started', 'turn-7'], ['turn.completed', 'turn-7']]);
@@ -158,7 +158,7 @@ describe('run', () => {
     const { harness, script, session, started, completed } = cursor();
     started('turn-a');
     // Both prompts wait behind the running turn, so neither admission names a turn.
-    script.on('sendPrompt', async () => ({ providerSession: { kind: 'cursor', sessionId: 'session', folder: '/work' } }));
+    script.on('sendPrompt', async () => ({ providerSession: { kind: 'cursor', conversationId: 'session', folder: '/work' } }));
     const second = harness.run(session, 'B'), third = harness.run(session, 'C');
     await Promise.all([second.admission, third.admission]);
     completed('turn-a'); started('turn-b'); completed('turn-b');
@@ -172,7 +172,7 @@ describe('run', () => {
   it('leaves a turn to the prompt that was sent before the run, however that prompt was sent', async () => {
     const { harness, script, session, started, completed } = cursor();
     started('turn-a');
-    script.on('sendPrompt', async () => ({ providerSession: { kind: 'cursor', sessionId: 'session', folder: '/work' } }));
+    script.on('sendPrompt', async () => ({ providerSession: { kind: 'cursor', conversationId: 'session', folder: '/work' } }));
     // B is sent without a run and waits behind the running turn; C's run waits behind B.
     await harness.sendPrompt(session, 'B');
     const third = harness.run(session, 'C');
@@ -194,7 +194,7 @@ describe('run', () => {
     await expect(run.steer('late instruction')).rejects.toThrow('This run has ended.');
     await expect(run.interrupt()).rejects.toThrow('This run has ended.');
     // A run still waiting for its turn leaves the one in progress alone.
-    script.on('sendPrompt', async () => ({ providerSession: { kind: 'cursor', sessionId: 'session', folder: '/work' } }));
+    script.on('sendPrompt', async () => ({ providerSession: { kind: 'cursor', conversationId: 'session', folder: '/work' } }));
     const waiting = harness.run(session, 'Next');
     await waiting.admission;
     await expect(waiting.steer('not mine')).rejects.toThrow('This run\'s turn has not started.');

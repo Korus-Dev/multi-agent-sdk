@@ -13,9 +13,9 @@ function fixture(provider: 'cursor' | 'antigravity' | 'codex' | 'claude' = 'curs
   const native = {
     onEvent: (listener: typeof deliver) => { deliver = listener; return () => {}; },
     getCapabilities: () => ({ permissionModes: [{ id: 'selected' }], approvalPresets: [] }),
-    executeScopedPrompt: vi.fn(async (context: ProviderContext) => { log.push(`execute:${context.id}`); return { text: 'Done', session: provider === 'codex' ? { kind: 'codex' as const, threadId: context.id } : provider === 'claude' ? { kind: 'claude' as const, sessionId: context.id, transport: 'stdio' as const } : { kind: 'cursor' as const, sessionId: context.id } }; }),
-    sendPrompt: vi.fn(async (context: ProviderContext) => ({ providerSession: { kind: 'cursor' as const, sessionId: context.id } })),
-    interrupt: vi.fn(async (context: ProviderContext) => ({ providerSession: { kind: 'cursor' as const, sessionId: context.id } })),
+    executeScopedPrompt: vi.fn(async (context: ProviderContext) => { log.push(`execute:${context.id}`); return { text: 'Done', session: provider === 'codex' ? { kind: 'codex' as const, conversationId: context.id } : provider === 'claude' ? { kind: 'claude' as const, conversationId: context.id, transport: 'stdio' as const } : { kind: 'cursor' as const, conversationId: context.id } }; }),
+    sendPrompt: vi.fn(async (context: ProviderContext) => ({ providerSession: { kind: 'cursor' as const, conversationId: context.id } })),
+    interrupt: vi.fn(async (context: ProviderContext) => ({ providerSession: { kind: 'cursor' as const, conversationId: context.id } })),
     loadConversation: vi.fn(async (context: ProviderContext) => context.providerSession ?? null),
     readConversationContent: vi.fn(async () => ({ text: '', nextOffset: null })),
     disposeScopedSession: vi.fn(async (context: ProviderContext) => { log.push(`dispose:${context.id}`); }),
@@ -110,7 +110,7 @@ it('serializes scoped continuation and disposal before native admission or clean
   await expect(driver.executeScopedPrompt(main, { ...input, session: scope.session })).rejects.toThrow(/busy/i);
   await expect(driver.disposeScopedSession(scope.session)).rejects.toThrow(/busy/i);
   await expect(driver.release(main)).rejects.toThrow(/child scopes/i);
-  finish({ text: 'Done again', session: { kind: 'cursor', sessionId: 'same' } }); await continuation;
+  finish({ text: 'Done again', session: { kind: 'cursor', conversationId: 'same' } }); await continuation;
   let finishDisposal!: () => void;
   native.disposeScopedSession.mockImplementationOnce(() => new Promise(resolve => { finishDisposal = resolve; }));
   const disposal = driver.disposeScopedSession(scope.session);

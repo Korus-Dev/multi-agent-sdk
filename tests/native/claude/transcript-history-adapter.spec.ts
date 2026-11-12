@@ -177,7 +177,7 @@ describe('loadClaudeTranscriptHistory', () => {
         { type: 'user', uuid: 'assignment', message: { content: 'Task directions' } },
         { type: 'assistant', uuid: 'answer', message: { content: 'Inherited design decision' } },
       ].map(row => JSON.stringify(row)).join('\n'));
-      const worker: Agent = { id: 'worker', name: 'Worker', folder: '/worker/worktree', provider: 'claude', providerSession: { kind: 'claude', sessionId: 'native-child', transport: 'stdio', transcriptFolder } };
+      const worker: Agent = { id: 'worker', name: 'Worker', folder: '/worker/worktree', provider: 'claude', providerSession: { kind: 'claude', conversationId: 'native-child', transport: 'stdio', transcriptFolder } };
       const history = await loadClaudeTranscriptHistory(worker, { projectsRoot });
       expect(history?.messages).toContainEqual(expect.objectContaining({ agentId: 'worker', role: 'assistant', parts: [{ type: 'text', text: 'Inherited design decision' }] }));
       expect(history?.providerSession).toMatchObject({ transcriptFolder });
@@ -208,7 +208,7 @@ describe('loadClaudeTranscriptHistory', () => {
       name: 'Claude',
       folder,
       provider: 'claude',
-      providerSession: { kind: 'claude', sessionId: 'session-1', transport: 'stdio' },
+      providerSession: { kind: 'claude', conversationId: 'session-1', transport: 'stdio' },
     };
 
     const history = await loadClaudeTranscriptHistory(agent, { projectsRoot });
@@ -221,10 +221,9 @@ describe('loadClaudeTranscriptHistory', () => {
         id: 'claude-prompt-1', status: 'completed', error: null, willRetry: false,
         startedAt: null, completedAt: null, durationMs: null,
       }],
-      providerSession: {
-        kind: 'claude',
-        sessionId: 'session-1',
-        transcriptSessionId: 'session-1',
+      providerSession: { kind: 'claude',
+        conversationId: 'session-1',
+        transcriptConversationId: 'session-1',
         transport: 'stdio',
         model: 'claude-sonnet-5',
         reasoningEffort: 'high',
@@ -241,7 +240,7 @@ describe('loadClaudeTranscriptHistory', () => {
       ],
     });
     await expect(listClaudeTranscriptSummaries(agent, { projectsRoot })).resolves.toEqual([
-      expect.objectContaining({ ref: { provider: 'claude', folder, sessionId: 'session-1' } }),
+      expect.objectContaining({ ref: { provider: 'claude', folder, conversationId: 'session-1' } }),
     ]);
   });
 });
@@ -295,7 +294,7 @@ describe('listClaudeTranscriptSummaries', () => {
         updatedAt: '2026-06-09T11:00:00.000Z',
         messageCount: 1,
         storageState: 'active',
-        ref: { provider: 'claude', folder: '/Users/nbonamy/src/id8', sessionId: 'session-new' },
+        ref: { provider: 'claude', folder: '/Users/nbonamy/src/id8', conversationId: 'session-new' },
       },
       {
         id: 'session-old',
@@ -303,7 +302,7 @@ describe('listClaudeTranscriptSummaries', () => {
         updatedAt: '2026-06-09T10:00:00.000Z',
         messageCount: 2,
         storageState: 'active',
-        ref: { provider: 'claude', folder: '/Users/nbonamy/src/id8', sessionId: 'session-old' },
+        ref: { provider: 'claude', folder: '/Users/nbonamy/src/id8', conversationId: 'session-old' },
       },
     ]);
   });

@@ -144,7 +144,7 @@ export class CursorHost<Context extends ProviderContext = ProviderContext> imple
       const instructions = scope?.developerInstructions ?? this.options.instructions?.(agent) ?? '';
       const dispatched = this.options.formatPrompt?.(prompt, content) ?? (content === undefined ? prompt : promptContentDispatchText(content, prompt));
       const wire = instructions ? `${dispatched}\n\n<context id="${randomUUID()}">\n${instructions}\n</context>` : dispatched;
-      if (agent.providerSession?.kind !== this.provider || agent.providerSession.sessionId !== session.sessionId) {
+      if (agent.providerSession?.kind !== this.provider || agent.providerSession.conversationId !== session.sessionId) {
         this.emit({ type: 'agent.conversationAttached', provider: this.provider, agentId: agent.id,
           conversationId: session.sessionId, providerSessionId: session.sessionId, payload: { cwd: session.cwd } });
       }
@@ -189,7 +189,7 @@ export class CursorHost<Context extends ProviderContext = ProviderContext> imple
   async disposeScopedSession(agent: Context, scopedSession: ProviderSessionData): Promise<void> {
     if (scopedSession.kind !== this.provider) throw new Error('Cursor cannot dispose another provider execution.');
     const session = this.sessions.get(agent.id);
-    if (session && session.sessionId !== scopedSession.sessionId) throw new Error('Cursor execution session changed.');
+    if (session && session.sessionId !== scopedSession.conversationId) throw new Error('Cursor execution session changed.');
     await this.releaseConversation(agent.id);
   }
   async steerPrompt(agent: Context, prompt: string, options?: SendPromptOptions) {
@@ -197,7 +197,7 @@ export class CursorHost<Context extends ProviderContext = ProviderContext> imple
     if (!this.getCapabilities().steerPrompt) throw new Error('Cursor prompt steering fallback is disabled.');
     if (this.steering.has(agent.id)) throw new Error('Finish the current Cursor steering operation first.');
     const session = this.sessions.get(agent.id);
-    if (agent.provider !== this.provider || agent.providerSession?.kind !== this.provider || !session || session.isClosed || session.sessionId !== agent.providerSession.sessionId) throw new Error('Cursor steering requires the saved running session.');
+    if (agent.provider !== this.provider || agent.providerSession?.kind !== this.provider || !session || session.isClosed || session.sessionId !== agent.providerSession.conversationId) throw new Error('Cursor steering requires the saved running session.');
     if (path.resolve(this.workingDirectory(agent)) !== path.resolve(session.cwd)) throw new Error('Cursor steering workspace mismatch.');
     const turnId = session.snapshot.activeTurnId;
     if (!turnId) throw new Error('Cursor steering requires a running turn.');
@@ -206,7 +206,7 @@ export class CursorHost<Context extends ProviderContext = ProviderContext> imple
     const assertIdentity = () => {
       if (!this.getCapabilities().steerPrompt) throw new Error('Cursor prompt steering fallback is disabled.');
       if (this.closed || session.isClosed || this.sessions.get(agentId) !== session || generation !== (this.generations.get(agentId) ?? 0) || identity !== this.observedIdentity) throw new Error('Cursor steering session was released or its identity changed.');
-      if (agent.id !== agentId || agent.provider !== this.provider || agent.providerSession?.kind !== this.provider || agent.providerSession.sessionId !== session.sessionId || agent.folder !== folder || path.resolve(this.workingDirectory(agent)) !== path.resolve(session.cwd)) throw new Error('Cursor steering conversation identity or workspace changed.');
+      if (agent.id !== agentId || agent.provider !== this.provider || agent.providerSession?.kind !== this.provider || agent.providerSession.conversationId !== session.sessionId || agent.folder !== folder || path.resolve(this.workingDirectory(agent)) !== path.resolve(session.cwd)) throw new Error('Cursor steering conversation identity or workspace changed.');
       if (!sameScope(this.executionScopes.get(agentId), scope)) throw new Error('Cursor steering scope changed.');
       if (session.snapshot.activeTurnId || session.snapshot.turns.at(-1)?.id !== turnId) throw new Error('Cursor turn changed during steering.');
     };
@@ -241,11 +241,11 @@ export class CursorHost<Context extends ProviderContext = ProviderContext> imple
     if (ref.provider !== this.provider || this.closed) throw new Error('Invalid Cursor conversation reference.');
     const current = this.sessions.get(agentId);
     const cwd = ref.folder ?? path.join((this.options.stateDirectory?.() ?? defaultRuntimeDirectory()), 'cursor-quick-chats', encodeURIComponent(agentId));
-    if (current?.sessionId === ref.sessionId) {
+    if (current?.sessionId === ref.conversationId) {
       if (await realpath(cwd) !== await realpath(current.cwd)) throw new Error('Cursor conversation belongs to another workspace.');
       return structuredClone(current.snapshot.messages);
     }
-    const sessionId = ref.sessionId, abort = new AbortController(), id = randomUUID();
+    const sessionId = ref.conversationId, abort = new AbortController(), id = randomUUID();
     const done = (async () => {
       const auth = await this.authenticate({action:'check'});
       if (!auth.connected) throw new Error('Cursor is disconnected.');
@@ -269,7 +269,7 @@ export class CursorHost<Context extends ProviderContext = ProviderContext> imple
       const result: ConversationSummary[] = [];
       for (const entry of entries) {
         if (await realpath(entry.cwd).catch(() => null) !== workspace || (query && !`${entry.title} ${entry.sessionId}`.toLocaleLowerCase().includes(query))) continue;
-        result.push({ id: entry.sessionId, sessionId: entry.sessionId, title: entry.title, updatedAt: '', messageCount: 0, storageState: 'active', ref: { provider: this.provider, folder: agent.folder, sessionId: entry.sessionId } });
+        result.push({ id: entry.sessionId, sessionId: entry.sessionId, title: entry.title, updatedAt: '', messageCount: 0, storageState: 'active', ref: { provider: this.provider, folder: agent.folder, conversationId: entry.sessionId } });
       }
       return result.slice(0, Math.max(0, input?.limit ?? 100));
     })().finally(() => this.catalogs.delete(id));
@@ -278,7 +278,7 @@ export class CursorHost<Context extends ProviderContext = ProviderContext> imple
   async resumeConversation(agent: Context, target: ConversationResumeTarget) {
     if (agent.provider !== this.provider || target.ref.provider !== this.provider || target.ref.folder !== agent.folder || target.storageState !== 'active') throw new Error('Invalid Cursor history workspace or target.');
     if (this.closed || this.queues.has(agent.id) || this.opening.has(agent.id) || this.resuming.has(agent.id)) throw new Error('Finish the current Cursor operation first.');
-    const sessionId = target.ref.sessionId;
+    const sessionId = target.ref.conversationId;
     this.resuming.add(agent.id);
     const abort = new AbortController(), generation = this.generations.get(agent.id) ?? 0;
     const done = (async () => {
@@ -305,7 +305,7 @@ export class CursorHost<Context extends ProviderContext = ProviderContext> imple
     const permission = this.permissionMode({ ...agent, providerDefaults: defaults });
     await this.opening.get(agent.id)?.done;
     const session = this.sessions.get(agent.id);
-    if (session && agent.providerSession?.kind === this.provider && agent.providerSession.sessionId !== session.sessionId) throw new Error('Cursor conversation identity mismatch.');
+    if (session && agent.providerSession?.kind === this.provider && agent.providerSession.conversationId !== session.sessionId) throw new Error('Cursor conversation identity mismatch.');
     if (session && agent.folder && path.resolve(agent.folder) !== path.resolve(session.cwd)) throw new Error('Cursor conversation belongs to another workspace.');
     if (session && !session.isClosed) session.setPermissionMode(permission);
     this.emit({ type: 'conversation.settingsUpdated', provider: this.provider, agentId: agent.id, payload: { settings: { permission } } });
@@ -321,7 +321,7 @@ export class CursorHost<Context extends ProviderContext = ProviderContext> imple
   async loadConversation(agent: Context): Promise<ProviderSessionData | null> {
     const current = this.sessions.get(agent.id);
     if (!current) { if (!agent.providerSession) return null; const loaded = await this.ensure(agent); return this.reference(loaded); }
-    if (agent.providerSession && (agent.providerSession.kind !== this.provider || agent.providerSession.sessionId !== current.sessionId)) throw new Error('Cursor conversation identity mismatch.');
+    if (agent.providerSession && (agent.providerSession.kind !== this.provider || agent.providerSession.conversationId !== current.sessionId)) throw new Error('Cursor conversation identity mismatch.');
     this.publishSnapshot(agent.id, current);
     return this.reference(current);
   }
@@ -366,7 +366,7 @@ export class CursorHost<Context extends ProviderContext = ProviderContext> imple
         if (!this.authenticated) throw new Error('Cursor is disconnected. Sign in in Settings.');
         if (this.sessionIdentities.get(agent.id) !== this.observedIdentity) throw new Error('Cursor account identity changed. Explicitly select a conversation from history.');
       }
-      if (agent.providerSession && (agent.providerSession.kind !== this.provider || agent.providerSession.sessionId !== current.sessionId)) throw new Error('Cursor conversation identity mismatch.');
+      if (agent.providerSession && (agent.providerSession.kind !== this.provider || agent.providerSession.conversationId !== current.sessionId)) throw new Error('Cursor conversation identity mismatch.');
       if (agent.folder && path.resolve(agent.folder) !== path.resolve(current.cwd)) throw new Error('Cursor conversation belongs to another workspace.');
       if (!current.isClosed && sameScope(this.executionScopes.get(agent.id), scope)) return current;
     }
@@ -383,7 +383,7 @@ export class CursorHost<Context extends ProviderContext = ProviderContext> imple
       if (!auth.connected) throw new Error(auth.state.error ?? 'Cursor is disconnected. Sign in in Settings.');
       const cwd = this.workingDirectory(agent);
       if (!agent.folder) await mkdir(cwd, { recursive: true, mode: 0o700 });
-      const session = await CursorSession.open({ ...this.options.sessionOptions, agentId: agent.id, cwd, permissionMode: this.permissionMode(agent), runtime: this.runtime, mcpServers: this.mcpServers(agent, scope), appMcpServerName: this.options.trustedMcpServerName, sessionId: agent.providerSession?.kind === this.provider ? agent.providerSession.sessionId : undefined, signal: abort.signal,
+      const session = await CursorSession.open({ ...this.options.sessionOptions, agentId: agent.id, cwd, permissionMode: this.permissionMode(agent), runtime: this.runtime, mcpServers: this.mcpServers(agent, scope), appMcpServerName: this.options.trustedMcpServerName, sessionId: agent.providerSession?.kind === this.provider ? agent.providerSession.conversationId : undefined, signal: abort.signal,
         changed: event => this.conversationEvent(event), usage: sample => this.observeTokens(agent.id, sample), disconnected: error => this.disconnected(error),
       });
       if (this.closed || abort.signal.aborted || generation !== (this.generations.get(agent.id) ?? 0)) { await session.close(); throw new Error('Cursor session was released during startup.'); }
@@ -455,7 +455,7 @@ export class CursorHost<Context extends ProviderContext = ProviderContext> imple
   private publishRuntime(): void {
     this.emit({ provider: this.provider, type: 'provider.statusChanged', payload: this.getRuntimeStatus() });
   }
-  private reference(session: CursorSession): ProviderSessionData { return { kind: this.provider, sessionId: session.sessionId }; }
+  private reference(session: CursorSession): ProviderSessionData { return { kind: this.provider, conversationId: session.sessionId }; }
   private nextRevision(agentId: string) { const revision = (this.revisions.get(agentId) ?? 0) + 1; this.revisions.set(agentId, revision); return revision; }
   private emit(event: ProviderEvent) { for (const listener of this.listeners) { try { listener(event); } catch { /* Observer isolation. */ } } }
 }

@@ -8,14 +8,14 @@ describe('provider guards', () => {
   });
 
   it('accepts a well-formed conversation reference for every provider', () => {
-    expect(isProviderConversationRef({ provider: 'codex', threadId: 't' })).toBe(true);
-    expect(isProviderConversationRef({ provider: 'claude', folder: null, sessionId: 's', subagentId: 'a' })).toBe(true);
-    expect(isProviderConversationRef({ provider: 'cursor', folder: '/work', sessionId: 's' })).toBe(true);
-    expect(isProviderConversationRef({ provider: 'antigravity', folder: null, sessionId: 's' })).toBe(true);
+    expect(isProviderConversationRef({ provider: 'codex', conversationId: 't' })).toBe(true);
+    expect(isProviderConversationRef({ provider: 'claude', folder: null, conversationId: 's', subagentId: 'a' })).toBe(true);
+    expect(isProviderConversationRef({ provider: 'cursor', folder: '/work', conversationId: 's' })).toBe(true);
+    expect(isProviderConversationRef({ provider: 'antigravity', folder: null, conversationId: 's' })).toBe(true);
   });
 
   it('rejects malformed references', () => {
-    for (const value of [null, [], 'codex', { provider: 'codex' }, { provider: 'codex', threadId: ' ' }, { provider: 'claude', sessionId: 's' }, { provider: 'cursor', folder: 1, sessionId: 's' }, { provider: 'cursor', folder: ' ', sessionId: 's' }, { provider: 'claude', folder: null, sessionId: 's', subagentId: 1 }, { provider: 'claude', folder: null, sessionId: 's', subagentId: ' ' }, { provider: 'other', threadId: 't' }]) {
+    for (const value of [null, [], 'codex', { provider: 'codex' }, { provider: 'codex', conversationId: ' ' }, { provider: 'claude', conversationId: 's' }, { provider: 'cursor', folder: 1, conversationId: 's' }, { provider: 'cursor', folder: ' ', conversationId: 's' }, { provider: 'claude', folder: null, conversationId: 's', subagentId: 1 }, { provider: 'claude', folder: null, conversationId: 's', subagentId: ' ' }, { provider: 'other', threadId: 't' }]) {
       expect(isProviderConversationRef(value)).toBe(false);
     }
   });

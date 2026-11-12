@@ -282,7 +282,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
       }
       input.signal?.throwIfAborted();
       const sessionId = started.providerSession.kind === 'claude'
-        ? started.providerSession.sessionId
+        ? started.providerSession.conversationId
         : null;
       if (!sessionId) throw new Error('Claude did not create a scope conversation.');
       const snapshot = this.conversationReplicasByAgentId.get(agent.id)?.getSnapshot();
@@ -293,7 +293,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
         .trim() ?? '';
       return {
         text,
-        session: { kind: 'claude', sessionId, transport: 'stdio' },
+        session: { kind: 'claude', conversationId: sessionId, transport: 'stdio' },
       };
     } finally {
       unsubscribe();
@@ -303,9 +303,9 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
   async disposeScopedSession(agent: Context, scopedSession: ProviderSessionData): Promise<void> {
     if (scopedSession.kind !== 'claude') throw new Error('Claude cannot dispose a non-Claude scope conversation.');
     if (this.transport.deleteSession) {
-      await this.transport.deleteSession(scopedSession.sessionId, scopedSession.transcriptFolder ?? claudeWorkingDirectory(agent));
+      await this.transport.deleteSession(scopedSession.conversationId, scopedSession.transcriptFolder ?? claudeWorkingDirectory(agent));
     } else {
-      await this.transport.closeSession?.(scopedSession.sessionId);
+      await this.transport.closeSession?.(scopedSession.conversationId);
     }
   }
 
@@ -336,7 +336,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
     const now = Date.now() / 1000;
     const started = await this.sendPrompt(agent, `/goal ${condition}`, { recordUserMessage: false });
     if (started.providerSession.kind !== 'claude') throw new Error('Claude did not return a session.');
-    const goal: ThreadGoal = { threadId: started.providerSession.sessionId, objective: condition, status: 'active', tokenBudget: null, tokensUsed: 0, timeUsedSeconds: 0, createdAt: now, updatedAt: now };
+    const goal: ThreadGoal = { threadId: started.providerSession.conversationId, objective: condition, status: 'active', tokenBudget: null, tokensUsed: 0, timeUsedSeconds: 0, createdAt: now, updatedAt: now };
     this.goalsByAgentId.set(agent.id, goal);
     return { providerSession: started.providerSession, ...(started.turnId ? { turnId: started.turnId } : {}), goal };
   }
@@ -477,7 +477,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
         compactionCompleted: false,
         resolveStart: result => {
           if (messageId && options.content && result.providerSession.kind === 'claude') {
-            const sessionId = result.providerSession.sessionId;
+            const sessionId = result.providerSession.conversationId;
             const pending = this.promptContentWrites.get(sessionId) ?? new Set<Promise<void>>();
             this.promptContentWrites.set(sessionId, pending);
             const write = savePromptContent(this.promptContentHome(), sessionId, messageId, options.content)
@@ -655,7 +655,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
 
     this.resetConversationReplica(
       agent,
-      history.providerSession.kind === 'claude' ? history.providerSession.sessionId : null,
+      history.providerSession.kind === 'claude' ? history.providerSession.conversationId : null,
       history.messages,
       history.taskPlan,
       history.turns,
@@ -779,13 +779,13 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
     if (ref.provider !== 'claude') {
       throw new Error('Claude cannot resume non-Claude conversation history.');
     }
-    const currentTranscriptFolder = agent.providerSession?.kind === 'claude' && agent.providerSession.sessionId === ref.sessionId ? agent.providerSession.transcriptFolder : undefined;
+    const currentTranscriptFolder = agent.providerSession?.kind === 'claude' && agent.providerSession.conversationId === ref.conversationId ? agent.providerSession.transcriptFolder : undefined;
     if (ref.folder !== agent.folder && ref.folder !== currentTranscriptFolder) {
       throw new Error('Claude conversation folder does not match the agent folder.');
     }
 
-    const providerSession = claudeProviderSession(ref.sessionId, undefined, undefined, currentTranscriptFolder);
-    const load = { token: Symbol(), sessionId: ref.sessionId };
+    const providerSession = claudeProviderSession(ref.conversationId, undefined, undefined, currentTranscriptFolder);
+    const load = { token: Symbol(), sessionId: ref.conversationId };
     this.historyLoads.set(agent.id, load);
     const revision = this.conversationRevisionsByAgentId.get(agent.id);
     const history = await this.loadHistory({
@@ -798,7 +798,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
     const resolvedProviderSession = history?.providerSession ?? providerSession;
     this.resetConversationReplica(
       agent,
-      resolvedProviderSession.kind === 'claude' ? resolvedProviderSession.sessionId : ref.sessionId,
+      resolvedProviderSession.kind === 'claude' ? resolvedProviderSession.conversationId : ref.conversationId,
       history?.messages ?? [],
       history?.taskPlan,
       history?.turns,
@@ -889,12 +889,12 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
     }
 
     const current = this.conversationReplicasByAgentId.get(agentId)?.getSnapshot();
-    if (ref.subagentId === undefined && current?.sessionId === ref.sessionId) return this.historyWindows.get(agentId)?.readMessages(current.messages) ?? structuredClone(current.messages);
+    if (ref.subagentId === undefined && current?.sessionId === ref.conversationId) return this.historyWindows.get(agentId)?.readMessages(current.messages) ?? structuredClone(current.messages);
 
     const historyAgent = this.driverOptions.contextForConversation?.(ref, agentId);
     const context: Agent = historyAgent ?? {
       id: agentId, name: agentId, folder: ref.folder, provider: 'claude',
-      providerSession: { kind: 'claude', sessionId: ref.sessionId, transport: 'stdio' },
+      providerSession: { kind: 'claude', conversationId: ref.conversationId, transport: 'stdio' },
     };
     const history = ref.subagentId === undefined && historyAgent ? await this.loadHistory(historyAgent)
       : await loadClaudeTranscriptHistory(context, { projectsRoot: this.claudeProjectsRoot(), subagentId: ref.subagentId, toolOptions: this.driverOptions.toolOptions });
@@ -915,11 +915,11 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
         projectsRoot: this.claudeProjectsRoot(), recent,
       }) : await this.historyLoader(agent, { recent });
     if (history?.providerSession.kind === 'claude') {
-      await this.flushPromptContent(history.providerSession.sessionId);
-      await restorePromptContent(this.promptContentHome(), history.providerSession.sessionId, history.messages);
+      await this.flushPromptContent(history.providerSession.conversationId);
+      await restorePromptContent(this.promptContentHome(), history.providerSession.conversationId, history.messages);
       const source = history.source;
       if (source) {
-        const home = this.promptContentHome(); const sessionId = history.providerSession.sessionId;
+        const home = this.promptContentHome(); const sessionId = history.providerSession.conversationId;
         const restore = async (messages: Message[]) => { await restorePromptContent(home, sessionId, messages); return messages; };
         const restoredSource = (original: import('./history-source').ClaudeHistorySource): import('./history-source').ClaudeHistorySource => ({
           ...original, readTurn: async id => restore(await original.readTurn(id)), readAll: async () => restore(await original.readAll()),
@@ -1181,7 +1181,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
 
   private queueHydratedContextUsageRefresh(agent: Context, providerSession: Extract<ProviderSessionData, { kind: 'claude' }>): void {
     if (!this.transport.readContextUsage) return;
-    const sessionId = providerSession.sessionId;
+    const sessionId = providerSession.conversationId;
     this.contextUsageSessionIdsByAgentId.set(agent.id, sessionId);
     const previous = this.contextUsageRefreshesByAgentId.get(agent.id) ?? Promise.resolve();
     const refresh = previous
@@ -2029,7 +2029,7 @@ function claudeEffort(value: string | null | undefined): ClaudeTurnParams['effor
 }
 
 function claudeSessionId(agent: Agent): string | null {
-  return agent.providerSession?.kind === 'claude' ? agent.providerSession.sessionId : null;
+  return agent.providerSession?.kind === 'claude' ? agent.providerSession.conversationId : null;
 }
 
 function claudeProviderSession(
@@ -2040,7 +2040,7 @@ function claudeProviderSession(
 ): ProviderSessionData {
   return {
     kind: 'claude',
-    sessionId,
+    conversationId: sessionId,
     transport: 'stdio',
     ...(transcriptFolder ? { transcriptFolder } : {}),
     ...(model ? { model } : {}),

@@ -81,8 +81,6 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
 
   // ---- Provider hooks -------------------------------------------------------------------------------------------
 
-  /** The native conversation id carried by persisted session or reference data. */
-  protected abstract identityOf(data: Record<string, unknown>): unknown;
   /** The reference that names a session's conversation. */
   protected abstract conversationRef(data: ProviderSessionData, context: ProviderContext): ProviderConversationRef;
   /** Native defaults that select a permission option. */
@@ -185,7 +183,7 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
   private validate(value: { provider: string; data: object }, type: 'session' | 'ref'): Record<string, unknown> {
     if (!value || typeof value !== 'object' || value.provider !== this.provider || !value.data || typeof value.data !== 'object') throw new Error('Invalid persisted harness handle.');
     const data = value.data as Record<string, unknown>;
-    const identity = this.identityOf(data);
+    const identity = data.conversationId;
     if (typeof identity !== 'string' || !identity || (type === 'session' ? data.kind : data.provider) !== this.provider) throw new Error('Invalid persisted harness identity.');
     if (type === 'session') this.validateSessionData(data); else this.validateRefData(data);
     return data;
@@ -395,7 +393,7 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
   readConversationContent(session: Session, input: Parameters<Harness['readConversationContent']>[1]) {
     const context = this.interactive(session).context; const data = context.providerSession;
     if (!data) throw new Error('Session has not been admitted.');
-    const sessionId = this.identityOf(data) as string;
+    const sessionId = data.conversationId;
     return this.native.readConversationContent?.(context, { ...input, sessionId }) ?? unavailable('Conversation content');
   }
   getSessionData(session: Session) {

@@ -74,14 +74,14 @@ it('Codex exposes restored native execution selection without consumer persisten
 
 it('Claude publishes model settings recovered from provider history and later native settings events', async () => {
   let deliver!: (event: NativeEvent) => void;
-  const saved = { kind: 'claude' as const, sessionId: 'native', transport: 'stdio' as const, model: 'claude-opus', reasoningEffort: 'high' };
+  const saved = { kind: 'claude' as const, conversationId: 'native', transport: 'stdio' as const, model: 'claude-opus', reasoningEffort: 'high' };
   const native = { onEvent: (listener: typeof deliver) => { deliver = listener; return () => {}; }, close: vi.fn(),
     resumeConversation: async () => ({ providerSession: saved }), loadConversation: async () => ({ ...saved, reasoningEffort: undefined }),
     sendPrompt: async () => ({ providerSession: saved }),
   } as unknown as NativeDriver<ProviderContext, NativeEvent>;
   const driver = harnessForHost('claude', native);
   const session = driver.open({ id: 'tax', folder: '/ledger' });
-  const ref = driver.restoreRef({ provider: 'claude', data: { provider: 'claude', folder: '/ledger', sessionId: 'native' } });
+  const ref = driver.restoreRef({ provider: 'claude', data: { provider: 'claude', folder: '/ledger', conversationId: 'native' } });
   await driver.resumeConversation(session, { ref, storageState: 'active' });
   expect(driver.readSession(session).selection).toEqual({ model: 'claude-opus', reasoningEffort: 'high' });
   await driver.loadConversation(session);
@@ -100,7 +100,7 @@ it('Claude publishes model settings recovered from provider history and later na
 it.each(['codex', 'claude'] as const)('%s publishes accepted permission changes and keeps the last confirmed mode on failure', async provider => {
   const mode = provider === 'codex' ? 'full-access' : 'dontAsk';
   const update = vi.fn().mockResolvedValue(provider === 'codex'
-    ? { providerSession: { kind: 'codex', threadId: 'native' }, approvalPreset: mode }
+    ? { providerSession: { kind: 'codex', conversationId: 'native' }, approvalPreset: mode }
     : { providerDefaults: { kind: 'claude', permission: mode } });
   const native = { onEvent: () => () => {}, close: vi.fn(),
     getCapabilities: () => provider === 'codex' ? { approvalPresets: [mode] } : { permissionModes: [{ id: mode }] },

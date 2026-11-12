@@ -283,12 +283,12 @@ export class CodexHostController<Context extends Agent = Agent> implements Provi
     if (ref.provider !== 'codex') {
       throw new Error('Codex cannot read non-Codex conversation history.');
     }
-    return this.sessionManager.readConversationMessages(ref.threadId, agentId, options);
+    return this.sessionManager.readConversationMessages(ref.conversationId, agentId, options);
   }
 
   async readConversationSummary(agent: Context, ref: ProviderConversationRef): Promise<ConversationSummary | null> {
     if (ref.provider !== 'codex') return null;
-    return this.sessionManager.readConversationSummary(agent, ref.threadId);
+    return this.sessionManager.readConversationSummary(agent, ref.conversationId);
   }
 
   async listConversations(agent: Context, input?: ConversationListInput): Promise<ConversationSummary[]> {
@@ -355,7 +355,7 @@ function cleanedPromptOptions(options: SendPromptOptions): SendPromptOptions | u
 function codexProviderSession(threadId: string): Extract<ProviderSessionData, { kind: 'codex' }> {
   return {
     kind: 'codex',
-    threadId,
+    conversationId: threadId,
   };
 }
 

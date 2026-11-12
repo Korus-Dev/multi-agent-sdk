@@ -20,7 +20,7 @@ export class CursorHarness extends SessionHarness<'cursor'> {
   static readonly provider = 'cursor';
   static readonly capabilities = cursorHarnessCapabilities;
   /** A fresh session record for a conversation id. */
-  static sessionData(id: string, folder: string | null): ProviderSessionData { return { kind: 'cursor', sessionId: id, folder } as ProviderSessionData; }
+  static sessionData(id: string, folder: string | null): ProviderSessionData { return { kind: 'cursor', conversationId: id, folder } as ProviderSessionData; }
 
   constructor(native: ProviderDriver<ProviderContext, ProviderEvent>, rules?: WorkPhaseRules) { super('cursor', native, rules); }
 

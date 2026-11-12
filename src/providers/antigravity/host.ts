@@ -257,7 +257,7 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
   async disposeScopedSession(agent: Context, scopedSession: ProviderSessionData): Promise<void> {
     if (scopedSession.kind !== this.provider) throw new Error('Antigravity cannot dispose another provider execution.');
     const session = this.sessions.get(agent.id);
-    if (session && session.sessionId !== scopedSession.sessionId) throw new Error('Antigravity execution session changed.');
+    if (session && session.sessionId !== scopedSession.conversationId) throw new Error('Antigravity execution session changed.');
     await this.releaseConversation(agent.id);
   }
 
@@ -285,7 +285,7 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
     let finishResume!: () => void;
     this.resuming.set(agent.id, new Promise<void>(resolve => { finishResume = resolve; }));
     try {
-      const next = await this.open(agent, target.ref.sessionId);
+      const next = await this.open(agent, target.ref.conversationId);
       if (this.closed || generation !== (this.generations.get(agent.id) ?? 0)) { await next.close(); throw new Error('Antigravity session was released during history loading.'); }
       await this.releaseConversation(agent.id);
       this.sessions.set(agent.id, next);
@@ -313,7 +313,7 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
         .slice(0, input?.limit ?? 100)
         .map(entry => ({ id: entry.sessionId, sessionId: entry.sessionId, title: entry.title,
           updatedAt: entry.updatedAt, messageCount: 0, storageState: 'active',
-          ref: { provider: this.provider, folder: agent.folder, sessionId: entry.sessionId } }));
+          ref: { provider: this.provider, folder: agent.folder, conversationId: entry.sessionId } }));
     } catch (error) { if (error instanceof NativeLoginRequired) this.authState(false); throw error; }
     finally { await runtime.close(); }
   }
@@ -321,17 +321,17 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
   async readConversationMessages(ref: ProviderConversationRef, agentId: string) {
     if (ref.provider !== this.provider) throw new Error('Antigravity cannot read another provider conversation.');
     const current = this.sessions.get(agentId);
-    if (current?.sessionId === ref.sessionId) {
+    if (current?.sessionId === ref.conversationId) {
       if (await realpath(current.cwd) !== await realpath(this.workingDirectory({ id: agentId, folder: ref.folder }))) throw new Error('Antigravity conversation belongs to another workspace.');
       return structuredClone(current.snapshot.messages);
     }
-    const session = await this.openSession({ agentId, cwd: this.workingDirectory({ id: agentId, folder: ref.folder }), sessionId: ref.sessionId, mcpServers: [], changed: () => {} });
+    const session = await this.openSession({ agentId, cwd: this.workingDirectory({ id: agentId, folder: ref.folder }), sessionId: ref.conversationId, mcpServers: [], changed: () => {} });
     try { return structuredClone(session.snapshot.messages); } finally { await session.close(); }
   }
 
   async readConversationSummary(agent: Context, ref: ProviderConversationRef): Promise<ConversationSummary | null> {
     if (ref.provider !== this.provider || ref.folder !== agent.folder) return null;
-    return (await this.listConversations(agent)).find(entry => entry.sessionId === ref.sessionId) ?? null;
+    return (await this.listConversations(agent)).find(entry => entry.sessionId === ref.conversationId) ?? null;
   }
 
   async listModels(agent: Context): Promise<ProviderModelOption[]> {
@@ -376,7 +376,7 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
     const pending = this.opening.get(agent.id);
     if (pending) return pending;
     const generation = this.generations.get(agent.id) ?? 0;
-    const sessionId = agent.providerSession?.kind === this.provider ? agent.providerSession.sessionId : current?.sessionId;
+    const sessionId = agent.providerSession?.kind === this.provider ? agent.providerSession.conversationId : current?.sessionId;
     if (scope) this.executionScopes.set(agent.id, scope);
     const work = this.open(agent, sessionId, scope).then(async session => {
       if (this.closed || generation !== (this.generations.get(agent.id) ?? 0)) { await session.close(); throw new Error('Antigravity session was released during startup.'); }
@@ -428,7 +428,7 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
     this.emit({ type: 'antigravity.conversationSnapshotChanged', agentId, provider: this.provider, providerSessionId: session.sessionId, conversationId: session.sessionId,
       payload: { revision: this.nextRevision(agentId), snapshot: session.snapshot } });
   }
-  private reference(session: AcpSession): ProviderSessionData { return { kind: this.provider, sessionId: session.sessionId }; }
+  private reference(session: AcpSession): ProviderSessionData { return { kind: this.provider, conversationId: session.sessionId }; }
   private nextRevision(agentId: string): number { const revision = (this.revisions.get(agentId) ?? 0) + 1; this.revisions.set(agentId, revision); return revision; }
   private authState(connected: boolean): ProviderAuthentication {
     const state: ProviderAuthentication = { kind: this.provider, connected, state: { loggedIn: connected, homePath: (this.options.home?.() ?? antigravityHome(this.options.stateDirectory?.())) } };

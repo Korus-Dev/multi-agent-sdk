@@ -9,5 +9,5 @@ it('turns scripted Claude messages into session state through the SDK host', asy
   emit({ type: 'system', subtype: 'init', session_id: 'claude-1' });
   await sending;
   expect(inputs).toHaveLength(1);
-  expect(harness.getSessionData(session).data).toMatchObject({ kind: 'claude', sessionId: 'claude-1' });
+  expect(harness.getSessionData(session).data).toMatchObject({ kind: 'claude', conversationId: 'claude-1' });
 });

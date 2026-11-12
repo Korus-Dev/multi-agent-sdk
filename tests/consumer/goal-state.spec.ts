@@ -6,8 +6,8 @@ it('publishes authoritative goal mutation results even when the native transport
   const goal = { threadId: 'native', objective: 'Finish checks', status: 'active' as const, tokenBudget: null, tokensUsed: 0,
     timeUsedSeconds: 0, createdAt: 0, updatedAt: 0 };
   const native = { onEvent: () => () => {}, close: vi.fn(),
-    setGoal: async () => ({ providerSession: { kind: 'claude', sessionId: 'native', transport: 'stdio' }, goal }),
-    clearGoal: async () => ({ providerSession: { kind: 'claude', sessionId: 'native', transport: 'stdio' }, cleared: true }),
+    setGoal: async () => ({ providerSession: { kind: 'claude', conversationId: 'native', transport: 'stdio' }, goal }),
+    clearGoal: async () => ({ providerSession: { kind: 'claude', conversationId: 'native', transport: 'stdio' }, cleared: true }),
   } as unknown as NativeDriver<import('../../src/context').ProviderContext, import('../../src/driver').ProviderEvent>;
   const driver = harnessForHost('claude', native);
   const session = driver.open({ id: 'main', folder: '/tmp' });

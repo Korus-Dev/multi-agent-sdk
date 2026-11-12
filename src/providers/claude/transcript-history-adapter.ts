@@ -58,7 +58,7 @@ export async function loadClaudeTranscriptHistory(
     return null;
   }
 
-  const sessionId = agent.providerSession.transcriptSessionId ?? agent.providerSession.sessionId;
+  const sessionId = agent.providerSession.transcriptConversationId ?? agent.providerSession.conversationId;
   if (!isSafeSessionId(sessionId)) {
     return null;
   }
@@ -126,8 +126,8 @@ async function decodeClaudeHistory(agent: Agent, sessionId: string, transcriptPa
   const { model: _model, reasoningEffort: _reasoningEffort, ...session } = agent.providerSession;
   const turnBoundaries: Record<string, string> = {};
   const nativeMessageTurnIds: Record<string, string> = {};
-  const goal = claudeTranscriptGoal(content, agent.providerSession.sessionId);
-  const subagentEvents = claudeSubagentHistoryEvents(content, agent.id, agent.providerSession.sessionId);
+  const goal = claudeTranscriptGoal(content, agent.providerSession.conversationId);
+  const subagentEvents = claudeSubagentHistoryEvents(content, agent.id, agent.providerSession.conversationId);
   const taskPlan = new ClaudeTaskPlan();
   const turns: ClaudeConversationTurn[] = [];
   const ranges = new Map<string, ClaudeTurnRange>();
@@ -137,7 +137,7 @@ async function decodeClaudeHistory(agent: Agent, sessionId: string, transcriptPa
   return {
     providerSession: {
       ...session,
-      transcriptSessionId: sessionId,
+      transcriptConversationId: sessionId,
       ...settings,
     },
     messages,
@@ -270,7 +270,7 @@ export async function listClaudeTranscriptSummaries(
       ref: {
         provider: 'claude',
         folder,
-        sessionId: file.sessionId,
+        conversationId: file.sessionId,
       },
     });
   }

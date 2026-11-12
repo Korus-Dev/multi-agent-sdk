@@ -47,7 +47,7 @@ describe(`Codex SDK → ${product.name} subagent ownership`, () => {
     conversation('conversation-a').emit(spawn);
     emit(completed);
     conversation('child').setSnapshot({ messages: [message('first'), message('second')] });
-    const live = await driver.readConversationMessages({ provider: 'codex', threadId: 'child' }, 'agent-a');
+    const live = await driver.readConversationMessages({ provider: 'codex', conversationId: 'child' }, 'agent-a');
     expect(live.map((item) => item.parts)).toStrictEqual([[{ type: 'text', text: 'first' }], [{ type: 'text', text: 'second' }]]);
     expect(conversation('child').handle.readHistory).not.toHaveBeenCalled();
     conversation('cold').handle.readHistory.mockResolvedValue({ conversationId: 'cold', messages: [message('inherited'), message('final')], threadStatus: { type: 'idle' } });

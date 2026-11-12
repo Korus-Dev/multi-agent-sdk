@@ -3,8 +3,8 @@ import { harnessForHost } from '../../src/internal';
 import type { ProviderContext } from '../../src/context';
 import type { ProviderDriver, ProviderEvent } from '../../src/driver';
 
-const first = { kind: 'cursor' as const, sessionId: 's1', folder: '/work' };
-const second = { kind: 'cursor' as const, sessionId: 's2', folder: '/work' };
+const first = { kind: 'cursor' as const, conversationId: 's1', folder: '/work' };
+const second = { kind: 'cursor' as const, conversationId: 's2', folder: '/work' };
 
 it('lets the host app re-state a session\'s stored identity and folder so the provider can enforce its own checks', async () => {
   const seen: ProviderContext[] = [];
@@ -17,13 +17,13 @@ it('lets the host app re-state a session\'s stored identity and folder so the pr
   harness.syncSession(session, { data: second, folder: '/other', name: 'Renamed' });
   await harness.sendPrompt(session, 'hello');
   expect(seen[0]).toMatchObject({ id: 'main', folder: '/other', name: 'Renamed', providerSession: second });
-  expect(harness.getSessionData(session).data).toMatchObject({ sessionId: 's2' });
+  expect(harness.getSessionData(session).data).toMatchObject({ conversationId: 's2' });
 });
 
 it('rejects stored data that belongs to another provider', () => {
   const harness = harnessForHost('cursor', { onEvent: () => () => {}, getCapabilities: () => ({}), close: async () => {} } as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
   const session = harness.open({ id: 'main', folder: '/work' });
-  expect(() => harness.syncSession(session, { data: { kind: 'codex', threadId: 't' } as never })).toThrow(/invalid persisted/i);
+  expect(() => harness.syncSession(session, { data: { kind: 'codex', conversationId: 't' } as never })).toThrow(/invalid persisted/i);
 });
 
 it('clears the stored identity when asked, so the next prompt starts a new conversation', async () => {
@@ -65,9 +65,9 @@ it('lets a provider operation in flight see what the app re-states meanwhile', a
 });
 
 it.each([
-  ['codex', (id: string) => ({ kind: 'codex' as const, threadId: id })],
-  ['antigravity', (id: string) => ({ kind: 'antigravity' as const, sessionId: id })],
-  ['cursor', (id: string) => ({ kind: 'cursor' as const, sessionId: id, folder: '/work' })],
+  ['codex', (id: string) => ({ kind: 'codex' as const, conversationId: id })],
+  ['antigravity', (id: string) => ({ kind: 'antigravity' as const, conversationId: id })],
+  ['cursor', (id: string) => ({ kind: 'cursor' as const, conversationId: id, folder: '/work' })],
 ] as const)('starts a new %s conversation after the identity is cleared, instead of carrying on in the one it holds', async (provider, stored) => {
   const order: string[] = [];
   const native = { onEvent: () => () => {}, getCapabilities: () => ({}), close: async () => {},

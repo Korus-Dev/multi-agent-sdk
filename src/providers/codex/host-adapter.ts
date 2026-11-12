@@ -275,7 +275,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
   async setConversationStorage(ref: ProviderConversationRef, state: ConversationStorageState): Promise<void> {
     if (ref.provider !== 'codex') throw new Error('Not a Codex conversation reference.');
     await this.host.connect();
-    await (state === 'archived' ? this.host.archiveConversation(ref.threadId) : this.host.unarchiveConversation(ref.threadId));
+    await (state === 'archived' ? this.host.archiveConversation(ref.conversationId) : this.host.unarchiveConversation(ref.conversationId));
   }
 
   async startRealtime(agent: Context, options: StartCodexRealtimeOptions): Promise<CodexRealtimeSession> {
@@ -482,7 +482,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
       }
       return {
         text: assistantTurnText(snapshot.messages, targetTurnId),
-        session: { kind: 'codex', threadId: conversationId },
+        session: { kind: 'codex', conversationId: conversationId },
       };
     } finally {
       unsubscribe();
@@ -494,8 +494,8 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
 
   async disposeScopedSession(scopedSession: ProviderSessionData): Promise<void> {
     if (scopedSession.kind !== 'codex') throw new Error('Codex cannot dispose a non-Codex scoped conversation.');
-    await this.host.archiveConversation(scopedSession.threadId);
-    this.host.forgetConversation(scopedSession.threadId);
+    await this.host.archiveConversation(scopedSession.conversationId);
+    this.host.forgetConversation(scopedSession.conversationId);
   }
 
   async sendPrompt(agent: Context, prompt: string, options: SendPromptOptions = {}) {
@@ -755,7 +755,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
 
   async resumeConversation(agent: Context, target: ConversationResumeTarget) {
     if (target.ref.provider !== 'codex') throw new Error('Codex cannot resume a non-Codex conversation.');
-    const threadId = target.ref.threadId;
+    const threadId = target.ref.conversationId;
     const previousThreadId = codexThreadId(agent);
     const targetWasArchived = target.storageState === 'archived';
     if (targetWasArchived) await this.host.unarchiveConversation(threadId);
@@ -803,7 +803,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
   async reconcileConversations(agents: Context[]): Promise<void> {
     const retainedThreadIds = new Set(agents.flatMap((agent) => {
       const threadId = codexThreadId(agent);
-      return [threadId, ...(this.options.retainedSessions?.(agent) ?? []).flatMap(session => session.kind === 'codex' ? [session.threadId] : [])].filter((id): id is string => Boolean(id));
+      return [threadId, ...(this.options.retainedSessions?.(agent) ?? []).flatMap(session => session.kind === 'codex' ? [session.conversationId] : [])].filter((id): id is string => Boolean(id));
     }));
     const [active, archived] = await Promise.all([
       this.host.listConversations(),
@@ -1088,9 +1088,9 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
 
   async readConversationContent(agent: Context, input: import('../../contracts/conversation').ConversationContentInput): Promise<import('../../contracts/conversation').ConversationContentChunk> {
     const session = this.sessionsByAgentId.get(agent.id);
-    if (!session || agent.providerSession?.kind !== 'codex' || agent.providerSession.threadId !== input.sessionId || session.handle.id !== input.sessionId) throw new Error('Conversation image is no longer available.');
+    if (!session || agent.providerSession?.kind !== 'codex' || agent.providerSession.conversationId !== input.sessionId || session.handle.id !== input.sessionId) throw new Error('Conversation image is no longer available.');
     const chunk = await session.handle.readContent(input.contentId, input.offset);
-    if (this.closed || this.sessionsByAgentId.get(agent.id) !== session || agent.providerSession?.kind !== 'codex' || agent.providerSession.threadId !== input.sessionId) throw new Error('Conversation image is no longer available.');
+    if (this.closed || this.sessionsByAgentId.get(agent.id) !== session || agent.providerSession?.kind !== 'codex' || agent.providerSession.conversationId !== input.sessionId) throw new Error('Conversation image is no longer available.');
     return chunk;
   }
 
@@ -1881,7 +1881,7 @@ function conversationSummary(
     updatedAt: conversation.updatedAt,
     messageCount: conversation.turnCount,
     storageState,
-    ref: { provider: 'codex', threadId: conversation.id },
+    ref: { provider: 'codex', conversationId: conversation.id },
   };
 }
 
@@ -2191,7 +2191,7 @@ function effectiveApprovalPreset(
 }
 
 function codexThreadId(agent: Agent): string | null {
-  return agent.providerSession?.kind === 'codex' ? agent.providerSession.threadId : null;
+  return agent.providerSession?.kind === 'codex' ? agent.providerSession.conversationId : null;
 }
 
 function agentCwd(agent: Pick<Agent, 'folder'>): { cwd?: string } {

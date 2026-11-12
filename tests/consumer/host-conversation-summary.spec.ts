@@ -4,7 +4,7 @@ import type { ProviderContext } from '../../src/context';
 import type { ProviderDriver, ProviderEvent } from '../../src/driver';
 import { HarnessUnsupportedError } from '../../src';
 
-const summary = { ref: { provider: 'cursor' as const, sessionId: 'old-chat', folder: '/work' }, title: 'Old chat', folder: '/work', updatedAt: '2026-01-01T00:00:00.000Z', storageState: 'active' as const };
+const summary = { ref: { provider: 'cursor' as const, conversationId: 'old-chat', folder: '/work' }, title: 'Old chat', folder: '/work', updatedAt: '2026-01-01T00:00:00.000Z', storageState: 'active' as const };
 
 it('Reads one conversation summary by reference, returning an opaque reference of its own', async () => {
   const native = {
@@ -17,7 +17,7 @@ it('Reads one conversation summary by reference, returning an opaque reference o
   const [listed] = await host.listConversations(session);
   const read = await host.readConversationSummary(session, listed!.ref);
   expect(read).toMatchObject({ title: 'Old chat', storageState: 'active' });
-  expect(host.getRefData(read!.ref)).toMatchObject({ provider: 'cursor', data: { sessionId: 'old-chat' } });
+  expect(host.getRefData(read!.ref)).toMatchObject({ provider: 'cursor', data: { conversationId: 'old-chat' } });
   expect(native.readConversationSummary).toHaveBeenCalledWith(expect.objectContaining({ id: 'main' }), summary.ref);
 });
 

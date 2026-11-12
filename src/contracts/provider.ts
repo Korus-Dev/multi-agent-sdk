@@ -8,18 +8,17 @@ import type {
 
 export type CodexApprovalsReviewer = 'user' | 'auto_review' | 'guardian_subagent';
 
+/** What a harness hands out to continue a conversation later. `conversationId` names the conversation on every harness. */
 export type ProviderSessionData =
-  | { kind: 'cursor'; sessionId: string }
-  | { kind: 'antigravity'; sessionId: string }
-  | {
-    kind: 'codex';
-    threadId: string;
-  }
+  | { kind: 'cursor'; conversationId: string }
+  | { kind: 'antigravity'; conversationId: string }
+  | { kind: 'codex'; conversationId: string }
   | {
     kind: 'claude';
-    sessionId: string;
+    conversationId: string;
     transport: 'stdio' | 'websocket';
-    transcriptSessionId?: string;
+    /** The transcript the conversation reads from, when Claude keeps it under another id. */
+    transcriptConversationId?: string;
     /** Native store location; execution still uses the agent's folder. */
     transcriptFolder?: string;
     serverUrl?: string;
@@ -98,8 +97,15 @@ export type ProviderCapabilities = {
   login?: readonly import('./authentication').AuthenticationLoginMethod[];
   /** The provider offers a live realtime (voice or text) session. */
   realtime?: boolean;
+  /** Whether conversations belong to a working folder; a harness whose conversations span folders names none in their references. */
+  folderScopedConversations?: boolean;
   /** `getAccountRateLimits` reads subscription usage and rate limits for the signed-in account. */
   accountUsage?: boolean;
+  /**
+   * Where a subagent's transcript lives: inside its root conversation, as a conversation of its own, or nowhere the
+   * app can read.
+   */
+  subagentTranscripts?: 'inline' | 'separate' | 'none';
   /** `generateText` runs a one-off text generation. */
   textGeneration?: boolean;
   /** `generateText` accepts an `outputSchema` and the provider enforces it natively. */

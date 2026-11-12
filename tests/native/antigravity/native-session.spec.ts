@@ -366,8 +366,8 @@ describe('Antigravity native session', () => {
       const result = await host.sendPrompt(agent, 'Read my notes', { content, attachments: [{ type: 'file', path: file, name: 'notes.txt', mimeType: 'text/plain' }] });
       agent.providerSession = result.providerSession;
       await vi.waitFor(() => expect(events.some(event => event.type === 'antigravity.conversationEventReceived' && event.payload.event.type === 'turn.completed')).toBe(true));
-      const ref = { provider: 'antigravity' as const, sessionId: result.providerSession.kind === 'antigravity' ? result.providerSession.sessionId : '', folder: root };
-      const admitted = JSON.parse((await readFile(path.join(root, 'home', 'korus-sessions', encodeURIComponent(ref.sessionId), 'prompts.jsonl'), 'utf8')).trim());
+      const ref = { provider: 'antigravity' as const, conversationId: result.providerSession.kind === 'antigravity' ? result.providerSession.conversationId : '', folder: root };
+      const admitted = JSON.parse((await readFile(path.join(root, 'home', 'korus-sessions', encodeURIComponent(ref.conversationId), 'prompts.jsonl'), 'utf8')).trim());
       expect(admitted.wireText.startsWith(`@${file}\n\n<context>`)).toBe(true);
       const live = await host.readConversationMessages(ref, agent.id);
       await host.releaseConversation(agent.id);
@@ -388,10 +388,10 @@ describe('Antigravity native session', () => {
       const result = await host.sendPrompt(agent, 'Keep this prompt');
       agent.providerSession = result.providerSession;
       await vi.waitFor(() => expect(events.some(event => event.type === 'antigravity.conversationEventReceived' && event.payload.event.type === 'turn.completed')).toBe(true));
-      const sessionId = result.providerSession.kind === 'antigravity' ? result.providerSession.sessionId : '';
+      const sessionId = result.providerSession.kind === 'antigravity' ? result.providerSession.conversationId : '';
       await host.releaseConversation(agent.id);
       await appendFile(path.join(root, 'home', 'korus-sessions', encodeURIComponent(sessionId), 'prompts.jsonl'), '{"wireText":"half');
-      const replay = await host.readConversationMessages({ provider: 'antigravity', sessionId, folder: root }, agent.id);
+      const replay = await host.readConversationMessages({ provider: 'antigravity', conversationId: sessionId, folder: root }, agent.id);
       expect(replay[0]?.parts).toEqual([{ type: 'text', text: 'Keep this prompt' }]);
     } finally { await host.close(); }
   });
@@ -452,8 +452,8 @@ describe('Antigravity native session', () => {
     const agent: Agent = { id: 'history', name: 'History', folder: root, provider: 'antigravity' };
     try {
       const rows = await host.listConversations(agent, { searchTerm: 'file' });
-      expect(rows).toEqual([expect.objectContaining({ id: 'stored-session', title: 'Create a file', updatedAt: '', ref: { provider: 'antigravity', sessionId: 'stored-session', folder: root } })]);
-      await expect(host.resumeConversation(agent, { storageState: 'active', ref: { provider: 'antigravity', folder: root, sessionId: 'other-folder' } })).rejects.toThrow('another workspace');
+      expect(rows).toEqual([expect.objectContaining({ id: 'stored-session', title: 'Create a file', updatedAt: '', ref: { provider: 'antigravity', conversationId: 'stored-session', folder: root } })]);
+      await expect(host.resumeConversation(agent, { storageState: 'active', ref: { provider: 'antigravity', folder: root, conversationId: 'other-folder' } })).rejects.toThrow('another workspace');
       const messages = await host.readConversationMessages(rows[0]!.ref, agent.id);
       expect(messages).toHaveLength(2);
       expect(messages[1]?.parts[0]).toMatchObject({ type: 'tool', status: 'failed' });
@@ -465,7 +465,7 @@ describe('Antigravity native session', () => {
       await expect(host.sendPrompt(agent, 'too early')).rejects.toThrow('history is still loading');
       await loading;
       await catalog;
-      await expect(host.readConversationMessages({ provider: 'antigravity', sessionId: rows[0]!.sessionId!, folder: path.join(root, 'home') }, agent.id)).rejects.toThrow('another workspace');
+      await expect(host.readConversationMessages({ provider: 'antigravity', conversationId: rows[0]!.sessionId!, folder: path.join(root, 'home') }, agent.id)).rejects.toThrow('another workspace');
       const cancelledLoad = expect(host.resumeConversation(agent, { storageState: 'active', ref: rows[0]!.ref })).rejects.toThrow('released during history loading');
       const cancelledCatalog = expect(host.listModels(agent)).rejects.toThrow('released during model loading');
       await host.releaseConversation(agent.id);

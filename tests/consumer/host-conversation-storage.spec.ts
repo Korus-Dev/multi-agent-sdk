@@ -15,7 +15,7 @@ it('A recovery tool unarchives a Codex conversation by reference, with a custom 
   const transport = new MockCodexAppServer({ 'thread/archive': () => ({}), 'thread/unarchive': params => ({ thread: thread((params as { threadId: string }).threadId, false) }) });
   const host = createInternalHarness('codex', { client: { name: 'recovery' }, codex: { host: { client: new CodexAppServerClient(transport) } } });
   try {
-    const ref = host.restoreRef({ provider: 'codex', data: { provider: 'codex', threadId: 'recovered-thread' } });
+    const ref = host.restoreRef({ provider: 'codex', data: { provider: 'codex', conversationId: 'recovered-thread' } });
     await host.setConversationStorage(ref, 'active');
     expect(lastRequest(transport, 'thread/unarchive')).toMatchObject({ params: { threadId: 'recovered-thread' } });
     await host.setConversationStorage(ref, 'archived');
@@ -26,6 +26,6 @@ it('A recovery tool unarchives a Codex conversation by reference, with a custom 
 it('A provider that cannot change conversation storage rejects with the typed unsupported error', async () => {
   const native = { onEvent: () => () => {}, getCapabilities: () => ({}), close: vi.fn(async () => {}) };
   const host = harnessForHost('cursor', native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
-  const ref = host.restoreRef({ provider: 'cursor', data: { provider: 'cursor', sessionId: 'chat', folder: '/work' } });
+  const ref = host.restoreRef({ provider: 'cursor', data: { provider: 'cursor', conversationId: 'chat', folder: '/work' } });
   await expect(host.setConversationStorage(ref, 'archived')).rejects.toBeInstanceOf(HarnessUnsupportedError);
 });

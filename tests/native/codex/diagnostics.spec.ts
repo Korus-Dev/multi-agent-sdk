@@ -41,7 +41,7 @@ it('keeps native bind failure authoritative when diagnostic and error sinks thro
     await expect(driver.loadConversation(sdkAgent())).rejects.toBe(failure);
     expect(diagnostics.some(record => record.stage === 'bind.failed')).toBe(true);
     expect(onListenerError).toHaveBeenCalledWith(observerError);
-    await expect(driver.loadConversation(sdkAgent())).resolves.toEqual({ kind: 'codex', threadId: 'conversation-a' });
+    await expect(driver.loadConversation(sdkAgent())).resolves.toEqual({ kind: 'codex', conversationId: 'conversation-a' });
     expect(diagnostics.some(record => record.stage === 'frame.projected-and-emitted')).toBe(true);
   } finally { await driver.close(); }
 });

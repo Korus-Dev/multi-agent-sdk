@@ -10,7 +10,7 @@ function fixture() {
   const native = {
     onEvent: (listener: typeof deliver) => { deliver = listener; return () => {}; },
     getCapabilities: () => ({ permissionModes: [{ id: 'default' }] }),
-    sendPrompt: vi.fn(async (context: ProviderContext) => { seen.push(structuredClone(context.providerDefaults)); return { providerSession: { kind: 'cursor' as const, sessionId: context.id } }; }),
+    sendPrompt: vi.fn(async (context: ProviderContext) => { seen.push(structuredClone(context.providerDefaults)); return { providerSession: { kind: 'cursor' as const, conversationId: context.id } }; }),
     close: vi.fn(async () => {}),
   };
   const harness = harnessForHost('cursor', native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);

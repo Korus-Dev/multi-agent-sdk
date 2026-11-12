@@ -43,7 +43,7 @@ it('Codex: resuming and loading a native full-access chat never writes a default
   const driver = createInternalHarness('codex', { client: { name: 'cpa' }, codex: { host: { client: new CodexAppServerClient(transport) } } });
   const session = driver.open({ id: 'restored', folder: '/accounting' });
   try {
-    const ref = driver.restoreRef({ provider: 'codex', data: { provider: 'codex', threadId: 'retained-access' } });
+    const ref = driver.restoreRef({ provider: 'codex', data: { provider: 'codex', conversationId: 'retained-access' } });
     await driver.resumeConversation(session, { ref, storageState: 'active' });
     await driver.loadConversation(session);
     expect(driver.readSession(session).permission).toBe('full-access');

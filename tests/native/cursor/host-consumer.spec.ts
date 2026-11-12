@@ -27,7 +27,7 @@ it('serves a non-Korus consumer through the unified driver and a caller-owned ex
     expect(events).toContainEqual(expect.objectContaining({ type: 'conversation.settingsUpdated', agentId: 'tax-assistant', payload: { settings: expect.objectContaining({ permission: 'default' }) } }));
     // Loading after completion is the public read path; the fixture completes synchronously after its prompt.
     await expect.poll(() => events.some(event => event.type === 'agent.statusChanged' && event.payload.type === 'idle')).toBe(true);
-    const messages = await driver.readConversationMessages!({ provider: 'cursor', folder: root, sessionId: started.providerSession.kind === 'cursor' ? started.providerSession.sessionId : '' }, context.id);
+    const messages = await driver.readConversationMessages!({ provider: 'cursor', folder: root, conversationId: started.providerSession.kind === 'cursor' ? started.providerSession.conversationId : '' }, context.id);
     expect(messages.filter(message => message.role === 'user').map(message => message.parts.filter(part => part.type === 'text').map(part => part.text).join(''))).toStrictEqual(['Check invoices']);
     const scoped = await driver.executeScopedPrompt!(context, { cwd: root, prompt: 'Classify invoices', session: context.providerSession, scope: { id: 'tax-rules', mcpServers: [] } });
     expect(scoped.text.trim().length).toBeGreaterThan(0);

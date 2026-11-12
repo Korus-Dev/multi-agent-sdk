@@ -4,12 +4,12 @@ import type { ProviderContext } from '../../src/context';
 import type { ProviderDriver, ProviderEvent, ProviderScopedPromptInput } from '../../src/driver';
 
 function fixture() {
-  const pending = new Map<string, { input: ProviderScopedPromptInput; resolve: (value: { text: string; session: { kind: 'cursor'; sessionId: string } }) => void; reject: (error: Error) => void }>();
+  const pending = new Map<string, { input: ProviderScopedPromptInput; resolve: (value: { text: string; session: { kind: 'cursor'; conversationId: string } }) => void; reject: (error: Error) => void }>();
   const released: string[] = [];
   const cancelled: string[] = [];
   const native = {
     onEvent: (_listener: (event: ProviderEvent) => void) => () => {},
-    executeScopedPrompt: vi.fn((context: ProviderContext, input: ProviderScopedPromptInput) => new Promise<{ text: string; session: { kind: 'cursor'; sessionId: string } }>((resolve, reject) => pending.set(context.id, { input, resolve, reject }))),
+    executeScopedPrompt: vi.fn((context: ProviderContext, input: ProviderScopedPromptInput) => new Promise<{ text: string; session: { kind: 'cursor'; conversationId: string } }>((resolve, reject) => pending.set(context.id, { input, resolve, reject }))),
     cancelScopedPrompt: vi.fn(async (context: ProviderContext) => { cancelled.push(context.id); }),
     releaseConversation: vi.fn(async (id: string) => { released.push(id); }),
     close: vi.fn(async () => {}),
@@ -33,11 +33,11 @@ it('cancels a fresh scope before its first frame and cleans a late native admiss
   expect(pending.get(firstId)!.input.signal).toBe(abort.signal);
   expect(settled).toBe(false);
   expect(cancelled).not.toContain('main'); expect(cancelled).not.toContain(secondId);
-  pending.get(firstId)!.resolve({ text: 'late admission', session: { kind: 'cursor', sessionId: 'late' } });
+  pending.get(firstId)!.resolve({ text: 'late admission', session: { kind: 'cursor', conversationId: 'late' } });
   await rejected;
   expect(released).toContain(firstId);
   expect(released).not.toContain('main'); expect(released).not.toContain(secondId);
-  pending.get(secondId)!.resolve({ text: 'unaffected', session: { kind: 'cursor', sessionId: 'other' } });
+  pending.get(secondId)!.resolve({ text: 'unaffected', session: { kind: 'cursor', conversationId: 'other' } });
   expect((await second).text).toBe('unaffected');
   expect(driver.readSession(main).busy).toBe(false);
   await driver.close();
@@ -103,12 +103,12 @@ it('runs a new scope with the parent session\'s defaults', async () => {
   const seen: unknown[] = [];
   const native = {
     onEvent: () => () => {}, getCapabilities: () => ({}), close: async () => {},
-    executeScopedPrompt: async (context: { providerDefaults?: unknown }) => { seen.push(structuredClone(context.providerDefaults)); return { text: 'ok', session: { kind: 'cursor', sessionId: 'scope-1' } }; },
+    executeScopedPrompt: async (context: { providerDefaults?: unknown }) => { seen.push(structuredClone(context.providerDefaults)); return { text: 'ok', session: { kind: 'cursor', conversationId: 'scope-1' } }; },
     disposeScopedSession: async () => {},
   };
   const { harnessForHost } = await import('../../src/internal');
   const harness = harnessForHost('cursor', native as never);
-  const main = harness.restoreSession({ id: 'main', folder: '/work', defaults: { model: 'beta', reasoningEffort: 'xhigh' } }, { provider: 'cursor', data: { kind: 'cursor', sessionId: 's' }, role: 'main' });
+  const main = harness.restoreSession({ id: 'main', folder: '/work', defaults: { model: 'beta', reasoningEffort: 'xhigh' } }, { provider: 'cursor', data: { kind: 'cursor', conversationId: 's' }, role: 'main' });
   await harness.executeScopedPrompt(main, { prompt: 'review', cwd: '/work', scope: { id: 'r' } });
   expect(seen[0]).toMatchObject({ kind: 'cursor', model: 'beta', reasoningEffort: 'xhigh' });
 });
@@ -118,13 +118,13 @@ it('opens a scope ahead of its run and steers it while it executes', async () =>
   const steered: string[] = [];
   const native = {
     onEvent: () => () => {}, getCapabilities: () => ({}), close: async () => {},
-    executeScopedPrompt: async () => { await new Promise<void>(resolve => { release = resolve; }); return { text: 'done', session: { kind: 'cursor', sessionId: 'scope-1' } }; },
-    steerPrompt: async (context: { id: string }) => { steered.push(context.id); return { providerSession: { kind: 'cursor', sessionId: 'scope-1' }, turnId: 't' }; },
+    executeScopedPrompt: async () => { await new Promise<void>(resolve => { release = resolve; }); return { text: 'done', session: { kind: 'cursor', conversationId: 'scope-1' } }; },
+    steerPrompt: async (context: { id: string }) => { steered.push(context.id); return { providerSession: { kind: 'cursor', conversationId: 'scope-1' }, turnId: 't' }; },
     disposeScopedSession: async () => {},
   };
   const { harnessForHost } = await import('../../src/internal');
   const harness = harnessForHost('cursor', native as never);
-  const main = harness.restoreSession({ id: 'main', folder: '/work' }, { provider: 'cursor', data: { kind: 'cursor', sessionId: 's' }, role: 'main' });
+  const main = harness.restoreSession({ id: 'main', folder: '/work' }, { provider: 'cursor', data: { kind: 'cursor', conversationId: 's' }, role: 'main' });
   const scope = harness.openScope(main, { cwd: '/work' });
   const running = harness.executeScopedPrompt(main, { prompt: 'review', cwd: '/work', scope: { id: 'r' }, session: scope });
   await new Promise(resolve => setTimeout(resolve, 5));

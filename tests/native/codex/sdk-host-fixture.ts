@@ -25,7 +25,7 @@ export function sdkSnapshot(id = 'conversation-a', overrides: Partial<CodexConve
 export function sdkAgent(id = 'agent-a', conversationId = 'conversation-a'): Agent {
   return {
     id, name: id, folder: '/repo', provider: 'codex',
-    providerSession: { kind: 'codex', threadId: conversationId },
+    providerSession: { kind: 'codex', conversationId: conversationId },
   };
 }
 

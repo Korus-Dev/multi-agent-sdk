@@ -25,7 +25,7 @@ export class ClaudeHarness extends SessionHarness<'claude'> {
   static readonly provider = 'claude';
   static readonly capabilities = claudeHarnessCapabilities;
   /** A fresh session record for a conversation id. */
-  static sessionData(id: string): ProviderSessionData { return { kind: 'claude', sessionId: id, transport: 'stdio' }; }
+  static sessionData(id: string): ProviderSessionData { return { kind: 'claude', conversationId: id, transport: 'stdio' }; }
 
   constructor(native: ProviderDriver<ProviderContext, ProviderEvent>, rules?: WorkPhaseRules) { super('claude', native, rules); }
 
@@ -64,7 +64,7 @@ export class ClaudeHarness extends SessionHarness<'claude'> {
     // One Claude home per application process; close before switching profiles.
     if (home) process.env.CLAUDE_CONFIG_DIR = home;
     const driver = new ClaudeHost(options.claude?.transport ?? new ClaudeAgentSdkTransport({ ...options.claude?.transportOptions, client: { ...options.claude?.transportOptions?.client, ...options.client } }), undefined, {
-      contextForConversation: (ref, id) => ({ id, name: id, folder: ref.folder, provider: 'claude', providerSession: { kind: 'claude', sessionId: ref.sessionId, transport: 'stdio' } }) as Context,
+      contextForConversation: (ref, id) => ({ id, name: id, folder: ref.folder, provider: 'claude', providerSession: { kind: 'claude', conversationId: ref.conversationId, transport: 'stdio' } }) as Context,
       ...options.claude?.host,
       configurePrompt: context => {
         const defaults = options.claude?.host?.configurePrompt?.(context) ?? {};
@@ -102,7 +102,7 @@ export class ClaudeHarness extends SessionHarness<'claude'> {
   /** Claude records the model and effort it ran with in its session data. */
   protected override selectionFromSession(data: ProviderSessionData, previous: ProviderSessionData | undefined, current: SessionSelection | undefined, preserveRuntime: boolean): SessionSelection | undefined {
     if (data.kind !== 'claude') return undefined;
-    const runtime = preserveRuntime && previous?.kind === 'claude' && previous.sessionId === data.sessionId ? current : undefined;
+    const runtime = preserveRuntime && previous?.kind === 'claude' && previous.conversationId === data.conversationId ? current : undefined;
     return {
       ...runtime,
       ...(data.model !== undefined && data.model !== runtime?.model ? { reasoningEffort: undefined, serviceTier: undefined } : {}),

@@ -5,9 +5,8 @@ import { ProviderHarness } from './harness';
 
 /** A harness whose conversations are named by a session id and whose permissions are native permission modes. */
 export abstract class SessionHarness<P extends HarnessProvider = HarnessProvider> extends ProviderHarness<P> {
-  protected identityOf(data: Record<string, unknown>): unknown { return data.sessionId; }
   protected conversationRef(data: ProviderSessionData, context: ProviderContext): ProviderConversationRef {
-    return { provider: data.kind, sessionId: (data as { sessionId: string }).sessionId, folder: context.folder } as ProviderConversationRef;
+    return { provider: data.kind, conversationId: data.conversationId, folder: context.folder } as ProviderConversationRef;
   }
   protected override validateRefData(data: Record<string, unknown>): void {
     if (data.folder !== null && typeof data.folder !== 'string') throw new Error('Invalid persisted folder.');

@@ -52,7 +52,7 @@ it('starts a new scoped conversation with the scope\'s servers instead of reload
   });
   try {
     await expect(fixture.driver.executeScopedPrompt!(context, { cwd: '/repo', prompt: 'Review', scope: { id: 'review', mcpServers: [{ name: 'app', url: 'http://127.0.0.1:1234/review', required: true, enabledTools: ['report'] }] } }))
-      .resolves.toStrictEqual({ text: 'Done.', session: { kind: 'codex', threadId: 'conversation-new' } });
+      .resolves.toStrictEqual({ text: 'Done.', session: { kind: 'codex', conversationId: 'conversation-new' } });
     expect(fixture.host.createConversation).toHaveBeenCalledExactlyOnceWith(expect.anything(), expect.objectContaining({
       mcpServers: [{ name: 'app', transport: { type: 'http', url: 'http://127.0.0.1:1234/review' }, enabledTools: ['report'], toolApprovalMode: 'approve', required: true }] }));
     // Codex has no saved conversation to reload before its first turn; the reload after it restores the normal servers.

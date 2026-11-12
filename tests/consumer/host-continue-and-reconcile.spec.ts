@@ -4,7 +4,7 @@ import type { ProviderContext } from '../../src/context';
 import type { ProviderDriver, ProviderEvent } from '../../src/driver';
 import { HarnessUnsupportedError } from '../../src';
 
-const data = { kind: 'cursor' as const, sessionId: 's1', folder: '/work' };
+const data = { kind: 'cursor' as const, conversationId: 's1', folder: '/work' };
 const base = { onEvent: () => () => {}, getCapabilities: () => ({}), close: vi.fn(async () => {}) };
 const open = (native: object) => {
   const harness = harnessForHost('cursor', { ...base, ...native } as unknown as ProviderDriver<ProviderContext, ProviderEvent>);

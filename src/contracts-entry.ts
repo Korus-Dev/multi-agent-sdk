@@ -13,7 +13,7 @@ export {
 } from './contracts/safety-review';
 export { harnessProviders, isHarnessProvider } from './contracts/shared';
 export {
-  conversationRefId, defaultsPermission, isProviderSessionData, sameConversationRef, sessionConversationId, sessionConversationRef,
+  conversationRefId, isProviderSessionData, sameConversationRef, sessionConversationId, sessionConversationRef,
   conversationSessionData, sessionHasConversation, subagentOfRef, subagentRef
 } from './contracts/session-data';
 export {

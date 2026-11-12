@@ -15,7 +15,7 @@ describe(`Codex SDK → ${product.name} backend lifecycle`, () => {
     await driver.loadConversation(agent);
     expect(native.handle.updateSettings).not.toHaveBeenCalled();
     expect(events.filter(event => event.type === 'codex.conversationSnapshotChanged').at(-1)).toMatchObject({ payload: { snapshot: { approvalPreset: 'full-access' } } });
-    await driver.resumeConversation(agent, { ref: { provider: 'codex', threadId: 'conversation-a' }, storageState: 'active' });
+    await driver.resumeConversation(agent, { ref: { provider: 'codex', conversationId: 'conversation-a' }, storageState: 'active' });
     expect(native.handle.updateSettings).not.toHaveBeenCalled();
   });
 
@@ -70,7 +70,7 @@ describe(`Codex SDK → ${product.name} backend lifecycle`, () => {
     host.createConversation.mockResolvedValue(sdkSnapshot());
     conversation('conversation-a').handle.sendMessage.mockResolvedValue(sdkSnapshot('conversation-a', { turnIds: ['accepted'], activeTurnId: 'accepted' }));
     const options = driver.preparePromptOptions(agent, { planMode: true, selection: { model: 'model', reasoningEffort: 'high', serviceTier: 'fast' } });
-    await expect(driver.sendPrompt(agent, 'Implement', options)).resolves.toStrictEqual({ providerSession: { kind: 'codex', threadId: 'conversation-a' }, turnId: 'accepted' });
+    await expect(driver.sendPrompt(agent, 'Implement', options)).resolves.toStrictEqual({ providerSession: { kind: 'codex', conversationId: 'conversation-a' }, turnId: 'accepted' });
     expect(host.createConversation).toHaveBeenCalledWith({ cwd: '/repo', threadSource: 'user' }, { extensionContext: agent });
     expect(conversation('conversation-a').handle.updateSettings).toHaveBeenCalledWith({ planMode: true });
     expect(conversation('conversation-a').handle.sendMessage).toHaveBeenCalledWith('Implement', { model: 'model', reasoningEffort: 'high', serviceTier: 'fast', planMode: true });
@@ -107,7 +107,7 @@ describe(`Codex SDK → ${product.name} backend lifecycle`, () => {
     await vi.waitFor(() => expect(host.createConversation).toHaveBeenCalled());
     finishCreation();
     await title;
-    await expect(prompt).resolves.toStrictEqual({ providerSession: { kind: 'codex', threadId: 'created-1' }, turnId: 'accepted' });
+    await expect(prompt).resolves.toStrictEqual({ providerSession: { kind: 'codex', conversationId: 'created-1' }, turnId: 'accepted' });
     expect(host.createConversation).toHaveBeenCalledOnce();
     expect(host.forgetConversation).not.toHaveBeenCalled();
     expect(conversation('created-1').handle.rename).toHaveBeenCalledWith('Issue 61');
@@ -123,11 +123,11 @@ describe(`Codex SDK → ${product.name} backend lifecycle`, () => {
     host.createConversation.mockResolvedValue(sdkSnapshot('independent'));
     const first = expect(driver.sendPrompt(firstAgent, 'first')).rejects.toThrow('creation failed');
     await vi.waitFor(() => expect(host.createConversation).toHaveBeenCalledOnce());
-    await expect(driver.sendPrompt(secondAgent, 'independent')).resolves.toMatchObject({ providerSession: { threadId: 'independent' } });
+    await expect(driver.sendPrompt(secondAgent, 'independent')).resolves.toMatchObject({ providerSession: { conversationId: 'independent' } });
     rejectCreation(new Error('creation failed'));
     await first;
     host.createConversation.mockResolvedValue(sdkSnapshot('retry'));
-    await expect(driver.sendPrompt(firstAgent, 'retry')).resolves.toMatchObject({ providerSession: { threadId: 'retry' } });
+    await expect(driver.sendPrompt(firstAgent, 'retry')).resolves.toMatchObject({ providerSession: { conversationId: 'retry' } });
     expect(conversation('retry').handle.sendMessage).toHaveBeenCalledWith('retry', {});
     expect(host.forgetConversation).not.toHaveBeenCalledWith('independent');
   });
@@ -152,14 +152,14 @@ describe(`Codex SDK → ${product.name} backend lifecycle`, () => {
     host.unarchiveConversation.mockImplementation(async (id) => { order.push(`restore:${id}`); return sdkSnapshot(id); });
     conversation('archived').handle.load.mockImplementation(async () => { order.push('load:archived'); return sdkSnapshot('archived'); });
     host.archiveConversation.mockImplementation(async (id) => { order.push(`archive:${id}`); return sdkSnapshot(id); });
-    await expect(driver.resumeConversation(sdkAgent(), { ref: { provider: 'codex', threadId: 'archived' }, storageState: 'archived' })).resolves.toMatchObject({ providerSession: { kind: 'codex', threadId: 'archived' } });
+    await expect(driver.resumeConversation(sdkAgent(), { ref: { provider: 'codex', conversationId: 'archived' }, storageState: 'archived' })).resolves.toMatchObject({ providerSession: { kind: 'codex', conversationId: 'archived' } });
     expect(order).toStrictEqual(['restore:archived', 'load:archived']);
   });
 
   it('rolls back failed restoration and keeps subsequent prompts on the previous conversation', async () => {
     const { driver, host, conversation } = setup();
     conversation('broken').handle.load.mockRejectedValueOnce(new Error('cannot load'));
-    await expect(driver.resumeConversation(sdkAgent(), { ref: { provider: 'codex', threadId: 'broken' }, storageState: 'archived' })).rejects.toThrow('cannot load');
+    await expect(driver.resumeConversation(sdkAgent(), { ref: { provider: 'codex', conversationId: 'broken' }, storageState: 'archived' })).rejects.toThrow('cannot load');
     expect(host.archiveConversation).toHaveBeenCalledExactlyOnceWith('broken');
     await driver.sendPrompt(sdkAgent(), 'continue');
     expect(conversation('conversation-a').handle.sendMessage).toHaveBeenCalledOnce();

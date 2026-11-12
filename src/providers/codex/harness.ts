@@ -34,7 +34,7 @@ export class CodexHarness extends ProviderHarness<'codex'> {
   static readonly provider = 'codex';
   static readonly capabilities = codexHarnessCapabilities;
   /** A fresh session record for a conversation id. */
-  static sessionData(id: string): ProviderSessionData { return { kind: 'codex', threadId: id }; }
+  static sessionData(id: string): ProviderSessionData { return { kind: 'codex', conversationId: id }; }
 
   constructor(native: ProviderDriver<ProviderContext, ProviderEvent>, rules?: import('../../conversations/work-phases').WorkPhaseRules) { super('codex', native, rules); }
 
@@ -114,8 +114,7 @@ export class CodexHarness extends ProviderHarness<'codex'> {
     return new CodexHostController(adapter);
   }
 
-  protected identityOf(data: Record<string, unknown>): unknown { return data.threadId; }
-  protected conversationRef(data: ProviderSessionData): ProviderConversationRef { return { provider: 'codex', threadId: (data as { threadId: string }).threadId }; }
+  protected conversationRef(data: ProviderSessionData): ProviderConversationRef { return { provider: 'codex', conversationId: data.conversationId }; }
   protected permissionOptions(capabilities: ProviderCapabilities): HarnessCapabilities['permissions'] {
     return (capabilities.approvalPresets ?? []).map(id => ({ id, ...(id === 'full-access' ? { dangerous: true } : {}) }));
   }

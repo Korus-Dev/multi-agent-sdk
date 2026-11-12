@@ -40,7 +40,7 @@ it('keeps CPA instructions and MCP scopes caller-owned through the unified Claud
     await expect(harness.options[index]!.canUseTool!('mcp__ledger__lookup', { invoice: 42 }, { signal: new AbortController().signal, toolUseID: 'ledger-lookup', requestId: 'ledger-lookup' })).resolves.toMatchObject({ behavior: 'allow', updatedInput: { invoice: 42 } });
     expect(harness.options[index]!.mcpServers).not.toHaveProperty('tax_rules');
     complete('Ledger verified.', index);
-    await expect(scoped).resolves.toMatchObject({ text: 'Ledger verified.', session: { kind: 'claude', sessionId: 'cpa-session' } });
+    await expect(scoped).resolves.toMatchObject({ text: 'Ledger verified.', session: { kind: 'claude', conversationId: 'cpa-session' } });
     expect(host.getCapabilities(context)).not.toHaveProperty('codeReview');
   } finally { await host.close(); await rm(root, { recursive: true, force: true }); }
 });
