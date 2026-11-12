@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Session patches send what changed inside a message: `appendPartText` for streamed text, `spliceParts` for a part that was added or replaced, and `setMessageFields` for the message's own fields. `spliceMessages` is used only when messages are added, removed or replaced, so a streaming answer no longer resends the text already sent.
+- `bindSession` is removed. An app re-states what it has stored for a session with `syncSession`, which an operation already in flight sees the next time it looks.
 - `capabilities.commands` lists each harness's own slash commands (compact, plan, goal), so an app can offer them without knowing the harness.
 - `capabilities.safetyReview` says whether a harness stops turns on safety findings and resumes them from a safety review.
 - Provider updates name their conversation in `conversationId` only; `threadId` and `providerSessionId` no longer appear on harness events.

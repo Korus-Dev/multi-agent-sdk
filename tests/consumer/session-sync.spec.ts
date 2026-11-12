@@ -48,18 +48,18 @@ it('replaces the stored defaults when the host app re-states them, instead of me
   expect(seen[0]).toStrictEqual({ kind: 'cursor', model: 'beta' });
 });
 
-it('follows the host app\'s record live, so a provider operation in flight sees later changes', async () => {
+it('lets a provider operation in flight see what the app re-states meanwhile', async () => {
   const record = { data: first as typeof first | null, folder: '/work' as string | null };
   let during: { providerSession?: unknown; folder: string | null } | undefined;
   const native = { onEvent: () => () => {}, getCapabilities: () => ({}), close: async () => {},
     sendPrompt: async (context: ProviderContext) => {
       record.data = second; record.folder = '/moved';
+      harness.syncSession(session, { data: record.data, folder: record.folder });
       during = { providerSession: context.providerSession, folder: context.folder };
       return { providerSession: second };
     } };
   const harness = harnessForHost('cursor', native as unknown as ProviderDriver<ProviderContext, ProviderEvent>);
   const session = harness.restoreSession({ id: 'main', folder: '/work' }, { provider: 'cursor', data: first, role: 'main' });
-  harness.bindSession(session, () => ({ data: record.data, folder: record.folder, defaults: { model: 'live' } }));
   await harness.sendPrompt(session, 'hello');
   expect(during).toMatchObject({ providerSession: second, folder: '/moved' });
 });

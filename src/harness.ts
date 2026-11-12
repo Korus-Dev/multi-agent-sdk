@@ -15,7 +15,6 @@ import { diffSessionState, emptyPatchBase, type SessionPatchBase, type SessionSn
 
 const emptyState = (): SessionState => ({ messages: [], busy: false, activeTurnId: null, turns: [], requests: [], error: null, title: null, goal: null, contextUsage: null, plan: null });
 type Binding = {
-  stored?: { providerSession?: unknown };
   /** The last turn that reported output; `turn.output` is published once per turn. */
   outputTurn?: string;
   kind: 'main' | 'scope';
@@ -355,7 +354,7 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
   }
   getSessionData(session: Session) {
     const binding = this.get(session);
-    const data = (binding.stored ? binding.stored.providerSession : binding.context.providerSession) as ProviderSessionData | undefined;
+    const data = binding.context.providerSession;
     if (!data) throw new Error('Session has not been admitted.');
     if (binding.nativeDisposed || binding.operation === 'disposing' || binding.operation === 'releasing') throw new Error('Scope disposal has already started.');
     const parentId = binding.parent ? this.get(binding.parent).context.id : undefined;
@@ -431,19 +430,6 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
     if (!this.getCapabilities(session).permissions.some(p => p.id === id)) throw new Error('Unsupported permission option.');
     b.state.permission = await this.applyPermission(b.context, id);
     this.changed(session);
-  }
-  bindSession(session: Session, source: Parameters<Harness['bindSession']>[1]) {
-    const binding = this.get(session);
-    const context = binding.context as unknown as Record<string, unknown>;
-    const stored = { providerSession: context.providerSession, folder: context.folder, name: context.name, providerDefaults: context.providerDefaults };
-    const defaultsOf = () => { const live = source().defaults; if (live === undefined) return stored.providerDefaults; return this.mergeDefaults({ kind: this.provider } as ProviderDefaults, live); };
-    binding.stored = stored;
-    Object.defineProperties(context, {
-      providerSession: { enumerable: true, configurable: true, get: () => { const v = source().data; return v === undefined ? stored.providerSession : (v ?? undefined); }, set: (value: unknown) => { stored.providerSession = value; } },
-      folder: { enumerable: true, configurable: true, get: () => { const v = source().folder; return v === undefined ? stored.folder : v; }, set: (value: unknown) => { stored.folder = value; } },
-      name: { enumerable: true, configurable: true, get: () => { const v = source().name; return v === undefined ? stored.name : v; }, set: (value: unknown) => { stored.name = value; } },
-      providerDefaults: { enumerable: true, configurable: true, get: defaultsOf, set: (value: unknown) => { stored.providerDefaults = value as ProviderDefaults | undefined; } },
-    });
   }
   syncSession(session: Session, state: Parameters<Harness['syncSession']>[1]) {
     const b = this.get(session);

@@ -197,12 +197,8 @@ export type Harness<P extends HarnessProvider = HarnessProvider> = {
   /** Changes the model, reasoning effort, speed or permission used by the session's next calls. */
   updateDefaults(session: Session, defaults: Partial<HarnessDefaults>): void;
   /**
-   * Makes the session follow the host app's own record: the provider reads the stored conversation, folder, name and defaults
-   * from `source` each time it looks, so a change made while an operation is in flight is seen by that operation.
-   */
-  bindSession(session: Session, source: () => { data?: import('./contracts/index').ProviderSessionData | null; folder?: string | null; name?: string | null; defaults?: HarnessDefaults }): void;
-  /**
    * Re-states what the host app has stored for a session: its provider conversation (`null` clears it), folder or name.
+   * An operation already in flight sees the re-stated values the next time it looks.
    * Providers keep enforcing their own identity and workspace checks against the re-stated values.
    */
   syncSession(session: Session, state: { data?: import('./contracts/index').ProviderSessionData | null; folder?: string | null; name?: string | null; /** Replaces the session's defaults; nothing from earlier defaults is kept. */ defaults?: HarnessDefaults }): void;
