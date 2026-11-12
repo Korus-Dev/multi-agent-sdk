@@ -31,11 +31,12 @@ export type ProviderSessionData =
 type ProviderExecutionDefaults = {
   [K in Exclude<keyof ExecutionSelection, 'provider'>]?: K extends 'serviceTier' ? ExecutionSelection[K] : NonNullable<ExecutionSelection[K]>;
 };
-export type ProviderDefaults = ProviderExecutionDefaults & { userSelectedModel?: boolean } & (
-  | { kind: 'cursor'; permissionMode?: string }
-  | { kind: 'antigravity'; permissionMode?: string }
-  | { kind: 'codex'; approvalPreset?: ApprovalPreset; approvalPolicy?: string; approvalsReviewer?: CodexApprovalsReviewer; sandboxMode?: string }
-  | { kind: 'claude'; permissionMode?: string; thinking?: { type: 'enabled' | 'disabled'; budgetTokens?: number } }
+/** `permission` is one of the ids the harness lists in `capabilities.permissions`, the same field for every harness. */
+export type ProviderDefaults = ProviderExecutionDefaults & { userSelectedModel?: boolean; permission?: string } & (
+  | { kind: 'cursor' }
+  | { kind: 'antigravity' }
+  | { kind: 'codex' }
+  | { kind: 'claude'; thinking?: { type: 'enabled' | 'disabled'; budgetTokens?: number } }
 );
 
 export type CodexThreadSettings = {

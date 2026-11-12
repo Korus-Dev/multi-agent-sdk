@@ -1469,7 +1469,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
       type: 'conversation.modeUpdated',
       payload: {
         mode: permissionMode === 'plan' ? 'plan' : 'default',
-        permissionMode,
+        permission: permissionMode,
       },
     });
   }
@@ -2011,7 +2011,7 @@ function claudeTurnParams(
     model,
     effort: claudeEffort(options.selection?.reasoningEffort ?? defaults?.reasoningEffort ?? restoredEffort),
     fastMode: tier === 'fast',
-    permissionMode: options.planMode ? 'plan' : claudeOptions?.permissionMode ?? defaults?.permissionMode ?? null,
+    permissionMode: options.planMode ? 'plan' : claudeOptions?.permissionMode ?? defaults?.permission ?? null,
     appendSystemPrompt: configuration.appendSystemPrompt,
     mcpServerUrl,
     mcpServerName: configuration.mcpServerName,

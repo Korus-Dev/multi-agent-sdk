@@ -244,7 +244,7 @@ describe('ClaudeBackendDriver', () => {
         kind: 'claude',
         model: 'sonnet',
         reasoningEffort: 'high',
-        permissionMode: 'acceptEdits',
+        permission: 'acceptEdits',
       },
     });
     expect(transport.startTurn).not.toHaveBeenCalled();
@@ -1061,7 +1061,7 @@ describe('ClaudeBackendDriver', () => {
       threadId: 'claude-session-plan',
       payload: {
         mode: 'plan',
-        permissionMode: 'plan',
+        permission: 'plan',
       },
     }));
     expect(events).toContainEqual(expect.objectContaining({

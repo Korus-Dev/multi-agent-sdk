@@ -186,7 +186,7 @@ describe(`Codex SDK → ${product.name} backend controls`, () => {
     const { driver, conversation, host } = setup();
     host.getSnapshot.mockReturnValue(sdkSnapshot('conversation-a', { approvalPresets: ['ask-for-approval', 'full-access'] }));
     const target = { ...sdkAgent('worker'), folder: '/worker', providerSession: undefined,
-      providerDefaults: { kind: 'codex' as const, approvalPreset: 'ask-for-approval' as const } };
+      providerDefaults: { kind: 'codex' as const, permission: 'ask-for-approval' as const } };
     conversation('conversation-a').handle.fork.mockResolvedValue({ conversationId: 'child', conversation: host.conversation('child'), snapshot: sdkSnapshot('child') });
     await expect(driver.forkConversation(sdkAgent(), target)).resolves.not.toHaveProperty('forkedFromTurnId');
     expect(conversation('conversation-a').handle.fork).toHaveBeenCalledExactlyOnceWith({ cwd: '/worker', approvalPreset: 'ask-for-approval' }, { extensionContext: target });

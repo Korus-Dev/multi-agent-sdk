@@ -89,7 +89,7 @@ it('Claude publishes model settings recovered from provider history and later na
   deliver({ type: 'conversation.settingsUpdated', provider: 'claude', agentId: 'tax', payload: { settings: { model: 'claude-sonnet', reasoningEffort: 'medium' } } });
   expect(driver.readSession(session).selection).toEqual({ model: 'claude-sonnet', reasoningEffort: 'medium' });
   deliver({ type: 'conversation.settingsUpdated', provider: 'claude', agentId: 'tax', payload: { settings: { model: 'claude-opus', reasoningEffort: 'high', serviceTier: 'fast' } } });
-  deliver({ type: 'conversation.modeUpdated', provider: 'claude', agentId: 'tax', payload: { mode: 'default', permissionMode: 'dontAsk' } });
+  deliver({ type: 'conversation.modeUpdated', provider: 'claude', agentId: 'tax', payload: { mode: 'default', permission: 'dontAsk' } });
   expect(driver.readSession(session).permission).toBe('dontAsk');
   await driver.sendPrompt(session, 'Continue');
   expect(driver.readSession(session).selection).toEqual({ model: 'claude-opus', reasoningEffort: 'high', serviceTier: 'fast' });
@@ -101,7 +101,7 @@ it.each(['codex', 'claude'] as const)('%s publishes accepted permission changes 
   const mode = provider === 'codex' ? 'full-access' : 'dontAsk';
   const update = vi.fn().mockResolvedValue(provider === 'codex'
     ? { providerSession: { kind: 'codex', threadId: 'native' }, approvalPreset: mode }
-    : { providerDefaults: { kind: 'claude', permissionMode: mode } });
+    : { providerDefaults: { kind: 'claude', permission: mode } });
   const native = { onEvent: () => () => {}, close: vi.fn(),
     getCapabilities: () => provider === 'codex' ? { approvalPresets: [mode] } : { permissionModes: [{ id: mode }] },
     setApprovalPreset: update, setPermissionMode: update,

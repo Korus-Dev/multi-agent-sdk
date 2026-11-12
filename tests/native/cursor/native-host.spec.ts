@@ -64,7 +64,7 @@ describe('Cursor ACP host transport boundary', () => {
 
   it.each([false, true])('restores full-access policy on session startup and uses only once-only permission options (missingOnce=%s)', async missingOnce => {
     await writeFile(path.join(root, 'mcp-permission.json'), JSON.stringify({ noOnce: missingOnce }));
-    await host.sendPrompt({ ...agent, providerDefaults: { kind: 'cursor', permissionMode: 'full-access' } }, 'mcp-permission');
+    await host.sendPrompt({ ...agent, providerDefaults: { kind: 'cursor', permission: 'full-access' } }, 'mcp-permission');
     await vi.waitFor(() => expect(completions()).toHaveLength(1));
     expect((await wire()).find(call => call.id === 8 && call.result)?.result).toStrictEqual({ outcome: missingOnce ? { outcome: 'cancelled' } : { outcome: 'selected', optionId: 'native-mcp-once' } });
     expect((await snapshot()).clientRequests).toStrictEqual([]);
@@ -78,7 +78,7 @@ describe('Cursor ACP host transport boundary', () => {
     expect((await snapshot()).clientRequests).toStrictEqual([]);
   });
   it('does not apply one conversation full-access policy to another agent', async () => {
-    const full = { ...agent, providerDefaults: { kind: 'cursor' as const, permissionMode: 'full-access' } };
+    const full = { ...agent, providerDefaults: { kind: 'cursor' as const, permission: 'full-access' } };
     const manual = { ...agent, id: 'manual-agent' };
     await host.sendPrompt(full, 'permission');
     await vi.waitFor(() => expect(completions()).toHaveLength(1));

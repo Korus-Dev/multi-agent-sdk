@@ -86,9 +86,9 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
   /** The reference that names a session's conversation. */
   protected abstract conversationRef(data: ProviderSessionData, context: ProviderContext): ProviderConversationRef;
   /** Native defaults that select a permission option. */
-  protected abstract permissionDefaults(id: string): Partial<ProviderDefaults>;
+  protected permissionDefaults(id: string): Partial<ProviderDefaults> { return { permission: id }; }
   /** The permission option native defaults select. */
-  protected abstract permissionOf(defaults: ProviderDefaults): string | undefined;
+  protected permissionOf(defaults: ProviderDefaults): string | undefined { return defaults.permission; }
   /** The permission options native capabilities offer. */
   protected abstract permissionOptions(capabilities: ProviderCapabilities): HarnessCapabilities['permissions'];
   /** Applies a permission option natively, updating the context, and returns the option the provider confirmed. */
@@ -105,7 +105,11 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
   /** The neutral activity one native frame carries, read the way this provider writes its frames. */
   protected abstract activityOf(frame: ProviderEvent): FrameActivity[];
   /** The permission option a native settings or mode event reports; undefined when it reports none. */
-  protected abstract permissionFromEvent(event: ProviderEvent): string | null | undefined;
+  protected permissionFromEvent(event: ProviderEvent): string | null | undefined {
+    if (event.type === 'conversation.modeUpdated') return event.payload.permission;
+    if (event.type === 'conversation.settingsUpdated') return event.payload.settings.permission;
+    return undefined;
+  }
   /** Extra checks on persisted session data. */
   protected validateSessionData(_data: Record<string, unknown>): void {}
   /** Extra checks on persisted reference data. */

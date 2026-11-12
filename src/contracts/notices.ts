@@ -75,7 +75,7 @@ export type ProviderNotice =
       type: 'conversation.modeUpdated';
       agentId: string;
       provider: HarnessProvider;
-      payload: { mode: ThreadMode; permissionMode?: string };
+      payload: { mode: ThreadMode; permission?: string };
     }>
   | EventWith<{
       type: 'conversation.goalUpdated';

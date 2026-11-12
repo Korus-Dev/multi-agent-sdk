@@ -19,14 +19,14 @@ it('runs a caller-owned Antigravity client and selects utility models without pr
     host = createProviderHost('antigravity', { client: { name: 'cpa-workbench', title: 'Accounting workbench', metadataDirectory: 'accounting-sessions' }, stateDirectory: () => root, antigravity: { home: () => home, resolveRuntime: () => runtime,
       runtimeOptions: () => ({ runtime, home }),
     } });
-    const context: ProviderContext = { id: 'tax-assistant', provider: 'antigravity', folder: root, providerDefaults: { kind: 'antigravity', model: 'opaque-oss-id', permissionMode: 'accept-edits' } };
+    const context: ProviderContext = { id: 'tax-assistant', provider: 'antigravity', folder: root, providerDefaults: { kind: 'antigravity', model: 'opaque-oss-id', permission: 'accept-edits' } };
     const events: ProviderEvent[] = [];
     host.onEvent(event => events.push(event));
     const started = await host.sendPrompt(context, 'Check invoices');
     context.providerSession = started.providerSession;
     await expect.poll(() => events.some(event => event.type === 'agent.statusChanged' && event.payload.type === 'idle')).toBe(true);
     // The conversation reports the model and permission it runs with, as every harness does.
-    expect(events).toContainEqual(expect.objectContaining({ type: 'conversation.settingsUpdated', agentId: 'tax-assistant', payload: { settings: { model: 'opaque-oss-id', permissionMode: 'accept-edits' } } }));
+    expect(events).toContainEqual(expect.objectContaining({ type: 'conversation.settingsUpdated', agentId: 'tax-assistant', payload: { settings: { model: 'opaque-oss-id', permission: 'accept-edits' } } }));
     const initialization = JSON.parse(await readFile(path.join(root, 'fixture-initialize.json'), 'utf8'));
     expect(initialization.clientInfo).toStrictEqual({ name: 'cpa-workbench', title: 'Accounting workbench', version: '1' });
     const attached = events.filter(event => event.type === 'antigravity.conversationSnapshotChanged').length;
@@ -88,7 +88,7 @@ it('plans in the CLI\'s own plan mode, hands over the plan it wrote, and leaves 
     configOptions: [{ id: 'model', currentValue: 'gemini-3.8-flash', options: [{ value: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' }] },
       { id: 'thought_level', currentValue: 'high', options: [{ value: 'low', name: 'Low' }, { value: 'high', name: 'High' }] }],
   } }));
-  const agent: ProviderContext = { id: 'planner', provider: 'antigravity', folder: root, providerDefaults: { kind: 'antigravity', permissionMode: 'accept-edits', reasoningEffort: 'low' } };
+  const agent: ProviderContext = { id: 'planner', provider: 'antigravity', folder: root, providerDefaults: { kind: 'antigravity', permission: 'accept-edits', reasoningEffort: 'low' } };
   const events: ProviderEvent[] = [];
   host.onEvent(event => events.push(event));
   try {

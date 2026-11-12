@@ -72,7 +72,7 @@ export function createScriptedHarness(provider: HarnessProvider, options: Script
     forkConversation: (_context: ProviderContext, target: ProviderContext) => ({ providerSession: sessionFor(provider, target) }),
     executeScopedPrompt: (context: ProviderContext) => ({ text: '', session: sessionFor(provider, { ...context, providerSession: undefined, id: `${context.id}-scope` }) }),
     disposeScopedSession: () => undefined,
-    setPermissionMode: (context: ProviderContext, mode: string) => ({ providerDefaults: { ...context.providerDefaults, kind: provider, permissionMode: mode } }),
+    setPermissionMode: (context: ProviderContext, mode: string) => ({ providerDefaults: { ...context.providerDefaults, kind: provider, permission: mode } }),
     respondToAgentRequest: () => undefined,
     close: () => undefined,
   };

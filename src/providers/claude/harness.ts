@@ -19,7 +19,7 @@ export type ClaudeProviderOptions<Context extends ProviderContext = ProviderCont
   claude?: { transport?: ClaudeTurnTransport; transportOptions?: ClaudeAgentSdkTransportOptions; host?: ClaudeHostOptions<Context> };
 };
 
-const permissionOf = (defaults: import('../../contracts').ProviderDefaults) => 'permissionMode' in defaults ? defaults.permissionMode : undefined;
+const permissionOf = (defaults: import('../../contracts').ProviderDefaults) => defaults.permission;
 
 export class ClaudeHarness extends SessionHarness<'claude'> {
   static readonly provider = 'claude';

@@ -62,7 +62,7 @@ it('clones parent defaults and never treats a main or foreign-parent handle as a
   const scope = await driver.executeScopedPrompt(main, { ...input, options: { selection: { model: 'override' } } });
   expect(native.executeScopedPrompt).toHaveBeenNthCalledWith(1, expect.anything(), expect.objectContaining({ options: { selection: { model: 'override' } } }));
   const context = native.executeScopedPrompt.mock.calls[0]![0];
-  expect(context.providerDefaults).toEqual({ kind: 'cursor', model: 'selected-model', reasoningEffort: 'high', serviceTier: 'fast', permissionMode: 'selected' });
+  expect(context.providerDefaults).toEqual({ kind: 'cursor', model: 'selected-model', reasoningEffort: 'high', serviceTier: 'fast', permission: 'selected' });
   context.providerDefaults!.model = 'mutated';
   const second = await driver.executeScopedPrompt(main, input);
   expect(native.executeScopedPrompt.mock.calls[1]![0].providerDefaults?.model).toBe('selected-model');

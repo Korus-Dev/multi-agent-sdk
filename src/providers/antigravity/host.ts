@@ -142,14 +142,14 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
     if (effort) await session.setReasoningEffort(effort);
     admissionGuard?.();
     const permission = options?.providerOptions?.kind === this.provider ? options.providerOptions.permissionMode
-      : agent.providerDefaults?.kind === this.provider ? agent.providerDefaults.permissionMode : undefined;
+      : agent.providerDefaults?.kind === this.provider ? agent.providerDefaults.permission : undefined;
     // Planning is a mode of its own, in place of the permission mode for that turn; the next turn leaves it again.
     const planning = options?.planMode === true || /^\/plan(?:\s|$)/.test(prompt);
     const mode = planning ? 'plan' : permission ?? (session.mode === 'plan' ? 'default' : undefined);
     if (mode) await session.setMode(mode);
     // Readers learn what the conversation runs with from the conversation, as on every harness.
     if (model || effort || permission) this.emit({ type: 'conversation.settingsUpdated', provider: this.provider, agentId: agent.id, payload: { settings: {
-      ...(model ? { model } : {}), ...(effort ? { reasoningEffort: effort } : {}), ...(permission ? { permissionMode: permission } : {}) } } });
+      ...(model ? { model } : {}), ...(effort ? { reasoningEffort: effort } : {}), ...(permission ? { permission } : {}) } } });
     admissionGuard?.();
     const instructions = scope?.developerInstructions ?? this.options.instructions?.(agent, { planMode: planning }) ?? '';
     const body = this.options.formatPrompt?.(prompt, content) ?? (content === undefined ? prompt : promptContentDispatchText(content, prompt));
@@ -345,8 +345,8 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
 
   async setPermissionMode(agent: Context, mode: string) {
     await (await this.ensure(agent)).setMode(mode);
-    this.emit({ type: 'conversation.settingsUpdated', provider: this.provider, agentId: agent.id, payload: { settings: { permissionMode: mode } } });
-    return { providerDefaults: { ...(agent.providerDefaults?.kind === this.provider ? agent.providerDefaults : {}), kind: this.provider, permissionMode: mode } };
+    this.emit({ type: 'conversation.settingsUpdated', provider: this.provider, agentId: agent.id, payload: { settings: { permission: mode } } });
+    return { providerDefaults: { ...(agent.providerDefaults?.kind === this.provider ? agent.providerDefaults : {}), kind: this.provider, permission: mode } };
   }
 
   async releaseConversation(agentId: string): Promise<void> {

@@ -29,12 +29,9 @@ function defaultFormatPrompt(prompt: string, content?: SendPromptOptions['conten
 /** A scope's MCP servers for Codex. The app's own server runs without approval prompts, as it does outside a scope. */
 function scopedMcpServers(scope: HarnessPromptScope, trusted?: string) { return (scope.mcpServers ?? []).map(server => ({ name: server.name, transport: { type: 'http' as const, url: server.url }, ...(server.enabledTools ? { enabledTools: [...server.enabledTools] } : {}), ...(server.name === trusted ? { toolApprovalMode: 'approve' as const } : server.approval === 'auto' ? { toolApprovalMode: 'auto' as const } : {}), ...(server.required === undefined ? {} : { required: server.required }) })); }
 function nativeApprovalPreset(defaults: import('../../contracts').ProviderDefaults | undefined): ApprovalPreset | undefined {
-  if (defaults?.kind !== 'codex') return undefined;
   // Missing caller policy inherits the native thread; it is not an approval override.
-  if (defaults.approvalPreset === undefined && defaults.approvalPolicy === undefined && defaults.sandboxMode === undefined && defaults.approvalsReviewer === undefined) return undefined;
-  if (defaults.approvalPreset) return defaults.approvalPreset;
-  if (defaults.approvalPolicy === 'never' && defaults.sandboxMode === 'danger-full-access') return 'full-access';
-  return defaults.approvalPolicy === 'on-request' && ['auto_review','guardian_subagent'].includes(defaults.approvalsReviewer ?? '') ? 'approve-for-me' : 'ask-for-approval';
+  const permission = defaults?.kind === 'codex' ? defaults.permission : undefined;
+  return permission === 'ask-for-approval' || permission === 'approve-for-me' || permission === 'full-access' ? permission : undefined;
 }
 import { providerSafetyBlockMessage, type ProviderSafetyReviewTarget } from '../../contracts/safety-review';
 
@@ -1627,7 +1624,7 @@ export class CodexHostAdapter<Context extends Agent = Agent> {
         type: 'conversation.settingsUpdated',
         payload: {
           settings: {
-            ...(preset ? { approvalPreset: preset } : {}),
+            ...(preset ? { permission: preset } : {}),
             ...(selectedModelId ? { model: selectedModelId } : {}),
             ...(selectedReasoningEffort ? { reasoningEffort: selectedReasoningEffort } : {}),
             ...(selectedServiceTier === undefined ? {} : { serviceTier: selectedServiceTier }),

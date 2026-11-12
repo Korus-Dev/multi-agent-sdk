@@ -139,7 +139,7 @@ export class CursorHost<Context extends ProviderContext = ProviderContext> imple
       session.assertSelection(selection.model,selection.reasoningEffort,options?.planMode === true);
       // Readers learn what the conversation runs with from the conversation, as on every harness.
       this.emit({ type: 'conversation.settingsUpdated', provider: this.provider, agentId: agent.id, payload: { settings: {
-        ...(selection.model ? { model: selection.model } : {}), ...(selection.reasoningEffort !== null ? { reasoningEffort: selection.reasoningEffort } : {}), permissionMode: this.permissionMode(agent) } } });
+        ...(selection.model ? { model: selection.model } : {}), ...(selection.reasoningEffort !== null ? { reasoningEffort: selection.reasoningEffort } : {}), permission: this.permissionMode(agent) } } });
       const content = options?.content === undefined ? undefined : normalizePromptContent(options.content);
       const instructions = scope?.developerInstructions ?? this.options.instructions?.(agent) ?? '';
       const dispatched = this.options.formatPrompt?.(prompt, content) ?? (content === undefined ? prompt : promptContentDispatchText(content, prompt));
@@ -295,20 +295,20 @@ export class CursorHost<Context extends ProviderContext = ProviderContext> imple
   }
   private workingDirectory(agent: Context): string { return agent.folder ?? path.join((this.options.stateDirectory?.() ?? defaultRuntimeDirectory()), 'cursor-quick-chats', encodeURIComponent(agent.id)); }
   private permissionMode(agent: Context): 'default' | 'full-access' {
-    const mode = agent.providerDefaults?.kind === this.provider ? agent.providerDefaults.permissionMode ?? 'default' : 'default';
+    const mode = agent.providerDefaults?.kind === this.provider ? agent.providerDefaults.permission ?? 'default' : 'default';
     if (mode !== 'default' && mode !== 'full-access') throw new Error('Unsupported permission mode for Cursor.');
     return mode;
   }
   async setPermissionMode(agent: Context, mode: string) {
     if (this.closed || agent.provider !== this.provider || (agent.providerSession && agent.providerSession.kind !== this.provider)) throw new Error('Cursor conversation identity mismatch.');
-    const defaults = { ...(agent.providerDefaults?.kind === this.provider ? agent.providerDefaults : {}), kind: this.provider, permissionMode: mode };
+    const defaults = { ...(agent.providerDefaults?.kind === this.provider ? agent.providerDefaults : {}), kind: this.provider, permission: mode };
     const permission = this.permissionMode({ ...agent, providerDefaults: defaults });
     await this.opening.get(agent.id)?.done;
     const session = this.sessions.get(agent.id);
     if (session && agent.providerSession?.kind === this.provider && agent.providerSession.sessionId !== session.sessionId) throw new Error('Cursor conversation identity mismatch.');
     if (session && agent.folder && path.resolve(agent.folder) !== path.resolve(session.cwd)) throw new Error('Cursor conversation belongs to another workspace.');
     if (session && !session.isClosed) session.setPermissionMode(permission);
-    this.emit({ type: 'conversation.settingsUpdated', provider: this.provider, agentId: agent.id, payload: { settings: { permissionMode: permission } } });
+    this.emit({ type: 'conversation.settingsUpdated', provider: this.provider, agentId: agent.id, payload: { settings: { permission } } });
     return { providerDefaults: defaults };
   }
   async listModels(agent: Context) { return (await this.ensure(agent, this.executionScopes.get(agent.id))).models; }

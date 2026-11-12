@@ -56,7 +56,7 @@ export class ClaudeProviderCatalog {
     return {
       providerDefaults: {
         ...defaults,
-        permissionMode: mode,
+        permission: mode,
       },
     };
   }

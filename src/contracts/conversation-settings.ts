@@ -2,6 +2,6 @@ export type ConversationSettings = {
   model?: string;
   reasoningEffort?: string;
   serviceTier?: string | null;
-  approvalPreset?: import('./shared').ApprovalPreset;
-  permissionMode?: string;
+  /** The permission in effect, as one of the ids in `capabilities.permissions`. */
+  permission?: string;
 };

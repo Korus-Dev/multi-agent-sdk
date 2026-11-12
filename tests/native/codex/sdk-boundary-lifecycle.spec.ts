@@ -24,7 +24,7 @@ describe(`Codex SDK → ${product.name} backend lifecycle`, () => {
     fixtures.push(fixture);
     const native = fixture.conversation('conversation-a');
     native.setSnapshot({ approvalPresets: ['ask-for-approval', 'approve-for-me', 'full-access'], approvalPreset: 'full-access' });
-    await fixture.driver.loadConversation({ ...sdkAgent(), ...(policy === 'caller' ? { providerDefaults: { kind: 'codex', approvalPreset: 'ask-for-approval' } as const } : {}) });
+    await fixture.driver.loadConversation({ ...sdkAgent(), ...(policy === 'caller' ? { providerDefaults: { kind: 'codex', permission: 'ask-for-approval' } as const } : {}) });
     expect(native.handle.updateSettings).toHaveBeenCalledExactlyOnceWith({ approvalPreset: 'ask-for-approval' });
   });
 
@@ -36,7 +36,7 @@ describe(`Codex SDK → ${product.name} backend lifecycle`, () => {
     const agent = { ...sdkAgent(), providerDefaults: { kind: 'codex', model: 'saved-model', reasoningEffort: 'high', serviceTier: 'fast', userSelectedModel: true } as const };
     await fixture.driver.loadConversation(agent);
     expect(session.handle.updateSettings).not.toHaveBeenCalled();
-    expect(fixture.events.filter(event => event.type === 'conversation.settingsUpdated').at(-1)).toMatchObject({ payload: { settings: { model: 'native-model', reasoningEffort: 'low', approvalPreset: 'ask-for-approval' } } });
+    expect(fixture.events.filter(event => event.type === 'conversation.settingsUpdated').at(-1)).toMatchObject({ payload: { settings: { model: 'native-model', reasoningEffort: 'low', permission: 'ask-for-approval' } } });
     fixture.host.createConversation.mockResolvedValue(sdkSnapshot('new'));
     await fixture.driver.sendPrompt({ ...agent, id: 'new-agent', providerSession: undefined }, 'New conversation');
     expect(fixture.host.createConversation).toHaveBeenCalledWith(expect.objectContaining({ model: 'saved-model', reasoningEffort: 'high', serviceTier: 'fast' }), expect.anything());

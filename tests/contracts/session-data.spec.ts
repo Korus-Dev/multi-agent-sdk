@@ -57,8 +57,8 @@ describe('session data readers', () => {
   });
 
   it('reads the permission persisted defaults select', () => {
-    expect(defaultsPermission({ kind: 'codex', approvalPreset: 'full-access' })).toBe('full-access');
-    expect(defaultsPermission({ kind: 'claude', permissionMode: 'acceptEdits' })).toBe('acceptEdits');
+    expect(defaultsPermission({ kind: 'codex', permission: 'full-access' })).toBe('full-access');
+    expect(defaultsPermission({ kind: 'claude', permission: 'acceptEdits' })).toBe('acceptEdits');
     expect(defaultsPermission(undefined)).toBeUndefined();
   });
 });

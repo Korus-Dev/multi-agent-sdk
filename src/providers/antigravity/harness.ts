@@ -14,7 +14,7 @@ import { transcriptActivity } from '../../conversations/conversation-activity';
 
 export type AntigravityProviderOptions<Context extends ProviderContext = ProviderContext> = SharedProviderOptions<Context> & { antigravity?: AntigravityHostOptions<Context> };
 
-const permissionOf = (defaults: ProviderDefaults) => 'permissionMode' in defaults ? defaults.permissionMode : undefined;
+const permissionOf = (defaults: ProviderDefaults) => defaults.permission;
 
 export class AntigravityHarness extends SessionHarness<'antigravity'> {
   static readonly provider = 'antigravity';

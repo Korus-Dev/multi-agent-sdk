@@ -28,7 +28,7 @@ export type CodexProviderOptions<Context extends ProviderContext = ProviderConte
 };
 type CodexBinding<Context> = { context: Context; scope?: HarnessPromptScope };
 
-const permissionOf = (defaults: ProviderDefaults) => defaults.kind === 'codex' ? defaults.approvalPreset : undefined;
+const permissionOf = (defaults: ProviderDefaults) => defaults.permission;
 
 export class CodexHarness extends ProviderHarness<'codex'> {
   static readonly provider = 'codex';
@@ -116,20 +116,14 @@ export class CodexHarness extends ProviderHarness<'codex'> {
 
   protected identityOf(data: Record<string, unknown>): unknown { return data.threadId; }
   protected conversationRef(data: ProviderSessionData): ProviderConversationRef { return { provider: 'codex', threadId: (data as { threadId: string }).threadId }; }
-  protected permissionDefaults(id: string): Partial<ProviderDefaults> { return { approvalPreset: id } as Partial<ProviderDefaults>; }
-  protected permissionOf(defaults: ProviderDefaults): string | undefined { return permissionOf(defaults); }
   protected permissionOptions(capabilities: ProviderCapabilities): HarnessCapabilities['permissions'] {
     return (capabilities.approvalPresets ?? []).map(id => ({ id, ...(id === 'full-access' ? { dangerous: true } : {}) }));
-  }
-  /** Codex reports its permission as the approval preset in settings events. */
-  protected permissionFromEvent(event: ProviderEvent): string | null | undefined {
-    return event.type === 'conversation.settingsUpdated' ? event.payload.settings.approvalPreset : undefined;
   }
   protected async applyPermission(context: ProviderContext, id: string): Promise<string> {
     if (!this.native.setApprovalPreset) throw new Error('Permission updates are unavailable.');
     const result = await this.native.setApprovalPreset(context, id as import('../../contracts').ApprovalPreset);
     context.providerSession = result.providerSession;
-    context.providerDefaults = { ...context.providerDefaults, kind: 'codex', approvalPreset: result.approvalPreset };
+    context.providerDefaults = { ...context.providerDefaults, kind: 'codex', permission: result.approvalPreset };
     return result.approvalPreset;
   }
   protected activityOf(frame: ProviderEvent) { return codexActivity(frame); }

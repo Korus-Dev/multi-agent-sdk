@@ -14,7 +14,7 @@ import { transcriptActivity } from '../../conversations/conversation-activity';
 
 export type CursorProviderOptions<Context extends ProviderContext = ProviderContext> = SharedProviderOptions<Context> & { cursor?: CursorHostOptions<Context> };
 
-const permissionOf = (defaults: ProviderDefaults) => 'permissionMode' in defaults ? defaults.permissionMode : undefined;
+const permissionOf = (defaults: ProviderDefaults) => defaults.permission;
 
 export class CursorHarness extends SessionHarness<'cursor'> {
   static readonly provider = 'cursor';

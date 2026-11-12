@@ -77,5 +77,5 @@ export function isProviderSessionData(value: unknown): value is ProviderSessionD
 /** The permission option persisted defaults select; undefined when they select none. */
 export function defaultsPermission(defaults: ProviderDefaults | null | undefined): string | undefined {
   if (!defaults) return undefined;
-  return defaults.kind === 'codex' ? defaults.approvalPreset : defaults.permissionMode;
+  return defaults.permission;
 }
