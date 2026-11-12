@@ -18,12 +18,14 @@ it('runs a caller-owned Antigravity client and selects utility models without pr
     host = createProviderHost('antigravity', { client: { name: 'cpa-workbench', title: 'Accounting workbench', metadataDirectory: 'accounting-sessions' }, stateDirectory: () => root, antigravity: { home: () => home, resolveRuntime: () => runtime,
       runtimeOptions: () => ({ runtime, home }),
     } });
-    const context: ProviderContext = { id: 'tax-assistant', provider: 'antigravity', folder: root };
+    const context: ProviderContext = { id: 'tax-assistant', provider: 'antigravity', folder: root, providerDefaults: { kind: 'antigravity', model: 'opaque-oss-id', permissionMode: 'auto_edit' } };
     const events: ProviderEvent[] = [];
     host.onEvent(event => events.push(event));
     const started = await host.sendPrompt(context, 'Check invoices');
     context.providerSession = started.providerSession;
     await expect.poll(() => events.some(event => event.type === 'agent.statusChanged' && event.payload.type === 'idle')).toBe(true);
+    // The conversation reports the model and permission it runs with, as every harness does.
+    expect(events).toContainEqual(expect.objectContaining({ type: 'conversation.settingsUpdated', agentId: 'tax-assistant', payload: { settings: { model: 'opaque-oss-id', permissionMode: 'auto_edit' } } }));
     const initialization = JSON.parse(await readFile(path.join(root, 'fixture-initialize.json'), 'utf8'));
     expect(initialization.clientInfo).toStrictEqual({ name: 'cpa-workbench', title: 'Accounting workbench', version: '1' });
     const attached = events.filter(event => event.type === 'antigravity.conversationSnapshotChanged').length;

@@ -20,9 +20,11 @@ it('serves a non-Korus consumer through the unified driver and a caller-owned ex
       sessionOptions: { client: { name: 'cpa-workbench', metadataDirectory: 'accounting-sessions' }, resolveCommand: () => command },
     } });
     driver.onEvent(event => events.push(event));
-    const context: ProviderContext = { id: 'tax-assistant', provider: 'cursor', folder: root, name: 'Tax assistant' };
+    const context: ProviderContext = { id: 'tax-assistant', provider: 'cursor', folder: root, name: 'Tax assistant', providerDefaults: { kind: 'cursor', permissionMode: 'default' } };
     const started = await driver.sendPrompt(context, 'Check invoices');
     context.providerSession = started.providerSession;
+    // The conversation reports the permission it runs with, as every harness does.
+    expect(events).toContainEqual(expect.objectContaining({ type: 'conversation.settingsUpdated', agentId: 'tax-assistant', payload: { settings: expect.objectContaining({ permissionMode: 'default' }) } }));
     // Loading after completion is the public read path; the fixture completes synchronously after its prompt.
     await expect.poll(() => events.some(event => event.type === 'agent.statusChanged' && event.payload.type === 'idle')).toBe(true);
     const messages = await driver.readConversationMessages!({ provider: 'cursor', folder: root, sessionId: started.providerSession.kind === 'cursor' ? started.providerSession.sessionId : '' }, context.id);

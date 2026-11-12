@@ -137,6 +137,9 @@ export class CursorHost<Context extends ProviderContext = ProviderContext> imple
       admissionGuard?.();
       admissionGuard?.();
       session.assertSelection(selection.model,selection.reasoningEffort,options?.planMode === true);
+      // Readers learn what the conversation runs with from the conversation, as on every harness.
+      this.emit({ type: 'conversation.settingsUpdated', provider: this.provider, agentId: agent.id, payload: { settings: {
+        ...(selection.model ? { model: selection.model } : {}), ...(selection.reasoningEffort !== null ? { reasoningEffort: selection.reasoningEffort } : {}), permissionMode: this.permissionMode(agent) } } });
       const content = options?.content === undefined ? undefined : normalizePromptContent(options.content);
       const instructions = scope?.developerInstructions ?? this.options.instructions?.(agent) ?? '';
       const dispatched = this.options.formatPrompt?.(prompt, content) ?? (content === undefined ? prompt : promptContentDispatchText(content, prompt));
@@ -305,6 +308,7 @@ export class CursorHost<Context extends ProviderContext = ProviderContext> imple
     if (session && agent.providerSession?.kind === this.provider && agent.providerSession.sessionId !== session.sessionId) throw new Error('Cursor conversation identity mismatch.');
     if (session && agent.folder && path.resolve(agent.folder) !== path.resolve(session.cwd)) throw new Error('Cursor conversation belongs to another workspace.');
     if (session && !session.isClosed) session.setPermissionMode(permission);
+    this.emit({ type: 'conversation.settingsUpdated', provider: this.provider, agentId: agent.id, payload: { settings: { permissionMode: permission } } });
     return { providerDefaults: defaults };
   }
   async listModels(agent: Context) { return (await this.ensure(agent, this.executionScopes.get(agent.id))).models; }

@@ -21,13 +21,14 @@ export function permissionRequest(params: Record<string, unknown>, trustedMcpSer
     && mcp.server === trustedMcpServerName && typeof mcp.tool === 'string' && mcp.tool.trim()
     ? options.find(option => option.kind === 'allow_once') : undefined;
   const title = typeof call.title === 'string' ? call.title : 'Antigravity permission';
-  const request: ClientRequest = question ? {
+  // A confirmation carries the id of its tool call, which is also the id of the tool part in the transcript.
+  const request: ClientRequest & { itemId?: string } = question ? {
     id, kind: 'ask_user', payload: { request: { itemId: call.toolCallId, blocking: true, delivery: 'tool', questions: [{
       id: call.toolCallId, header: 'Antigravity', question: title, isOther: false, isSecret: false,
       options: options.map(option => ({ label: option.name, description: '' })),
     }] } },
   } : {
-    id, kind: 'confirm_tool', payload: { confirmation: {
+    id, kind: 'confirm_tool', itemId: call.toolCallId, payload: { confirmation: {
       integrationId: 'antigravity', integrationName: 'antigravity', toolName: title, summary: title,
       argumentsPreview: JSON.stringify(call.rawInput ?? call.content ?? {}),
       allowAlways: options.some(option => option.kind === 'allow_always'), allowConversation: false,

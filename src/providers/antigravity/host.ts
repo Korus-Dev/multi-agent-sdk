@@ -136,6 +136,8 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
     const permission = options?.providerOptions?.kind === this.provider ? options.providerOptions.permissionMode
       : agent.providerDefaults?.kind === this.provider ? agent.providerDefaults.permissionMode : undefined;
     if (permission) await session.setMode(permission);
+    // Readers learn what the conversation runs with from the conversation, as on every harness.
+    if (model || permission) this.emit({ type: 'conversation.settingsUpdated', provider: this.provider, agentId: agent.id, payload: { settings: { ...(model ? { model } : {}), ...(permission ? { permissionMode: permission } : {}) } } });
     admissionGuard?.();
     const planning = options?.planMode === true || /^\/plan(?:\s|$)/.test(prompt);
     const instructions = scope?.developerInstructions ?? this.options.instructions?.(agent, { planMode: planning }) ?? '';
@@ -333,6 +335,7 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
 
   async setPermissionMode(agent: Context, mode: string) {
     await (await this.ensure(agent)).setMode(mode);
+    this.emit({ type: 'conversation.settingsUpdated', provider: this.provider, agentId: agent.id, payload: { settings: { permissionMode: mode } } });
     return { providerDefaults: { ...(agent.providerDefaults?.kind === this.provider ? agent.providerDefaults : {}), kind: this.provider, permissionMode: mode } };
   }
 

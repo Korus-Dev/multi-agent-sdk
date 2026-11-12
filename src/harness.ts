@@ -17,6 +17,8 @@ const emptyState = (): SessionState => ({ messages: [], busy: false, activeTurnI
 type Binding = {
   /** The last turn that reported output; `turn.output` is published once per turn. */
   outputTurn?: string;
+  /** Each tool's last reported status in the running turn; `tool.updated` is published when it changes. */
+  toolStatuses?: Map<string, string>;
   kind: 'main' | 'scope';
   parent?: Session;
   operation?: 'executing' | 'disposing' | 'releasing' | 'hydrating';
@@ -248,7 +250,16 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
           if (activity.turnId && binding.outputTurn === activity.turnId) continue;
           binding.outputTurn = activity.turnId;
           this.emit({ ...activity, session });
-        } else this.emit({ ...activity, session });
+        } else if (activity.type === 'tool.updated') {
+          // Harnesses repeat a tool's state with every detail they add; consumers hear of a status once.
+          const statuses = this.get(session).toolStatuses ??= new Map();
+          if (statuses.get(activity.tool.id) === activity.tool.status) continue;
+          statuses.set(activity.tool.id, activity.tool.status);
+          this.emit({ ...activity, session });
+        } else {
+          if (activity.type === 'turn.completed' && !activity.willRetry) this.get(session).toolStatuses = undefined;
+          this.emit({ ...activity, session });
+        }
       }
       return;
     }

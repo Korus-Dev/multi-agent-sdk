@@ -40,6 +40,18 @@ describe('conversation activity', () => {
     ]));
   });
 
+  it('reports a tool once per status, however often the harness repeats it', () => {
+    const scope = { seq: 1, occurredAt: at, agentId: 'agent', provider: 'claude', providerSessionId: 'session', turnId: 'turn-1' };
+    const tool = (status: string) => ({ ...scope, type: 'item.updated', payload: { itemId: 'tool-1', status } });
+    const { activity } = run('claude', claudeSnapshot, [
+      { ...scope, type: 'turn.started', payload: { turn: { id: 'turn-1', provider: 'claude' } } },
+      { ...scope, type: 'item.started', payload: { toolPart: { id: 'tool-1', type: 'tool', kind: 'command', title: 'ls', status: 'running' } } },
+      tool('running'), tool('running'), tool('completed'), tool('completed'),
+      { ...scope, type: 'turn.completed', payload: { turn: { id: 'turn-1', status: 'completed' } } },
+    ]);
+    expect(activity.flatMap(event => event.type === 'tool.updated' ? [event.tool.status] : [])).toStrictEqual(['running', 'completed']);
+  });
+
   it('reports a Claude error with when its limit resets, then the failed turn', () => {
     const scope = { seq: 1, occurredAt: at, agentId: 'agent', provider: 'claude', providerSessionId: 'session', turnId: 'turn-1' };
     const { session, activity } = run('claude', claudeSnapshot, [
