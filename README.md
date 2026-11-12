@@ -23,17 +23,17 @@ Requires Node.js 22.19+ and an installed, authenticated provider runtime. This i
 ```ts
 import { createHarness } from '@korus-dev/multi-agent-sdk';
 
-const driver = createHarness('codex', { client: { name: 'my-app' } });
-const session = driver.open({ id: 'review', folder: process.cwd() });
+const harness = createHarness('codex', { client: { name: 'my-app' } });
+const session = harness.open({ id: 'review', folder: process.cwd() });
 try {
-  const run = driver.run(session, 'Explain this project');
+  const run = harness.run(session, 'Explain this project');
   for await (const event of run.events) {
     if (event.type === 'tool.updated') console.log(event.tool.kind, event.tool.status);
   }
   const { status, error, messages } = await run.result; // completed, failed or interrupted
   console.log(status, error, messages);
 } finally {
-  await driver.close();
+  await harness.close();
 }
 ```
 

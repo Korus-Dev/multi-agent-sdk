@@ -6,6 +6,6 @@ Keep native credentials, home paths, raw runtime configuration, and restoration 
 
 Attachment readers are session-scoped. Authorize uploads and resolve opaque references in trusted host code. Applications own durable attachment retention: a path left in provider history does not guarantee that a preview remains readable after restart.
 
-Claude's configuration-home helpers are process-wide. Use sequential close/recreate when switching profiles. The single-home driver interface is not a concurrent tenant-isolation mechanism.
+Claude's configuration-home helpers are process-wide. Use sequential close/recreate when switching profiles. The single-home harness interface is not a concurrent tenant-isolation mechanism.
 
 When reporting a vulnerability, avoid posting credentials or private conversation data in a public issue. Use the repository's private security reporting channel if enabled, or contact the maintainer privately.

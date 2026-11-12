@@ -1,21 +1,58 @@
 # State and events
 
-`readSession(session)` returns the current neutral projection. Subscribe with `onEvent` to update the host view. The unsubscribe function removes that listener; `close()` owns native driver cleanup.
+`readSession(session)` returns the session's current state: messages, turns, pending requests, title, plan, goal and settings, in the same shape for every provider. Subscribe with `onEvent` to keep a view up to date. The function it returns removes the listener.
 
 | Event | Use |
 | --- | --- |
-| `session.changed` | Render messages, turns, busy state, pending requests, title, plan, goal, settings, and history state. |
-| `request.created` / `request.resolved` | Present or retire provider approval/question controls. |
-| `status.changed` | Show provider-reported work/status detail. |
-| `plan.readyForReview` | Present a provider-authored plan for host review. |
-| `recovery.required` | Surface the reason and reload authoritative conversation state before continuing incremental rendering. |
-| `usage.observed` | Record execution-level accounting evidence. |
-| `requestUsage.observed` | Record request-level accounting evidence where supplied. |
+| `session.changed` | Render the session from its full state. |
+| `session.patch` | Apply the same change as a small revisioned patch, to keep a copy of the state somewhere else. |
+| `turn.started` / `turn.completed` | Follow a turn from start to end, with its status and error. |
+| `turn.output` | Know a turn has started producing output. |
+| `tool.updated` | Show a tool call, once per status. |
+| `diff.updated` / `file.activity` | Show what the turn changed and which files it touched. |
+| `session.error` | Show an error the conversation reported. |
+| `request.created` / `request.resolved` | Present or retire an approval or a question. |
+| `status.changed` | Show whether the session is idle, working, or waiting on an approval or an answer. |
+| `plan.readyForReview` | Present a plan the provider wrote for review. |
+| `recovery.required` | Reload the conversation with `loadConversation` before rendering further changes. |
+| `usage.observed` / `requestUsage.observed` | Record what a turn or a request consumed. |
 
-Messages use the shared `Message`/`MessagePart` contracts. Provider replicas own their state and ordering; the neutral interface does not replace native behavior with a universal reducer. Turn details include native failure/retry evidence, timing, and execution usage.
+Session and provider updates such as `conversation.settingsUpdated` and `agent.conversationAttached` arrive in the same stream, in the same shape for every provider.
 
-A successful admission is independent of a successful turn. Correlate terminal status with `Admission.turnId` when supplied; do not infer completion merely because a message arrived or `sendPrompt` resolved.
+Sending a prompt and finishing a turn are separate: `sendPrompt` resolves when the provider accepts the prompt. Follow the turn with `run`, or match `turn.completed` against the admission's `turnId`.
 
-Pending-request snapshots are authoritative for Codex and ACP. Claude retains requests unless native answers or resolution events establish that they were handled. Unknown pending, usage, model, token, request, and cost information stays unknown. Do not coerce missing accounting evidence to zero.
+Unknown usage, model, token, request and cost information stays unknown. Do not treat missing accounting as zero.
 
-Use `driver.getCapabilities(session)` to decide which actions to offer. Capability flags control presentation; trusted host code still owns authorization. Operations that a provider does not implement reject rather than emulating unsupported native behavior.
+Use `harness.getCapabilities(session)` to decide which actions to offer. An operation a provider does not support rejects with `HarnessUnsupportedError`.
+
+## Keep a copy of a session elsewhere
+
+To show a session in another process, such as a browser window or a phone, send it a snapshot once and patches afterwards. Each patch carries only what changed: streamed text arrives as the text that was added.
+
+On the side that owns the harness:
+
+```ts
+send({ snapshot: harness.readSessionSnapshot(session) });
+harness.onEvent(event => {
+  if (event.type === 'session.patch' && event.session === session) send({ patch: event.patch });
+});
+```
+
+On the side that renders it, with no Node dependency:
+
+```ts
+import { applySessionPatch, SessionPatchGapError } from '@korus-dev/multi-agent-sdk/contracts';
+
+let copy = received.snapshot;
+function onPatch(patch) {
+  try {
+    copy = applySessionPatch(copy, patch);
+  } catch (error) {
+    if (!(error instanceof SessionPatchGapError)) throw error;
+    requestSnapshot(); // A patch was missed: start again from a fresh snapshot.
+  }
+  render(copy.state);
+}
+```
+
+Snapshots and patches are plain JSON. A patch applies only to the revision before it; `applySessionPatch` throws `SessionPatchGapError` when one was missed and `SessionPatchInvalidError` when a patch is not a valid change, and in both cases a fresh snapshot is the way forward.

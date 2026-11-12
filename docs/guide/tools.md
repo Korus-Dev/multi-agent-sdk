@@ -7,7 +7,7 @@ Query `getCapabilities(session).permissions` for supported opaque permission IDs
 Listen for requests and answer them through the owning session:
 
 ```ts
-await driver.respondToRequest(session, {
+await harness.respondToRequest(session, {
   id: request.id,
   outcome: { kind: 'decision', decision: 'deny' },
 });
@@ -20,7 +20,7 @@ Question outcomes use `{ kind: 'answered', answers }`; cancellation uses `{ kind
 Hosts supply named HTTP MCP endpoints through `mcpServers`:
 
 ```ts
-const driver = createHarness('codex', {
+const harness = createHarness('codex', {
   client: { name: 'my-app' },
   mcpServers: () => [{
     name: 'ledger',
@@ -31,7 +31,7 @@ const driver = createHarness('codex', {
 });
 ```
 
-Tool availability and approval policy are separate. Omitted `approval`, or `inherit`, uses native policy. `auto` explicitly trusts the selected tools and is supported only by Codex and Claude. `required: true` enforces startup connection only on Codex. Unsupported policy requests reject. `required: false` remains optional and is a no-op on providers without startup enforcement.
+Tool availability and approval policy are separate. Omitted `approval`, or `inherit`, uses native policy. `auto` explicitly trusts the selected tools and is supported only by Codex and Claude. Antigravity runs the tools of connected MCP servers without asking in every permission mode, so connect only servers you trust there. `required: true` enforces startup connection only on Codex. Unsupported policy requests reject. `required: false` remains optional and is a no-op on providers without startup enforcement.
 
 ## Scoped work and generation
 

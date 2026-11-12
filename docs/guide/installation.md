@@ -17,7 +17,7 @@ The package is ESM-only. Use `"type": "module"` in your application and configur
 | `cursor` | Cursor's `agent` or `cursor-agent` executable with ACP support. The adapter requires version 2026.10.08 or newer. |
 | `antigravity` | The Antigravity CLI (`agy`) 1.5.1 or later, signed in. |
 
-The package does not provision provider subscriptions or store application API keys. Check `driver.getRuntimeStatus()` for discovery status and use `await driver.authenticate({ action: 'check' })` for native account status. Authentication actions and account details differ by provider.
+The package does not provision provider subscriptions or store application API keys. Check `harness.getRuntimeStatus()` for discovery status and use `await harness.authenticate({ action: 'check' })` for native account status. Authentication actions and account details differ by provider.
 
 ## Homes and working folders
 
@@ -26,12 +26,12 @@ The package does not provision provider subscriptions or store application API k
 ```ts
 import { createHarness } from '@korus-dev/multi-agent-sdk';
 
-const driver = createHarness('codex', {
+const harness = createHarness('codex', {
   client: { name: 'my-app', version: '1.0.0' },
   home: '/srv/my-app/codex-profile',
 });
 ```
 
-Use one home per driver. Switch by awaiting `close()` and constructing a fresh driver. Claude's configuration home is process-wide: close the current Claude runtime before opening another profile. This interface does not provide concurrent multi-home isolation.
+Use one home per harness. Switch by awaiting `close()` and creating a fresh harness. Claude's configuration home is process-wide: close the current Claude runtime before opening another profile. This interface does not provide concurrent multi-home isolation.
 
 Continue with [your first conversation](quick-start.md).

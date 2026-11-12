@@ -7,7 +7,7 @@
 | Send returned but work continues | `sendPrompt` reports admission. Track the admitted turn through `session.changed`. |
 | Old conversation settings changed | Ensure the host did not supply an explicit default or policy callback. Omitted permission preferences preserve native settings. |
 | A control rejects | Read `getCapabilities(session)` and native catalog metadata. Unsupported behavior is not emulated. |
-| Handle rejected | Sessions/refs belong to the driver that issued them. Move detached restoration data, then restore in the new driver. |
+| Handle rejected | Sessions and refs belong to the harness that issued them. Move detached restoration data, then restore in the new harness. |
 | Messages stop updating | Handle `recovery.required`, report its reason, and reload authoritative state. |
 | Preview missing after restart | Provider history may retain a path without live content access. Use host-owned durable attachments. |
 | New checkout cannot install | The pinned Codex SDK version must exist on the configured registry. Local source mode does not replace npm dependency installation. |
