@@ -1,6 +1,6 @@
 {
   "name": "@korus-dev/multi-agent-sdk",
-  "version": "0.27.0",
+  "version": "0.27.1",
   "description": "Unified native coding-agent harness interface and adapters.",
   "license": "Apache-2.0",
   "author": "Nicolas Bonamy",
