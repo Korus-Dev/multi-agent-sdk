@@ -20,7 +20,9 @@ export function createClaudeConversationReplica(
       if (event.agentId !== snapshot.agentId) {
         throw new Error(`Claude conversation event belongs to '${event.agentId}', expected '${snapshot.agentId}'.`);
       }
-      const next = structuredClone(snapshot);
+      // A page of older history only adds messages and turns before the ones held, and never changes one of them, so
+      // the messages already held are shared with the snapshot before it. Every other event may change a message in place.
+      const next = event.type === 'history.prepended' || event.type === 'turn.historyUpdated' ? withSharedMessages(snapshot) : structuredClone(snapshot);
       if (event.type === 'clientRequest.resolved') {
         if (!next.answeredClientRequestIds.includes(event.payload.id)) {
           next.answeredClientRequestIds.push(event.payload.id);
@@ -41,6 +43,11 @@ export function createClaudeConversationReplica(
       return snapshot;
     },
   };
+}
+
+/** A new snapshot that shares the messages of `snapshot`; the lists the history events change are copied. */
+function withSharedMessages(snapshot: ClaudeConversationSnapshot): ClaudeConversationSnapshot {
+  return { ...snapshot, turnIds: [...snapshot.turnIds], turns: [...snapshot.turns], historyState: { ...snapshot.historyState } };
 }
 
 function applyTurnLifecycle(

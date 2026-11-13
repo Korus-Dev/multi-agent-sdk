@@ -28,6 +28,50 @@ describe('Claude conversation replica', () => {
     replica.apply(update);
     expect(replica.getSnapshot()).toMatchObject({ busy: true, activeTurnId: 'turn', turns: [update.payload.turn] });
   });
+  describe('when a page of older history is prepended', () => {
+    const message = (id: string, text: string) => ({ id, agentId: 'agent-1', turnId: `turn-${id}`, role: 'assistant' as const, status: 'complete' as const, createdAt: '', parts: [{ type: 'text' as const, text }] });
+    const open = () => {
+      const held = [message('c', 'Held 1'), message('d', 'Held 2')];
+      const replica = createClaudeConversationReplica({ ...emptySnapshot(), sessionId: 'session', messages: held });
+      const page = (...messages: ReturnType<typeof message>[]) => event({ type: 'history.prepended', providerSessionId: 'session', payload: { messages, hasOlder: true } });
+      return { replica, page };
+    };
+
+    it('shows the older messages first, in order, with the ones already held after them', () => {
+      const { replica, page } = open();
+      replica.apply(page(message('a', 'Older 1'), message('b', 'Older 2')));
+      expect(replica.getSnapshot().messages.map(row => row.id)).toStrictEqual(['a', 'b', 'c', 'd']);
+      expect(replica.getSnapshot().historyState).toStrictEqual({ hasOlder: true, loadingOlder: false });
+    });
+
+    it('leaves the snapshot returned before the page exactly as it was', () => {
+      const { replica, page } = open();
+      const before = replica.getSnapshot();
+      const copy = structuredClone(before);
+      replica.apply(page(message('a', 'Older 1')));
+      expect(before).toStrictEqual(copy);
+      expect(replica.getSnapshot()).not.toBe(before);
+    });
+
+    it('keeps the messages it already holds, without copying them again', () => {
+      const { replica, page } = open();
+      const held = replica.getSnapshot().messages;
+      replica.apply(page(message('a', 'Older 1'), message('b', 'Older 2')));
+      expect(replica.getSnapshot().messages.slice(-2)).toStrictEqual(held);
+      held.forEach((row, index) => expect(replica.getSnapshot().messages[index + 2]).toBe(row));
+    });
+
+    it('keeps the messages it already holds when the page names a turn it has not seen', () => {
+      const { replica } = open();
+      const held = replica.getSnapshot().messages;
+      const turn = { id: 'turn-a', status: 'completed' as const, error: null, willRetry: false, startedAt: null, completedAt: null, durationMs: null };
+      replica.apply(event({ type: 'turn.historyUpdated', providerSessionId: 'session', payload: { turn } }));
+      replica.apply(event({ type: 'history.prepended', providerSessionId: 'session', payload: { messages: [message('a', 'Older 1')], hasOlder: false } }));
+      expect(replica.getSnapshot().turns).toStrictEqual([turn]);
+      held.forEach((row, index) => expect(replica.getSnapshot().messages[index + 1]).toBe(row));
+    });
+  });
+
   it('keeps a steering message between the answers received before and after it', () => {
     const replica = createClaudeConversationReplica(emptySnapshot());
     replica.apply(event({ type: 'turn.started', turnId: 'turn-1', payload: { turn: { id: 'turn-1', provider: 'claude' } } }));

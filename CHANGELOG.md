@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The conversation replica no longer copies every message it holds when a page of older history is prepended (or a turn of it is updated). Each page used to cost more than the one before.
 - Sending to a session restored from saved data (or bound to a stored conversation with `syncSession`) reads that conversation first, on every harness: `sendPrompt`, `run`, `steerPrompt` and `continueInterruptedTurn` all do it once, before anything is sent. A Claude conversation that another agent messaged before the app opened it now shows its earlier history with the new turn, where it showed only the new turn. If the conversation cannot be read, the prompt is rejected with that error and nothing is sent.
 
 ## 0.27.1 (2026-11-12)
