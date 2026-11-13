@@ -1,0 +1,4 @@
+interface:
+  display_name: "Definition of Done"
+  short_description: "Verify Multi Agent SDK changes before handoff"
+  default_prompt: "Use $definition-of-done to verify this SDK change before handoff."
