@@ -1,5 +1,6 @@
 import type { ClaudeConversationEvent, ClaudeConversationSnapshot } from '../contracts';
 import {
+  appendAssistantReasoning,
   appendCompactionMarker,
   appendSystemMessage,
   assistantMessageId,
@@ -120,6 +121,11 @@ export function applyClaudeConversationEvent(
       event.occurredAt,
       event.payload.phase,
     );
+    return;
+  }
+
+  if (event.type === 'reasoning.delta') {
+    appendAssistantReasoning(snapshot, event.agentId, event.turnId, event.payload.delta, event.occurredAt, event.payload.itemId);
     return;
   }
 

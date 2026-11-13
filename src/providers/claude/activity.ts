@@ -15,7 +15,8 @@ export function claudeActivity(frame: ProviderEvent): FrameActivity[] {
     }
     case 'item.started': return [...toolActivity(scope, event.payload.toolPart), { ...scope, type: 'turn.output' }];
     case 'item.updated': return toolActivity(scope, { id: event.payload.itemId, status: event.payload.status });
-    case 'message.delta': return [{ ...scope, type: 'turn.output' }];
+    case 'message.delta':
+    case 'reasoning.delta': return [{ ...scope, type: 'turn.output' }];
     case 'turn.proposedPlanCompleted': return event.payload.markdown.trim()
       ? [{ ...scope, type: 'plan.proposed', turnId: event.turnId, markdown: event.payload.markdown, itemId: event.payload.itemId }] : [];
     default: return [];

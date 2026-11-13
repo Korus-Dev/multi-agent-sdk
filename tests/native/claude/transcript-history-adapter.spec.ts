@@ -307,3 +307,37 @@ describe('listClaudeTranscriptSummaries', () => {
     ]);
   });
 });
+
+describe('thinking written out as narration', () => {
+  const rows = (blocks: object[][]) => [
+    { type: 'user', uuid: 'prompt', message: { content: 'Do the work' } },
+    ...blocks.map((content, index) => ({ type: 'assistant', uuid: `a-${index}`, message: { id: 'msg-1', content } })),
+  ].map(row => JSON.stringify(row)).join('\n');
+  const parts = (content: string) => claudeTranscriptToMessages(content, 'agent', 'session').filter(message => message.role === 'assistant').flatMap(message => message.parts)
+    .map(part => part.type === 'reasoning' ? `reasoning:${part.summary}` : part.type === 'text' ? `text:${part.text}` : part.type);
+
+  it('shows the text of a thinking block as a reasoning part, in the order it was written', () => {
+    expect(parts(rows([
+      [{ type: 'thinking', thinking: 'I will look first.', signature: 'sig' }],
+      [{ type: 'text', text: 'Looking now.' }],
+      [{ type: 'tool_use', id: 'tool-1', name: 'Read', input: { file_path: '/a' } }],
+      [{ type: 'thinking', thinking: 'Found it; reporting.', signature: 'sig' }],
+    ]))).toStrictEqual(['reasoning:I will look first.', 'text:Looking now.', 'tool', 'reasoning:Found it; reporting.']);
+  });
+
+  it('gives every reasoning part its own id', () => {
+    const ids = claudeTranscriptToMessages(rows([[{ type: 'thinking', thinking: 'One.' }], [{ type: 'thinking', thinking: 'Two.' }]]), 'agent', 'session')
+      .flatMap(message => message.parts).flatMap(part => part.type === 'reasoning' ? [part.itemId] : []);
+    expect(ids).toHaveLength(2);
+    expect(new Set(ids).size).toBe(2);
+  });
+
+  it('shows only thinking that carries text', () => {
+    expect(parts(rows([
+      [{ type: 'thinking', thinking: '', signature: 'hidden' }],
+      [{ type: 'thinking', thinking: '   ', signature: 'blank' }],
+      [{ type: 'redacted_thinking', data: 'x' }],
+      [{ type: 'text', text: 'Answer.' }],
+    ]))).toStrictEqual(['text:Answer.']);
+  });
+});

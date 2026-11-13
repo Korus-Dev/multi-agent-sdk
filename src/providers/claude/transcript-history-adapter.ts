@@ -9,7 +9,7 @@ import { claudeWorkingDirectory } from './working-directory';
 import { claudeConfigDirectory } from './config-directory';
 import { claudeToolPart, completedClaudeToolPart, type ClaudeToolPartOptions } from './claude-tool-part-adapter';
 import { claudeToolResultText } from './claude-tool-result';
-import { claudeMessageContentBlocks, parseClaudeSdkMessage, type ClaudeSdkContentBlock, type ClaudeSdkMessage } from './protocol';
+import { claudeMessageContentBlocks, claudeThinkingText, parseClaudeSdkMessage, type ClaudeSdkContentBlock, type ClaudeSdkMessage } from './protocol';
 import { claudeSubagentHistoryEvents } from './claude-subagents';
 import { ClaudeTaskPlan } from './claude-task-plan';
 
@@ -575,9 +575,17 @@ async function findIndexedTranscriptPath(projectsRoot: string, folder: string, s
 }
 
 function assistantMessageParts(message: ClaudeSdkMessage, cwd?: string, toolOptions?: ClaudeToolPartOptions): MessagePart[] {
-  return claudeMessageContentBlocks(message).flatMap((block): MessagePart[] => {
+  return claudeMessageContentBlocks(message).flatMap((block, index): MessagePart[] => {
     if (block.type === 'text' && typeof block.text === 'string' && block.text) {
       return [{ type: 'text', text: block.text }];
+    }
+
+    // What Claude writes as thinking can be the narration the person reads, so it is shown; hidden thinking has no text.
+    const thinking = claudeThinkingText(block);
+    if (thinking) {
+      const entry = message as { uuid?: string; message?: { id?: string } };
+      const owner = entry.uuid ?? entry.message?.id ?? 'assistant';
+      return [{ type: 'reasoning', summary: thinking, itemId: `${owner}-thinking-${index}`, summaryIndex: 0 }];
     }
 
     if (isClaudeToolUseBlock(block)) {

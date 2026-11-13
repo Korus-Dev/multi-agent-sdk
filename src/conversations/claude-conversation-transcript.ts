@@ -53,6 +53,23 @@ export function appendAssistantDelta(
   pruneSupersededEmptyAssistantPlaceholders(snapshot, agentId);
 }
 
+/** Thinking Claude wrote, added to the reasoning part of its item, or as a new one after the text and tool calls before it. */
+export function appendAssistantReasoning(
+  snapshot: ClaudeTranscriptState,
+  agentId: string,
+  turnId: string,
+  delta: string,
+  createdAt: string,
+  itemId: string,
+): void {
+  const message = ensureAssistantMessage(snapshot, agentId, turnId, assistantMessageId(turnId), createdAt);
+  if (message.status !== 'complete') message.status = 'streaming';
+  const last = message.parts.at(-1);
+  if (last?.type === 'reasoning' && last.itemId === itemId) last.summary += delta;
+  else message.parts.push({ type: 'reasoning', summary: delta, itemId, summaryIndex: 0 });
+  pruneSupersededEmptyAssistantPlaceholders(snapshot, agentId);
+}
+
 export function appendCompactionMarker(snapshot: ClaudeTranscriptState, agentId: string, turnId: string, createdAt: string): Message {
   const existing = snapshot.messages.find((message) => {
     return message.agentId === agentId && message.id === compactionMessageId(turnId);

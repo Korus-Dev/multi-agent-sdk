@@ -72,6 +72,26 @@ describe('Claude conversation replica', () => {
     });
   });
 
+  describe('reasoning that arrives as it is written', () => {
+    const start = () => { const replica = createClaudeConversationReplica(emptySnapshot()); replica.apply(event({ type: 'turn.started', turnId: 'turn-1', payload: { turn: { id: 'turn-1', provider: 'claude' } } })); return replica; };
+    const reasoning = (itemId: string, delta: string) => event({ type: 'reasoning.delta', turnId: 'turn-1', payload: { itemId, delta } });
+    const summaries = (replica: ReturnType<typeof start>) => replica.getSnapshot().messages.flatMap(message => message.parts.flatMap(part => part.type === 'reasoning' ? [[part.itemId, part.summary]] : []));
+
+    it('grows one reasoning part for each item', () => {
+      const replica = start();
+      replica.apply(reasoning('r-1', 'I will ')); replica.apply(reasoning('r-1', 'look first.')); replica.apply(reasoning('r-2', 'Then report.'));
+      expect(summaries(replica)).toStrictEqual([['r-1', 'I will look first.'], ['r-2', 'Then report.']]);
+    });
+
+    it('keeps the order of reasoning, text and tool calls', () => {
+      const replica = start();
+      replica.apply(reasoning('r-1', 'Plan.'));
+      replica.apply(event({ type: 'message.delta', turnId: 'turn-1', payload: { delta: 'Working.' } }));
+      replica.apply(reasoning('r-2', 'Report.'));
+      expect(replica.getSnapshot().messages.flatMap(message => message.parts.map(part => part.type))).toStrictEqual(['reasoning', 'text', 'reasoning']);
+    });
+  });
+
   it('keeps a steering message between the answers received before and after it', () => {
     const replica = createClaudeConversationReplica(emptySnapshot());
     replica.apply(event({ type: 'turn.started', turnId: 'turn-1', payload: { turn: { id: 'turn-1', provider: 'claude' } } }));

@@ -89,6 +89,8 @@ import {
 } from './claude-tool-part-adapter';
 import {
   claudeMessageContentBlocks,
+  claudeStreamThinkingDelta,
+  claudeThinkingText,
   claudeMessageSessionId,
   claudeCompactionEvent,
   claudeResultErrorMessage,
@@ -125,6 +127,11 @@ type ActiveClaudeTurn = {
   completed: boolean;
   interrupted: boolean;
   streamedText: string;
+  /** Thinking streamed in the message being received, until its finished message repeats it. */
+  streamedThinking: string;
+  /** The reasoning item thinking is being added to, and how many items the turn has had. */
+  thinkingItem?: string;
+  reasoningItems: number;
   streamedToolsByIndex: Map<number, StreamedClaudeTool>;
   toolPartsById: Map<string, ToolPart>;
   fileActivitiesById: Map<string, ClaudeToolFileActivity>;
@@ -461,6 +468,8 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
         completed: false,
         interrupted: false,
         streamedText: '',
+        streamedThinking: '',
+        reasoningItems: 0,
         streamedToolsByIndex: new Map(),
         toolPartsById: new Map(),
         fileActivitiesById: new Map(),
@@ -1170,6 +1179,12 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
 
   private emitAssistantMessage(activeTurn: ActiveClaudeTurn, message: ClaudeSdkMessage): void {
     for (const block of claudeMessageContentBlocks(message)) {
+      const thinking = claudeThinkingText(block);
+      if (thinking) {
+        this.emitFinishedThinking(activeTurn, thinking);
+        continue;
+      }
+
       if (block.type === 'text' && typeof block.text === 'string' && block.text) {
         const text = finalAssistantTextDelta(activeTurn, block.text);
         if (text) {
@@ -1186,6 +1201,40 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
         this.emitClaudeToolPart(activeTurn, block);
       }
     }
+    activeTurn.streamedThinking = '';
+  }
+
+  /** The reasoning item thinking is added to: a new one for each block of thinking Claude starts. */
+  private newReasoningItem(activeTurn: ActiveClaudeTurn): string {
+    activeTurn.thinkingItem = `${activeTurn.turnId}-reasoning-${++activeTurn.reasoningItems}`;
+    return activeTurn.thinkingItem;
+  }
+
+  private emitReasoningDelta(activeTurn: ActiveClaudeTurn, delta: string, itemId: string): void {
+    this.emitConversation({
+      agentId: activeTurn.agentId,
+      provider: this.provider,
+      providerSessionId: activeTurn.sessionId ?? undefined,
+      turnId: activeTurn.turnId,
+      type: 'reasoning.delta',
+      payload: { itemId, delta },
+    });
+  }
+
+  /** A block of thinking from the finished message: only what did not already stream in, in the item it streamed into. */
+  private emitFinishedThinking(activeTurn: ActiveClaudeTurn, text: string): void {
+    const streamed = activeTurn.streamedThinking;
+    if (streamed && text.startsWith(streamed)) {
+      activeTurn.streamedThinking = '';
+      const rest = text.slice(streamed.length);
+      if (rest) this.emitReasoningDelta(activeTurn, rest, activeTurn.thinkingItem ?? this.newReasoningItem(activeTurn));
+      return;
+    }
+    if (streamed && streamed.startsWith(text)) {
+      activeTurn.streamedThinking = streamed.slice(text.length);
+      return;
+    }
+    this.emitReasoningDelta(activeTurn, text, this.newReasoningItem(activeTurn));
   }
 
   private emitStreamEvent(activeTurn: ActiveClaudeTurn, message: ClaudeSdkMessage): void {
@@ -1196,6 +1245,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
       const block = event.content_block as Record<string, unknown> | undefined;
       // Hidden thinking can stream only a signature, without any thinking_delta.
       if (block?.type === 'thinking' || block?.type === 'redacted_thinking') this.emitUsage(activeTurn, 'usage', 'output');
+      if (block?.type === 'thinking') this.newReasoningItem(activeTurn);
     } else if (event?.type === 'content_block_delta') {
       const delta = event.delta as Record<string, unknown> | undefined;
       if (delta && ['text_delta', 'thinking_delta', 'input_json_delta'].includes(String(delta.type))
@@ -1203,6 +1253,13 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
         this.emitUsage(activeTurn, 'usage', 'output');
       }
     }
+    const thinking = claudeStreamThinkingDelta(message);
+    if (thinking) {
+      activeTurn.streamedThinking += thinking;
+      this.emitReasoningDelta(activeTurn, thinking, activeTurn.thinkingItem ?? this.newReasoningItem(activeTurn));
+      return;
+    }
+
     const delta = claudeStreamTextDelta(message);
     if (delta) {
       activeTurn.streamedText += delta;

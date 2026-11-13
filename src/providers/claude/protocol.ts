@@ -16,6 +16,11 @@ export type ClaudeSdkContentBlock =
     is_error?: boolean;
   }
   | {
+    /** `thinking` is empty when Claude keeps its thinking hidden; only the signature remains. */
+    type: 'thinking';
+    thinking?: string;
+  }
+  | {
     type: string;
     [key: string]: unknown;
   };
@@ -150,6 +155,20 @@ export function claudeResultErrorMessage(message: ClaudeSdkMessage): string | nu
   }
 
   return `Claude turn finished with status '${message.subtype ?? 'error'}'.`;
+}
+
+/** The text of a thinking block, when it has any. */
+export function claudeThinkingText(block: ClaudeSdkContentBlock): string {
+  return block.type === 'thinking' && typeof block.thinking === 'string' && block.thinking.trim() ? block.thinking : '';
+}
+
+export function claudeStreamThinkingDelta(message: ClaudeSdkMessage): string {
+  if (message.type !== 'stream_event' || !isRecord(message.event) || message.event.type !== 'content_block_delta') {
+    return '';
+  }
+
+  const delta = message.event.delta;
+  return isRecord(delta) && delta.type === 'thinking_delta' && typeof delta.thinking === 'string' ? delta.thinking : '';
 }
 
 export function claudeStreamTextDelta(message: ClaudeSdkMessage): string {

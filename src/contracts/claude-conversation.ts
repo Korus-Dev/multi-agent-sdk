@@ -108,6 +108,12 @@ export type ClaudeConversationEvent =
       };
     }
   | ClaudeConversationEventBase & {
+      /** The next piece of text Claude wrote as thinking, for the reasoning item `itemId`. */
+      type: 'reasoning.delta';
+      turnId: string;
+      payload: { itemId: string; delta: string };
+    }
+  | ClaudeConversationEventBase & {
       type: 'message.userSubmitted';
       payload: { message: Message };
     }
