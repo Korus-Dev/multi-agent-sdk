@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.27.2 (2026-11-13)
 
 - Claude thinking that carries text is shown as a `reasoning` part, in order with the text and tool calls around it, both when a conversation is loaded from its transcript and while a turn runs (a new `reasoning.delta` event streams it in). Claude often writes the narration the person reads as thinking, so a paragraph, or the question a follow-up answers, no longer goes missing. Thinking that Claude keeps hidden has no text and is still left out.
 - The earlier part of a Claude conversation opened from the end of its transcript is read a step at a time: scrolling up widens the window to the next size (5 MiB, then 50 MiB) and only then reads the whole transcript, where it used to read all of it on the first scroll up. A prompt sent before the earlier part is loaded still reads all of it, so the task plan and goal are complete before work starts. On a 180 MB transcript the first scroll up takes about 85 ms instead of 2.6 s, and paging back to the start takes 4 s instead of 15 s.
