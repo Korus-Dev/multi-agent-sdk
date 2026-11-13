@@ -34,11 +34,6 @@ export type HarnessOptions = {
   trustedMcpServerName?: string;
   log?: HarnessLog;
   onDiagnostic?: (record: HarnessDiagnostic) => void;
-  /**
-   * Marks the app's own bookkeeping tool calls, such as a status report, so they do not count as work when
-   * harnesses without native work phases tag which text is commentary and which is the final answer.
-   */
-  isBookkeepingTool?: (tool: import('./contracts').ToolPart) => boolean;
   /** Rejects or rewrites the MCP servers a text generation may use. */
   generationMcpServers?: (servers: unknown) => readonly HarnessMcpServer[];
 

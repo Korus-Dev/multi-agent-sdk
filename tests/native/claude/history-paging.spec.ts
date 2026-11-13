@@ -8,7 +8,7 @@ import { createClaudeConversationReplica, type ClaudeConversationReplica } from 
 import type { ClaudeSdkMessage } from '../../../src/providers/claude/protocol';
 import type { NativeHarnessEvent as HarnessEvent } from '../../../src/internal';
 import { ClaudeHost } from '../../../src/providers/claude/host';
-import { loadClaudeTranscriptHistory, type ClaudeTranscriptHistory, claudeTranscriptToMessages } from '../../../src/providers/claude/transcript-history-adapter';
+import { loadClaudeTranscriptHistory, claudeTranscriptToMessages } from '../../../src/providers/claude/transcript-history-adapter';
 
 const session = { kind: 'claude' as const, conversationId: 'history-session', transport: 'stdio' as const };
 const agent: Agent = { id: 'history-agent', name: 'History', folder: '/synthetic', provider: 'claude', providerSession: session };
@@ -52,7 +52,6 @@ describe('Claude history paging', () => {
       await driver.resumeConversation(agent, { ref: { provider: 'claude', folder: agent.folder, conversationId: session.conversationId }, storageState: 'active' });
       expect(readSessionMessages).toHaveBeenCalledOnce();
       expect(replica.getSnapshot().historyState.hasOlder).toBe(false);
-      await driver.loadTurnHistory(agent, 'claude-user-0');
       expect(JSON.stringify(replica.getSnapshot())).toContain('Readable work');
       expect(await driver.readConversationMessages({ provider: 'claude', folder: agent.folder, conversationId: session.conversationId }, agent.id))
         .toStrictEqual(claudeTranscriptToMessages(content, agent.id, session.conversationId));
@@ -111,7 +110,6 @@ describe('Claude history paging', () => {
         await driver.loadOlderHistory(agent);
         expect(replica.getSnapshot().messages.length).toBeGreaterThan(before.messages.length);
         expect(replica.getSnapshot().messages.slice(-before.messages.length)).toStrictEqual(before.messages);
-        await driver.loadTurnHistory(agent, 'claude-user-58');
         expect(JSON.stringify(replica.getSnapshot())).toContain('Older tool output');
       }
     } finally { unblock(); await driver.close(); await rm(home, { recursive: true, force: true }); }
@@ -119,7 +117,7 @@ describe('Claude history paging', () => {
 
 
 
-  it.each([false, true])('expands a turn spanning multiple history pages in source order without losing earlier turns (recent=%s)', async recent => {
+  it.each([false, true])('pages a turn spanning multiple history pages in source order without losing earlier turns (recent=%s)', async recent => {
     const source = [transcript(5, 'Earlier work'), JSON.stringify({ type: 'user', uuid: 'root', promptId: 'large-turn', message: { content: 'One long interrupted turn' } }),
       ...Array.from({ length: 60 }, (_, i) => [
         { type: 'assistant', uuid: `segment-${i}`, message: { content: [{ type: 'text', text: `Commentary ${i}` }, { type: 'tool_use', id: `read-segment-${i}`, name: 'Read', input: { file_path: `/synthetic/${i}` } }] } },
@@ -146,51 +144,11 @@ describe('Claude history paging', () => {
     try {
       await driver.loadConversation(agent);
       expect(replica.getSnapshot().messages.length).toBeLessThan(messages.filter(message => message.turnId === 'claude-large-turn').length);
-      await driver.loadTurnHistory(agent, 'claude-large-turn');
-      expect(replica.getSnapshot().messages.map(message => message.id)).toStrictEqual(messages.filter(message => message.turnId === 'claude-large-turn').map(message => message.id));
-      expect(JSON.stringify(replica.getSnapshot().messages)).toContain('Segment output 0');
-      await driver.loadConversation(agent);
-      expect(replica.getSnapshot().turns.find(turn => turn.id === 'claude-large-turn')?.itemsView).toBe('summary');
-      await rename(file, `${file}.offline`);
-      await driver.loadTurnHistory(agent, 'claude-large-turn');
-      expect(replica.getSnapshot().messages.map(message => message.id)).toStrictEqual(messages.filter(message => message.turnId === 'claude-large-turn').map(message => message.id));
-      await rename(`${file}.offline`, file);
-      await driver.loadOlderHistory(agent);
+      for (let page = 0; page < 20 && replica.getSnapshot().historyState.hasOlder; page++) await driver.loadOlderHistory(agent);
       expect(replica.getSnapshot().messages.map(message => message.id)).toStrictEqual(messages.map(message => message.id));
       expect(replica.getSnapshot().historyState.hasOlder).toBe(false);
       expect(await driver.readConversationMessages({ provider: 'claude', folder: agent.folder, conversationId: session.conversationId }, agent.id)).toStrictEqual(messages);
     } finally { await driver.close(); await rm(home, { recursive: true, force: true }); }
-  });
-
-  it.each(['release', 'selection'] as const)('discards a pending disk expansion after %s', async cancellation => {
-    const home = await mkdtemp(path.join(os.tmpdir(), 'claude-details-race-'));
-    const project = path.join(home, '-synthetic'); await mkdir(project);
-    await writeFile(path.join(project, `${session.conversationId}.jsonl`), transcript(1, 'Old disk detail'));
-    const original = await loadClaudeTranscriptHistory(agent, { projectsRoot: home });
-    let resolveNext!: (history: ClaudeTranscriptHistory) => void;
-    const nextHistory = new Promise<ClaudeTranscriptHistory>(resolve => { resolveNext = resolve; });
-    const nextAgent = { ...agent, providerSession: { ...session, conversationId: 'next-session' } };
-    const driver = new ClaudeHost({ startTurn: vi.fn(), close: async () => {} }, owner => owner.providerSession?.kind === 'claude' && owner.providerSession.conversationId === session.conversationId ? Promise.resolve(original) : nextHistory);
-    const frames: HarnessEvent[] = []; let cancelled: Promise<unknown> | undefined;
-    driver.onEvent(frame => {
-      frames.push(frame);
-      if (frame.type === 'claude.conversationEventReceived' && frame.payload.event.type === 'turn.historyUpdated' && frame.payload.event.payload.turn.detailsLoading) {
-        cancelled = cancellation === 'release' ? driver.releaseConversation(agent.id) : driver.loadConversation(nextAgent);
-      }
-    });
-    try {
-      await driver.loadConversation(agent);
-      const first = driver.loadTurnHistory(agent, original!.turns![0]!.id);
-      const settled = await Promise.allSettled([first]);
-      expect(settled[0]).toMatchObject({ status: 'rejected', reason: expect.any(Error) });
-      expect(JSON.stringify(frames)).not.toContain('Old disk detail');
-      resolveNext({ providerSession: nextAgent.providerSession, messages: [] });
-      await cancelled;
-      if (cancellation === 'selection') expect(frames.at(-1)).toMatchObject({ type: 'claude.conversationSnapshotChanged', payload: { snapshot: { sessionId: 'next-session', messages: [] } } });
-    } finally {
-      resolveNext({ providerSession: nextAgent.providerSession, messages: [] });
-      await cancelled?.catch(() => undefined); await driver.close(); await rm(home, { recursive: true, force: true });
-    }
   });
 
   it('retains older history when an interrupted session continues before its conversation is opened', async () => {
@@ -307,7 +265,7 @@ describe('Claude history paging', () => {
       emit({ type: 'assistant', session_id: session.conversationId, message: { content: 'Final answer' } });
       emit({ type: 'result', subtype: 'success', session_id: session.conversationId, is_error: false });
       const live = (await driver.readConversationMessages({ provider: 'claude', folder: agent.folder, conversationId: session.conversationId }, agent.id)).find((row) => row.role === 'assistant' && row.turnId === turn.turnId)!;
-      expect(live.parts).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'live-tool', body: output }), { type: 'text', text: 'Final answer', phase: 'final_answer' }]));
+      expect(live.parts).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'live-tool', body: output }), { type: 'text', text: 'Final answer' }]));
       expect(replica.getSnapshot().messages.filter((row) => row.role === 'assistant' && row.turnId === turn.turnId)).toHaveLength(1);
       const reference = replica.getSnapshot().messages.find((row) => row.id === live.id)!.deferredContent!;
       const chunks: Buffer[] = []; let offset = 0;

@@ -36,7 +36,7 @@ export class CodexHarness extends ProviderHarness<'codex'> {
   /** A fresh session record for a conversation id. */
   static sessionData(id: string): ProviderSessionData { return { kind: 'codex', conversationId: id }; }
 
-  constructor(native: ProviderDriver<ProviderContext, ProviderEvent>, rules?: import('../../conversations/work-phases').WorkPhaseRules) { super('codex', native, rules); }
+  constructor(native: ProviderDriver<ProviderContext, ProviderEvent>) { super('codex', native); }
 
   /** A ChatGPT sign-in is a subscription; an API key is billed per use; Bedrock is a cloud account. */
   protected override accountOf(native: import('../../contracts/authentication').ProviderAuthentication) {

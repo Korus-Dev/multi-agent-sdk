@@ -80,6 +80,8 @@ Every session operation takes a handle owned by that harness. Every optional ope
 | `folderScopedConversations` | Whether conversations belong to a working folder, so their references carry a `folder`. |
 | `subagentTranscripts` | `'inline'`, `'separate'` or `'none'`: where a subagent's transcript can be read. |
 | `login` | The managed login methods `authenticate` can start. |
+| `workPhases` | The harness states each text part's work phase (`commentary` or `final_answer`). Where it is absent, text carries no phase and an app groups a turn's work itself, for example by its start time and duration. |
+| `turnHistory` | Turns can arrive as summaries, and `loadTurnHistory` loads one turn's full items. |
 
 ## Conversation identity and account
 

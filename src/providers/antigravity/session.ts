@@ -24,7 +24,6 @@ type SessionOptions = {
   utilityMcpTools?: readonly {server: string; tools: readonly string[]}[];
   /** Not a user conversation: persist no prompts and hide it from history. */
   ephemeral?: boolean;
-  isBookkeepingTool?: import('../../conversations/work-phases').WorkPhaseRules['isBookkeepingTool'];
   changed(event: AntigravityConversationEvent): void;
   requestChanged?(event: AntigravityConversationEvent): void;
   closed?(error: Error): void;
@@ -77,7 +76,7 @@ export class AcpSession {
           options.changed(event);
           if (event.type === 'request.created' || event.type === 'request.resolved') options.requestChanged?.(event);
         }
-      }, text => session.journal.display(text), { isBookkeepingTool: options.isBookkeepingTool });
+      }, text => session.journal.display(text));
       for (const params of session.initialization) session.update(params);
       session.initialization = [];
       session.transcript.finish('completed');

@@ -8,7 +8,6 @@ import { claudeHarnessCapabilities } from '../../capabilities';
 import { mcpEndpoints, providerHome, sharedProviderOptions, type SharedProviderOptions } from '../../harness-options';
 import { replicaProjection, transcriptState, type HarnessProjection } from '../../harness-projection';
 import { createClaudeConversationReplica } from '../../conversations/claude-conversation-replica';
-import type { WorkPhaseRules } from '../../conversations/work-phases';
 import { ClaudeHost, type ClaudeHostOptions } from './host';
 import { ClaudeAgentSdkTransport, type ClaudeAgentSdkTransportOptions } from './agent-sdk-transport';
 import type { ClaudeTurnTransport } from './transport';
@@ -27,7 +26,7 @@ export class ClaudeHarness extends SessionHarness<'claude'> {
   /** A fresh session record for a conversation id. */
   static sessionData(id: string): ProviderSessionData { return { kind: 'claude', conversationId: id, transport: 'stdio' }; }
 
-  constructor(native: ProviderDriver<ProviderContext, ProviderEvent>, rules?: WorkPhaseRules) { super('claude', native, rules); }
+  constructor(native: ProviderDriver<ProviderContext, ProviderEvent>) { super('claude', native); }
 
   protected override accountOf(native: import('../../contracts/authentication').ProviderAuthentication) {
     const account = native.kind === 'claude' ? native.state.account : undefined;
@@ -50,7 +49,6 @@ export class ClaudeHarness extends SessionHarness<'claude'> {
           ...(log ? { log: (level, component, message, details) => log(level, component, message, details) } : {}),
         },
         host: {
-          ...(options.isBookkeepingTool ? { isBookkeepingTool: options.isBookkeepingTool } : {}),
           ...(log ? { log: (level, component, message, details) => log(level, component, message, details) } : {}),
         },
       },
@@ -114,7 +112,7 @@ export class ClaudeHarness extends SessionHarness<'claude'> {
   protected createProjection(): HarnessProjection {
     return replicaProjection({
       snapshotEvent: 'claude.conversationSnapshotChanged', conversationEvent: 'claude.conversationEventReceived', label: 'Claude',
-      create: snapshot => createClaudeConversationReplica(snapshot, this.phaseRules),
+      create: snapshot => createClaudeConversationReplica(snapshot),
       apply: (replica, event) => replica.apply(event),
       state: replica => transcriptState(replica.getSnapshot()),
     });

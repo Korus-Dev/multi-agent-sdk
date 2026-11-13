@@ -16,7 +16,7 @@ export type ProviderOptions<Context extends ProviderContext = ProviderContext> =
 /** What the registry needs from a harness class. */
 export type HarnessClass = {
   readonly capabilities: ProviderCapabilities;
-  new (native: ProviderDriver<ProviderContext, ProviderEvent>, rules?: import('./conversations/work-phases').WorkPhaseRules): ProviderHarness;
+  new (native: ProviderDriver<ProviderContext, ProviderEvent>): ProviderHarness;
   mapOptions(options: HarnessOptions): ProviderOptions;
   createHost<Context extends ProviderContext = ProviderContext>(options: ProviderOptions<Context>): ProviderDriver<Context, ProviderEvent>;
   sessionData(id: string, folder: string | null): ProviderSessionData;

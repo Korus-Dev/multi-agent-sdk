@@ -1,5 +1,4 @@
 import type { ClaudeHistorySource, ClaudeHistoryState } from './history-source';
-import { withInferredTurnWorkPhases } from '../../conversations/work-phases';
 import { createHash } from 'node:crypto';
 import type { ClaudeConversationTurn, Message, MessagePart } from '../../contracts/index';
 import type { ConversationContentChunk, ConversationContentInput } from '../../contracts/conversation';
@@ -25,49 +24,17 @@ export class ClaudeHistoryWindow {
   private readonly messages: Message[];
   private readonly initialIds: Set<string>;
   private visibleIds = new Set<string>();
-  private readonly loadedTurns = new Set<string>();
-  private readonly historyMessages: Map<string, Message>;
   private readonly archiveTurns = new Map<string, ClaudeConversationTurn>();
   private pendingArchive?: Promise<void>;
   private recoveredState?: ClaudeHistoryState;
 
-  constructor(public sessionId: string | null, messages: Message[] = [], private readonly summaryTurnIds = new Set<string>(), private source?: ClaudeHistorySource, private readonly inferWorkPhases: (messages: Message[]) => Message[] = withInferredTurnWorkPhases) {
+  constructor(public sessionId: string | null, messages: Message[] = [], private source?: ClaudeHistorySource) {
     this.initialIds = new Set(messages.map(message => message.id));
-    this.historyMessages = phasedHistory(messages, this.summaryTurnIds, this.inferWorkPhases);
-    const workTurns = new Set([...this.historyMessages.values()].filter(message => message.kind === 'steer' || message.parts.some(isWork)).map(message => message.turnId));
-    for (const turnId of this.summaryTurnIds) if (!workTurns.has(turnId)) this.summaryTurnIds.delete(turnId);
-    if (source) {
-      for (const [id, message] of this.historyMessages) this.historyMessages.set(id, summarize(message));
-      this.messages = messages.map(message => this.historyMessages.get(message.id) ?? message);
-    } else this.messages = [...messages];
+    this.messages = [...messages];
     this.before = messages.length;
   }
 
-  isSummaryTurn(turnId: string): boolean { return this.summaryTurnIds.has(turnId); }
-
-  async expandTurn(turnId: string): Promise<Message[]> {
-    const messages = this.source && !this.loadedTurns.has(turnId) ? await this.source.readTurn(turnId) : this.messages.filter(message => message.turnId === turnId);
-    if (!messages.length) throw new Error('Claude turn is no longer available. Reload the conversation.');
-    if (this.source) {
-      const expected = this.messages.filter(message => message.turnId === turnId).map(message => message.id);
-      if (JSON.stringify(expected) !== JSON.stringify(messages.map(message => message.id))) throw new Error('Claude history changed. Reload the conversation.');
-      const indexes = new Map(this.messages.map((message, index) => [message.id, index]));
-      for (const message of messages) this.messages[indexes.get(message.id)!] = message;
-      for (const [id, message] of phasedHistory(messages, new Set([turnId]), this.inferWorkPhases)) this.historyMessages.set(id, message);
-    }
-    this.loadedTurns.add(turnId);
-    this.summaryTurnIds.delete(turnId);
-    return messages.map(message => this.project(this.historyMessages.get(message.id) ?? message));
-  }
-
-  visibleMessageIds(): Set<string> { return new Set(this.visibleIds); }
-  isHistoricalMessage(id: string): boolean { return this.initialIds.has(id); }
   reveal(messages: Message[]): void { for (const message of messages) this.visibleIds.add(message.id); }
-
-  nextVisibleMessage(messageId: string, visible: Set<string>): string | undefined {
-    const index = this.messages.findIndex(message => message.id === messageId);
-    return this.messages.slice(index + 1).find(message => visible.has(message.id))?.id;
-  }
 
   isCurrent(): Promise<boolean> { return this.source?.isCurrent() ?? Promise.resolve(false); }
 
@@ -93,12 +60,8 @@ export class ClaudeHistoryWindow {
         throw new Error('Claude history changed. Reload the conversation before loading older messages.');
       }
       const older = archive.messages.slice(0, split);
-      const summaryIds = new Set(archive.turns.filter(turn => turn.status !== 'inProgress').map(turn => turn.id));
-      const phased = phasedHistory(older, summaryIds, this.inferWorkPhases);
-      const workTurns = new Set([...phased.values()].filter(message => message.kind === 'steer' || message.parts.some(isWork)).map(message => message.turnId));
-      for (const id of summaryIds) if (workTurns.has(id)) this.summaryTurnIds.add(id);
-      for (const [id, message] of phased) { this.initialIds.add(id); this.historyMessages.set(id, summarize(message)); }
-      this.messages.unshift(...older.map(message => this.historyMessages.get(message.id) ?? message));
+      for (const message of older) this.initialIds.add(message.id);
+      this.messages.unshift(...older);
       for (const turn of archive.turns) this.archiveTurns.set(turn.id, turn);
       this.before += older.length;
       this.source = archive.source;
@@ -112,7 +75,7 @@ export class ClaudeHistoryWindow {
   pageTurns(messages: Message[]): ClaudeConversationTurn[] {
     return [...new Set(messages.map(message => message.turnId))].flatMap(id => {
       const turn = id ? this.archiveTurns.get(id) : undefined;
-      return turn ? [{ ...turn, itemsView: this.isSummaryTurn(turn.id) ? 'summary' as const : 'full' as const }] : [];
+      return turn ? [turn] : [];
     });
   }
 
@@ -126,17 +89,7 @@ export class ClaudeHistoryWindow {
   /** Reopening a bounded window makes its preceding history reachable again. */
   reopen(messages: Message[]): Message[] {
     this.capture(messages);
-    let page = this.recent(messages);
-    // A bounded reset must not advertise complete details for a turn cut by its boundary.
-    while (true) {
-      const included = new Set(page.map(message => message.id));
-      const partial = new Set(page.filter(message => message.turnId && this.loadedTurns.has(message.turnId)
-        && !this.summaryTurnIds.has(message.turnId)
-        && this.messages.some(candidate => candidate.turnId === message.turnId && !included.has(candidate.id))).map(message => message.turnId!));
-      if (!partial.size) break;
-      for (const id of partial) this.summaryTurnIds.add(id);
-      page = this.recent(messages);
-    }
+    const page = this.recent(messages);
     this.visibleIds = new Set(page.map(message => message.id));
     const first = page[0];
     const index = first ? this.messages.findIndex((message) => message.id === first.id) : -1;
@@ -151,7 +104,7 @@ export class ClaudeHistoryWindow {
       if (index === undefined) {
         indexes.set(message.id, this.messages.length);
         this.messages.push(message);
-      } else if (!message.deferredContent && !this.historyMessages.has(message.id)) this.messages[index] = message;
+      } else if (!message.deferredContent) this.messages[index] = message;
     }
   }
 
@@ -168,12 +121,7 @@ export class ClaudeHistoryWindow {
     let bytes = 2;
     const sources = new Map(this.messages.map(message => [message.id, message]));
     for (let i = messages.length - 1; i >= 0 && page.length < pageCount; i--) {
-      const source = sources.get(messages[i]!.id) ?? messages[i]!;
-      const phased = this.historyMessages.get(source.id) ?? source;
-      const summary = (source.role === 'assistant' || source.kind === 'steer') && this.summaryTurnIds.has(source.turnId ?? '')
-        ? summarize(phased)
-        : phased;
-      const message = this.project(summary);
+      const message = this.project(sources.get(messages[i]!.id) ?? messages[i]!);
       const size = Buffer.byteLength(JSON.stringify(message)) + 1;
       if (page.length && bytes + size > pageBytes) break;
       page.unshift(message);
@@ -236,29 +184,4 @@ function shrinkPart(part: MessagePart, limit: number): MessagePart {
   }
   if (part.type === 'text') return { ...part, text: head(part.text, Math.max(512, Math.floor(limit / 2))) };
   return { type: 'status', text: 'Content available on demand' };
-}
-
-/** Phase the whole native turn, including segments separated by compaction or interruption. */
-function phasedHistory(messages: Message[], turnIds: Set<string>, inferWorkPhases: (messages: Message[]) => Message[]): Map<string, Message> {
-  const turns = new Map<string, Message[]>();
-  for (const message of messages) {
-    if (!message.turnId || !turnIds.has(message.turnId)) continue;
-    const turn = turns.get(message.turnId) ?? [];
-    turn.push(message); turns.set(message.turnId, turn);
-  }
-  const projected = new Map<string, Message>();
-  for (const turn of turns.values()) {
-    for (const message of inferWorkPhases(turn)) {
-      if (message.role === 'assistant' || message.kind === 'steer') projected.set(message.id, message);
-    }
-  }
-  return projected;
-}
-
-function summarize(message: Message): Message {
-  return { ...message, parts: message.kind === 'steer' ? [] : message.parts.filter(part => !isWork(part)) };
-}
-
-function isWork(part: MessagePart): boolean {
-  return part.type === 'tool' || part.type === 'reasoning' || part.type === 'text' && part.phase === 'commentary';
 }

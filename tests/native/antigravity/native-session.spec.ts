@@ -423,7 +423,7 @@ describe('Antigravity native session', () => {
     expect(session.snapshot.turns[0]).toMatchObject({ startedAt: '', completedAt: '', durationMs: null });
     expect(session.snapshot.messages[1]?.parts).toEqual([
       expect.objectContaining({ type: 'tool', id: 'replay-id', status: 'failed', output: 'Rejected by user' }),
-      { type: 'text', text: 'Denied.', phase: 'final_answer' },
+      { type: 'text', text: 'Denied.' },
     ]);
     expect(session.snapshot).toMatchObject({ busy: false, activeTurnId: null, clientRequests: [] });
   });

@@ -16,9 +16,6 @@ export type ClaudeConversationTurn = {
   startedAt: string | null;
   completedAt: string | null;
   durationMs: number | null;
-  itemsView?: 'summary' | 'full';
-  detailsLoading?: boolean;
-  detailsError?: string | null;
 };
 
 export type ClaudeConversationSnapshot = {

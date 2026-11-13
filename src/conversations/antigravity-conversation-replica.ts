@@ -1,10 +1,8 @@
 import type { AntigravityConversationEvent, AntigravityConversationSnapshot } from '../contracts/antigravity-conversation';
-import { workPhaseView, type WorkPhaseRules } from './work-phases';
 
 /** Antigravity owns this replica; the app coordination reducer never contains its transcript. */
-export function createAntigravityConversationReplica(initial: AntigravityConversationSnapshot, rules: WorkPhaseRules = {}) {
+export function createAntigravityConversationReplica(initial: AntigravityConversationSnapshot) {
   let snapshot = structuredClone(initial);
-  const view = workPhaseView<AntigravityConversationSnapshot>(rules);
   const replica = {
     getSnapshot: () => snapshot,
     apply(event: AntigravityConversationEvent): AntigravityConversationSnapshot {
@@ -48,8 +46,7 @@ export function createAntigravityConversationReplica(initial: AntigravityConvers
       return snapshot;
     },
   };
-  // Reads carry work phases this harness does not tag itself.
-  return { ...replica, getSnapshot: () => view(snapshot), apply: (event: AntigravityConversationEvent) => view(replica.apply(event)) };
+  return replica;
 }
 
 export function emptyAntigravitySnapshot(agentId: string, sessionId: string): AntigravityConversationSnapshot {

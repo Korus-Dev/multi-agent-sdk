@@ -18,8 +18,6 @@ export type ScriptedHarnessOptions = {
   unsupported?: readonly ScriptedOperation[];
   /** Overrides what `getCapabilities` reports. */
   capabilities?: Record<string, unknown>;
-  /** The app's bookkeeping rule, as `createHarness` takes it. */
-  isBookkeepingTool?: import('./options').HarnessOptions['isBookkeepingTool'];
 };
 
 export type HarnessScript = {
@@ -97,7 +95,7 @@ export function createScriptedHarness(provider: HarnessProvider, options: Script
     calls: name => [...(recorded.get(name) ?? [])],
     reset: () => { handlers.clear(); recorded.clear(); },
   };
-  return { harness: new harnesses[provider](driver, options.isBookkeepingTool ? { isBookkeepingTool: options.isBookkeepingTool } : {}), script };
+  return { harness: new harnesses[provider](driver), script };
 }
 export { createScriptedCodexHarness, scriptedCodexSnapshot, type ScriptedCodex, type ScriptedConversation } from './testing-codex';
 export { createScriptedClaudeHarness, type ScriptedClaude } from './testing-claude';

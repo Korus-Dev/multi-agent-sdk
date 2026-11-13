@@ -7,7 +7,6 @@ import { antigravityHarnessCapabilities } from '../../capabilities';
 import { bridgedMcpServers, harnessContext, providerHome, sharedProviderOptions, type SharedProviderOptions } from '../../harness-options';
 import { replicaProjection, transcriptState, type HarnessProjection } from '../../harness-projection';
 import { createAntigravityConversationReplica } from '../../conversations/antigravity-conversation-replica';
-import type { WorkPhaseRules } from '../../conversations/work-phases';
 import { AntigravityHost, type AntigravityHostOptions } from './host';
 import { antigravityHome, resolveAcpRuntime } from './runtime';
 import { transcriptActivity } from '../../conversations/conversation-activity';
@@ -25,7 +24,7 @@ export class AntigravityHarness extends SessionHarness<'antigravity'> {
   /** Antigravity keeps a session on its live conversation unless told which other one to use, so a cleared session lets go of it first. */
   protected override startingOver(context: ProviderContext) { return this.native.releaseConversation?.(context.id); }
 
-  constructor(native: ProviderDriver<ProviderContext, ProviderEvent>, rules?: WorkPhaseRules) { super('antigravity', native, rules); }
+  constructor(native: ProviderDriver<ProviderContext, ProviderEvent>) { super('antigravity', native); }
 
   /** Maps app-facing options onto the Antigravity runtime. */
   static mapOptions(options: HarnessOptions): AntigravityProviderOptions {
@@ -34,7 +33,6 @@ export class AntigravityHarness extends SessionHarness<'antigravity'> {
       ...sharedProviderOptions(options, permissionOf),
       antigravity: {
         client: { ...options.client, ...(options.trustedMcpServerName ? { trustedMcpServerName: options.trustedMcpServerName } : {}) },
-        ...(options.isBookkeepingTool ? { isBookkeepingTool: options.isBookkeepingTool } : {}),
         ...(instructions ? { instructions: (native: ProviderContext, { planMode }: { planMode: boolean }) => instructions(harnessContext(native, permissionOf), { planMode }) } : {}),
         ...(options.antigravity?.command ? { resolveRuntime: () => resolveAcpRuntime({ command: options.antigravity?.command }) } : {}),
       },
@@ -58,7 +56,7 @@ export class AntigravityHarness extends SessionHarness<'antigravity'> {
   protected createProjection(): HarnessProjection {
     return replicaProjection({
       snapshotEvent: 'antigravity.conversationSnapshotChanged', conversationEvent: 'antigravity.conversationEventReceived', label: 'Antigravity',
-      create: snapshot => createAntigravityConversationReplica(snapshot, this.phaseRules),
+      create: snapshot => createAntigravityConversationReplica(snapshot),
       apply: (replica, event) => replica.apply(event),
       state: replica => transcriptState(replica.getSnapshot()),
     });

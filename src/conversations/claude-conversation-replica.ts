@@ -4,7 +4,6 @@ import type {
   ClaudeConversationTurn,
 } from '../contracts';
 import { applyClaudeConversationEvent } from './claude-conversation-reducer';
-import { workPhaseView, type WorkPhaseRules } from './work-phases';
 
 export type ClaudeConversationReplica = {
   apply(event: ClaudeConversationEvent): ClaudeConversationSnapshot;
@@ -13,11 +12,8 @@ export type ClaudeConversationReplica = {
 
 export function createClaudeConversationReplica(
   initialSnapshot: ClaudeConversationSnapshot,
-  rules: WorkPhaseRules = {},
 ): ClaudeConversationReplica {
   let snapshot = structuredClone(initialSnapshot);
-  // Reads carry work phases Claude does not tag itself.
-  const view = workPhaseView<ClaudeConversationSnapshot>(rules);
 
   return {
     apply(event) {
@@ -34,15 +30,15 @@ export function createClaudeConversationReplica(
           if (part.type === 'tool' && part.id === `approval-${event.payload.id}` && part.status === 'running') part.status = 'completed';
         }
         snapshot = next;
-        return view(snapshot);
+        return snapshot;
       }
 
       applyClaudeConversationEvent(next, structuredClone(event));
       snapshot = applyTurnLifecycle(next, event);
-      return view(snapshot);
+      return snapshot;
     },
     getSnapshot() {
-      return view(snapshot);
+      return snapshot;
     },
   };
 }

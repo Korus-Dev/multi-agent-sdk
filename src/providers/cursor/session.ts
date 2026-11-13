@@ -18,7 +18,7 @@ export { isCursorAuthenticationFailure } from './rpc-errors';
 
 const teamSwitched = 'Your team has switched. Reconnect Cursor in Settings.';
 const policyDenied = 'Cursor ACP is blocked by your team policy. Contact your administrator.';
-export type CursorSessionOptions = { client?: { name: string; version?: string; metadataDirectory?: string }; resolveCommand?: () => string | null; agentId: string; cwd: string; permissionMode?: 'default' | 'full-access'; runtime?: CursorRuntime; sessionId?: string; catalogOnly?: boolean; mcpServers?: unknown[]; appMcpServerName?: string; isBookkeepingTool?: import('../../conversations/work-phases').WorkPhaseRules['isBookkeepingTool']; signal: AbortSignal; changed(event: CursorConversationEvent): void; disconnected(error: Error): void; usage?(sample: { sessionId: string; turnId: string; tokens: Consumption }): void };
+export type CursorSessionOptions = { client?: { name: string; version?: string; metadataDirectory?: string }; resolveCommand?: () => string | null; agentId: string; cwd: string; permissionMode?: 'default' | 'full-access'; runtime?: CursorRuntime; sessionId?: string; catalogOnly?: boolean; mcpServers?: unknown[]; appMcpServerName?: string; signal: AbortSignal; changed(event: CursorConversationEvent): void; disconnected(error: Error): void; usage?(sample: { sessionId: string; turnId: string; tokens: Consumption }): void };
 
 /** One agent/session; framing, request deadlines and process teardown remain in the shared transport. */
 export class CursorSession {
@@ -62,7 +62,7 @@ export class CursorSession {
       if (!record(initialized) || initialized.protocolVersion !== 1 || !Array.isArray(initialized.authMethods) || !initialized.authMethods.some(method => record(method) && method.id === 'cursor_login')) throw new Error('Unsupported Cursor ACP handshake.');
       if (!record(initialized.agentCapabilities) || !record(initialized.agentCapabilities.sessionCapabilities) || !record(initialized.agentCapabilities.sessionCapabilities.list)) throw new Error('Cursor ACP lacks session/list support required for safe cancellation.');
       await session.connection.request('authenticate', { methodId: 'cursor_login' });
-      if (options.catalogOnly) { session.transcript = new CursorTranscript(options.agentId, 'catalog', () => {},undefined,options.cwd,{ isBookkeepingTool: options.isBookkeepingTool }); session.loading = false; return session; }
+      if (options.catalogOnly) { session.transcript = new CursorTranscript(options.agentId, 'catalog', () => {},undefined,options.cwd); session.loading = false; return session; }
       if (options.sessionId) {
         if (initialized.agentCapabilities.loadSession !== true) throw new Error('Cursor does not support history loading.');
         const catalog = await session.connection.request('session/list', { cwd: options.cwd });
@@ -70,18 +70,18 @@ export class CursorSession {
         const entry = catalog.sessions.find(value => record(value) && value.sessionId === options.sessionId);
         if (!record(entry) || typeof entry.cwd !== 'string' || !path.isAbsolute(entry.cwd) || await realpath(entry.cwd).catch(() => null) !== await realpath(options.cwd)) throw new Error('Cursor conversation is missing or belongs to another workspace.');
         session.journal = await CursorPromptJournal.open(options.runtime?.homePath ?? cursorRuntime().homePath, options.sessionId, options.client?.metadataDirectory);
-        session.transcript = new CursorTranscript(options.agentId, options.sessionId, () => {}, text => session.journal.display(text),options.cwd,{ isBookkeepingTool: options.isBookkeepingTool });
+        session.transcript = new CursorTranscript(options.agentId, options.sessionId, () => {}, text => session.journal.display(text),options.cwd);
       }
       const created = await session.connection.request(options.sessionId ? 'session/load' : 'session/new', { ...(options.sessionId ? { sessionId: options.sessionId } : {}), cwd: options.cwd, mcpServers: options.mcpServers ?? [] });
       if (!record(created) || (!options.sessionId && (typeof created.sessionId !== 'string' || !created.sessionId)) || (options.sessionId && created.sessionId !== undefined && created.sessionId !== options.sessionId)) throw new Error('Invalid Cursor session identity.');
       session.config = created;
       session.journal ??= await CursorPromptJournal.open(options.runtime?.homePath ?? cursorRuntime().homePath, created.sessionId as string, options.client?.metadataDirectory);
-      if (!options.sessionId) session.transcript = new CursorTranscript(options.agentId, created.sessionId as string, event => { if (!session.loading) session.changed(event); },undefined,options.cwd,{ isBookkeepingTool: options.isBookkeepingTool });
+      if (!options.sessionId) session.transcript = new CursorTranscript(options.agentId, created.sessionId as string, event => { if (!session.loading) session.changed(event); },undefined,options.cwd);
       // Rebind replay without publishing its synthetic lifecycle as live execution.
       if (options.sessionId) {
         session.transcript.finishReplay();
         const replay = session.snapshot;
-        session.transcript = new CursorTranscript(options.agentId, options.sessionId, event => session.changed(event),undefined,options.cwd,{ isBookkeepingTool: options.isBookkeepingTool });
+        session.transcript = new CursorTranscript(options.agentId, options.sessionId, event => session.changed(event),undefined,options.cwd);
         session.transcript.replica.replace(replay);
       }
       for (const params of session.startupUpdates) session.notification('session/update', params);

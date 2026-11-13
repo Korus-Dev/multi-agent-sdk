@@ -154,8 +154,7 @@ export function pruneSupersededEmptyAssistantPlaceholders(snapshot: ClaudeTransc
 
   for (let index = lastAgentMessageIndex - 1; index >= 0; index -= 1) {
     const message = snapshot.messages[index];
-    if (message?.agentId === agentId && isPlainEmptyAssistantPlaceholder(message)
-      && !snapshot.turns?.some(turn => turn.id === message.turnId && turn.itemsView === 'summary')) {
+    if (message?.agentId === agentId && isPlainEmptyAssistantPlaceholder(message)) {
       snapshot.messages.splice(index, 1);
     }
   }

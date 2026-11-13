@@ -1,6 +1,5 @@
 import { claudeHarnessCapabilities } from '../../capabilities';
 import { validateMcpPolicy } from '../../mcp-policy';
-import { tagTurnWorkPhases } from '../../conversations/work-phases';
 import type { ProviderHistoryLoadResult, HarnessPromptScope } from '../../driver';
 import { promptContentDispatchText, type PromptPart } from '../../core/prompt-content';
 import type { ClaudeToolPartOptions } from './claude-tool-part-adapter';
@@ -13,8 +12,6 @@ export type ClaudeHostOptions<Context extends Agent = Agent> = {
   authentication?: { check: typeof getLocalClaudeAuthentication; logout: typeof logoutLocalClaude };
   readAccountUsage?: typeof getClaudeAccountUsage;
   toolOptions?: ClaudeToolPartOptions;
-  /** The app's bookkeeping tool calls, which do not count as work when tagging work phases. */
-  isBookkeepingTool?: import('../../conversations/work-phases').WorkPhaseRules['isBookkeepingTool'];
   log?: (level: 'warn', component: string, message: string, details?: Record<string, unknown>) => void;
 };
 function scopedConfiguration(scope: HarnessPromptScope): ClaudeScopedTurnConfiguration {
@@ -181,7 +178,6 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
   private readonly conversationRevisionsByAgentId = new Map<string, number>();
   private readonly historyWindows = new Map<string, ClaudeHistoryWindow>();
   private readonly pendingOlderHistory = new Map<string, { window: ClaudeHistoryWindow; promise: Promise<ClaudeHistoryLoadResult> }>();
-  private readonly pendingTurnHistory = new Map<string, { window: ClaudeHistoryWindow; promise: Promise<void> }>();
   private readonly historyLoads = new Map<string, { token: symbol; sessionId: string | null }>();
   private readonly pendingRequestOwners = new Map<string, ActiveClaudeTurn>();
   private readonly liveSessionIdsByAgentId = new Map<string, string>();
@@ -194,7 +190,6 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
 
   private readonly historyLoader: ClaudeHistoryLoader<Context>;
 
-  private readonly tagHistoryTurn = (turn: Message[]) => tagTurnWorkPhases(turn, { isBookkeepingTool: this.driverOptions.isBookkeepingTool });
   constructor(
     private readonly transport: ClaudeTurnTransport = new ClaudeAgentSdkTransport(),
     historyLoader: ClaudeHistoryLoader<Context> | undefined = undefined,
@@ -605,10 +600,8 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
 
   async releaseConversation(agentId: string): Promise<void> {
     this.subagents.release(agentId);
-    const releasedWindow = this.historyWindows.get(agentId);
     this.historyWindows.delete(agentId);
     this.pendingOlderHistory.delete(agentId);
-    for (const [key, pending] of this.pendingTurnHistory) if (pending.window === releasedWindow) this.pendingTurnHistory.delete(key);
     this.historyLoads.delete(agentId);
     this.turnBoundariesByAgentId.delete(agentId);
     this.goalRefreshIds.delete(agentId);
@@ -709,54 +702,6 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
       type: 'turn.executionPlanUpdated', payload: { plan: taskPlan.plan } });
     this.publishGoal(agent.id, state.goal);
     for (const event of state.subagentEvents ?? []) this.emit(event);
-  }
-
-  async loadTurnHistory(agent: Context, turnId: string): Promise<void> {
-    const window = this.historyWindows.get(agent.id);
-    const snapshot = this.conversationReplicasByAgentId.get(agent.id)?.getSnapshot();
-    if (!window || !snapshot || window.sessionId !== claudeSessionId(agent) || snapshot.sessionId !== window.sessionId) {
-      throw new Error('Claude history is no longer open. Reload the conversation.');
-    }
-    const turn = snapshot.turns.find(candidate => candidate.id === turnId);
-    if (!turn || !snapshot.messages.some(message => message.turnId === turnId)) throw new Error('Claude turn is no longer available. Reload the conversation.');
-    if (!window.isSummaryTurn(turnId)) return;
-    const key = JSON.stringify([agent.id, turnId]);
-    const existing = this.pendingTurnHistory.get(key);
-    if (existing?.window === window) return existing.promise;
-    const current = () => this.historyWindows.get(agent.id) === window
-      && (!this.historyLoads.has(agent.id) || this.historyLoads.get(agent.id)!.sessionId === snapshot.sessionId)
-      && this.conversationReplicasByAgentId.get(agent.id)?.getSnapshot().sessionId === snapshot.sessionId;
-    const publishTurn = (update: Partial<ClaudeConversationTurn>) => this.emitConversation({
-      agentId: agent.id, provider: 'claude', providerSessionId: snapshot.sessionId ?? undefined,
-      type: 'turn.historyUpdated', payload: { turn: { ...turn, ...update } },
-    });
-    const promise = (async () => {
-      publishTurn({ detailsLoading: true, detailsError: null });
-      try {
-        const messages = await window.expandTurn(turnId);
-        if (!current()) throw new Error('Claude history is no longer open. Reload the conversation.');
-        const latest = this.conversationReplicasByAgentId.get(agent.id)!.getSnapshot();
-        window.capture(latest.messages);
-        const latestIds = new Set(latest.messages.map(message => message.id));
-        const visible = new Set([...window.visibleMessageIds()].filter(id => latestIds.has(id)));
-        // Live rows after the selected history were delivered incrementally, not by the last reset.
-        for (const message of latest.messages) if (!window.isHistoricalMessage(message.id)) visible.add(message.id);
-        for (const message of messages) {
-          const beforeMessageId = window.nextVisibleMessage(message.id, visible);
-          this.emitConversation({ agentId: agent.id, provider: 'claude', providerSessionId: snapshot.sessionId ?? undefined,
-            type: 'message.replaced', payload: { message, ...(beforeMessageId ? { beforeMessageId } : {}) } });
-          visible.add(message.id);
-        }
-        window.reveal(messages);
-        publishTurn({ itemsView: 'full', detailsLoading: false, detailsError: null });
-      } catch (error) {
-        if (current()) publishTurn({ itemsView: 'summary', detailsLoading: false, detailsError: error instanceof Error ? error.message : String(error) });
-        throw error;
-      }
-    })();
-    this.pendingTurnHistory.set(key, { window, promise });
-    try { await promise; }
-    finally { if (this.pendingTurnHistory.get(key)?.promise === promise) this.pendingTurnHistory.delete(key); }
   }
 
   async readConversationContent(agent: Context, input: import('../../contracts/conversation').ConversationContentInput): Promise<import('../../contracts/conversation').ConversationContentChunk> {
@@ -919,7 +864,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
         const home = this.promptContentHome(); const sessionId = history.providerSession.conversationId;
         const restore = async (messages: Message[]) => { await restorePromptContent(home, sessionId, messages); return messages; };
         const restoredSource = (original: import('./history-source').ClaudeHistorySource): import('./history-source').ClaudeHistorySource => ({
-          ...original, readTurn: async id => restore(await original.readTurn(id)), readAll: async () => restore(await original.readAll()),
+          ...original, readAll: async () => restore(await original.readAll()),
           ...(original.loadEarlier ? { loadEarlier: async () => {
             const archive = await original.loadEarlier!();
             return { ...archive, messages: await restore(archive.messages), source: restoredSource(archive.source) };
@@ -1007,7 +952,6 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
     this.taskPlansByAgentId.clear();
     this.historyWindows.clear();
     this.pendingOlderHistory.clear();
-    this.pendingTurnHistory.clear();
     this.historyLoads.clear();
     this.conversationRevisionsByAgentId.clear();
     this.liveSessionIdsByAgentId.clear();
@@ -1920,7 +1864,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
     source?: import('./history-source').ClaudeHistorySource,
   ): void {
     this.taskPlansByAgentId.set(agent.id, taskPlan);
-    const window = new ClaudeHistoryWindow(sessionId, messages, new Set(turns.filter(turn => turn.status !== 'inProgress').map(turn => turn.id)), source, this.tagHistoryTurn);
+    const window = new ClaudeHistoryWindow(sessionId, messages, source);
     this.historyWindows.set(agent.id, window);
     const page = window.older();
     this.publishConversationSnapshot({
@@ -1928,7 +1872,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
       sessionId,
       activeTurnId: null,
       turnIds: turns.map(turn => turn.id),
-      turns: turns.map(turn => ({ ...turn, itemsView: window.isSummaryTurn(turn.id) ? 'summary' : 'full' })),
+      turns,
       messages: page.messages,
       answeredClientRequestIds: [],
       busy: false,
@@ -1945,7 +1889,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
     if (!current || current.sessionId === sessionId) return;
     const window = this.historyWindows.get(agentId);
     if (window?.sessionId === null) window.sessionId = sessionId;
-    else if (window?.sessionId !== sessionId) this.historyWindows.set(agentId, new ClaudeHistoryWindow(sessionId, undefined, undefined, undefined, this.tagHistoryTurn));
+    else if (window?.sessionId !== sessionId) this.historyWindows.set(agentId, new ClaudeHistoryWindow(sessionId));
     this.publishConversationSnapshot({ ...current, sessionId });
   }
 
@@ -1953,15 +1897,13 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
     const window = this.historyWindows.get(snapshot.agentId);
     let publishedSnapshot = snapshot;
     if (window) {
-      publishedSnapshot = { ...snapshot, messages: window.reopen(snapshot.messages),
-        turns: snapshot.turns.map(turn => window.isSummaryTurn(turn.id) ? { ...turn, itemsView: 'summary' } : turn),
-        historyState: { hasOlder: window.hasOlder, loadingOlder: false } };
-      snapshot = { ...snapshot, turns: publishedSnapshot.turns, historyState: publishedSnapshot.historyState };
+      publishedSnapshot = { ...snapshot, messages: window.reopen(snapshot.messages), historyState: { hasOlder: window.hasOlder, loadingOlder: false } };
+      snapshot = { ...snapshot, historyState: publishedSnapshot.historyState };
     }
     const revision = this.nextConversationRevision(snapshot.agentId);
     this.conversationReplicasByAgentId.set(
       snapshot.agentId,
-      createClaudeConversationReplica(snapshot, { isBookkeepingTool: this.driverOptions.isBookkeepingTool }),
+      createClaudeConversationReplica(snapshot),
     );
     this.emit({
       agentId: snapshot.agentId,

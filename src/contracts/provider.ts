@@ -99,6 +99,8 @@ export type ProviderCapabilities = {
   realtime?: boolean;
   /** Whether conversations belong to a working folder; a harness whose conversations span folders names none in their references. */
   folderScopedConversations?: boolean;
+  /** The harness reports each text part's work phase (`commentary` or `final_answer`) itself; absent means text carries no phase. */
+  workPhases?: boolean;
   /** `getAccountRateLimits` reads subscription usage and rate limits for the signed-in account. */
   accountUsage?: boolean;
   /**

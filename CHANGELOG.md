@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- `capabilities.workPhases` says whether a harness states each text part's work phase (`commentary` or `final_answer`). Codex does; Claude, Cursor and Antigravity report assistant text exactly as the provider supplied it, with no inferred phase, so an app that groups work from the answer reads `workPhases` first. `isBookkeepingTool` is removed from `createHarness` options and from `createScriptedHarness`.
+- Claude loads every turn whole, with no summary turns: its turns no longer carry `itemsView`, `detailsLoading` or `detailsError`, `capabilities.turnHistory` is not set for Claude, and `loadTurnHistory` rejects with `HarnessUnsupportedError` there. `loadOlderHistory` still pages back through a conversation, and a part that is huge on its own is still cut to a preview that `readConversationContent` reads in full.
+
 ## 0.27.0 (2026-11-12)
 
 - Session data and conversation references name the conversation `conversationId` on every harness, replacing `sessionId` and Codex's `threadId`; Claude session data names its transcript `transcriptConversationId`, replacing `transcriptSessionId`. Data saved with the old names needs `conversationId` added before it is restored.

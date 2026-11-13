@@ -7,7 +7,6 @@ import { cursorHarnessCapabilities } from '../../capabilities';
 import { bridgedMcpServers, providerHome, sharedProviderOptions, type SharedProviderOptions } from '../../harness-options';
 import { replicaProjection, transcriptState, type HarnessProjection } from '../../harness-projection';
 import { createCursorConversationReplica } from '../../conversations/cursor-conversation-replica';
-import type { WorkPhaseRules } from '../../conversations/work-phases';
 import { CursorHost, type CursorHostOptions } from './host';
 import { cursorRuntime } from './runtime';
 import { transcriptActivity } from '../../conversations/conversation-activity';
@@ -22,7 +21,7 @@ export class CursorHarness extends SessionHarness<'cursor'> {
   /** A fresh session record for a conversation id. */
   static sessionData(id: string, folder: string | null): ProviderSessionData { return { kind: 'cursor', conversationId: id, folder } as ProviderSessionData; }
 
-  constructor(native: ProviderDriver<ProviderContext, ProviderEvent>, rules?: WorkPhaseRules) { super('cursor', native, rules); }
+  constructor(native: ProviderDriver<ProviderContext, ProviderEvent>) { super('cursor', native); }
 
   protected override accountOf(native: import('../../contracts/authentication').ProviderAuthentication) {
     if (native.kind !== 'cursor' || !native.state.account) return null;
@@ -41,7 +40,7 @@ export class CursorHarness extends SessionHarness<'cursor'> {
         ...(options.cursor?.command ? { resolveCommand: options.cursor.command } : {}),
         ...(options.cursor?.steeringFallback ? { steeringFallbackEnabled: options.cursor.steeringFallback } : {}),
         ...(options.trustedMcpServerName ? { trustedMcpServerName: options.trustedMcpServerName } : {}),
-        sessionOptions: { client: options.client, ...(options.cursor?.command ? { resolveCommand: options.cursor.command } : {}), ...(options.isBookkeepingTool ? { isBookkeepingTool: options.isBookkeepingTool } : {}) },
+        sessionOptions: { client: options.client, ...(options.cursor?.command ? { resolveCommand: options.cursor.command } : {})},
       },
     };
   }
@@ -63,7 +62,7 @@ export class CursorHarness extends SessionHarness<'cursor'> {
   protected createProjection(): HarnessProjection {
     return replicaProjection({
       snapshotEvent: 'cursor.conversationSnapshotChanged', conversationEvent: 'cursor.conversationEventReceived', label: 'Cursor',
-      create: snapshot => createCursorConversationReplica(snapshot, this.phaseRules),
+      create: snapshot => createCursorConversationReplica(snapshot),
       apply: (replica, event) => replica.apply(event),
       state: replica => transcriptState(replica.getSnapshot()),
     });

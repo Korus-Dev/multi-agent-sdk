@@ -60,7 +60,7 @@ if (refData) {
 
 Codex lists non-archived conversations by default, across working folders. Pass `cwd` to filter a workspace or `archived: true` for archived conversations. Listing starts the runtime as needed. `readConversationMessages(session, ref)` reads full Codex history without selecting, resuming, unarchiving, or mutating the conversation. Explicitly resuming an archived Codex conversation makes it active; it never archives the previous chat.
 
-Use `loadOlderHistory` and `loadTurnHistory` for provider-supported paging. `historyState` and `historyLoading` retain native evidence; absent paging flags are unknown.
+Use `loadOlderHistory` to page back through a conversation. Where `capabilities.turnHistory` is set, turns can arrive as summaries (`itemsView: 'summary'`) and `loadTurnHistory` loads one turn's full items; elsewhere every turn arrives whole. `historyState` and `historyLoading` retain native evidence; absent paging flags are unknown.
 
 ## Settings and lifecycle
 

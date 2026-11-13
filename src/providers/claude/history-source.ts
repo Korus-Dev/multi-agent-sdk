@@ -8,21 +8,18 @@ import type { ClaudeTaskPlan } from './claude-task-plan';
 export type ClaudeHistoryState = { taskPlan?: ClaudeTaskPlan; goal?: ThreadGoal | null; subagentEvents?: ProviderEvent[] };
 
 export type ClaudeHistorySource = {
-  readTurn(turnId: string): Promise<Message[]>;
   readAll(): Promise<Message[]>;
   isCurrent(): Promise<boolean>;
   loadEarlier?(): Promise<ClaudeHistoryState & { messages: Message[]; turns: ClaudeConversationTurn[]; source: ClaudeHistorySource }>;
 };
 
-export type ClaudeTurnRange = { start: number; end: number };
-type IndexedRange = ClaudeTurnRange & { hash: string };
+type IndexedRange = { start: number; end: number; hash: string };
 const hash = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
 
 /** Ephemeral index of one native transcript snapshot. No provider data is copied to disk. */
 export async function createClaudeHistorySource(
   file: string,
   content: string,
-  ranges: Map<string, ClaudeTurnRange>,
   decode: (content: string) => Message[],
   snapshot?: { offset: number; version: Stats },
 ): Promise<ClaudeHistorySource> {
@@ -30,8 +27,6 @@ export async function createClaudeHistorySource(
   const offset = snapshot?.offset ?? 0;
   const bytes = Buffer.from(content);
   const whole: IndexedRange = { start: offset, end: offset + bytes.length, hash: hash(bytes) };
-  const index = new Map<string, IndexedRange>();
-  for (const [id, range] of ranges) index.set(id, { start: offset + range.start, end: offset + range.end, hash: hash(bytes.subarray(range.start, range.end)) });
 
   const read = async (range: IndexedRange): Promise<Message[]> => {
     const handle = await open(file, 'r').catch(() => null);
@@ -50,16 +45,11 @@ export async function createClaudeHistorySource(
       if (hash(result) !== range.hash) throw new Error('changed');
       return decode(result.toString('utf8'));
     } catch {
-      throw new Error('Claude history changed. Reload the conversation before loading details.');
+      throw new Error('Claude history changed. Reload the conversation before loading older messages.');
     } finally { await handle.close(); }
   };
 
   return {
-    async readTurn(turnId) {
-      const range = index.get(turnId);
-      if (!range) throw new Error('Claude turn is no longer available. Reload the conversation.');
-      return (await read(range)).filter(message => message.turnId === turnId);
-    },
     readAll: () => read(whole),
     async isCurrent() {
       const current = await stat(file).catch(() => null);

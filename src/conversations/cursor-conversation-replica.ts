@@ -1,10 +1,8 @@
 import type { CursorConversationEvent, CursorConversationSnapshot } from '../contracts/cursor-conversation';
-import { workPhaseView, type WorkPhaseRules } from './work-phases';
 
 /** Cursor owns this replica; the app coordination reducer never contains its transcript. */
-export function createCursorConversationReplica(initial: CursorConversationSnapshot, rules: WorkPhaseRules = {}) {
+export function createCursorConversationReplica(initial: CursorConversationSnapshot) {
   let snapshot = structuredClone(initial);
-  const view = workPhaseView<CursorConversationSnapshot>(rules);
   const replica = {
     getSnapshot: () => snapshot,
     replace: (value: CursorConversationSnapshot) => { snapshot = structuredClone(value); },
@@ -50,8 +48,7 @@ export function createCursorConversationReplica(initial: CursorConversationSnaps
       return snapshot;
     },
   };
-  // Reads carry work phases this harness does not tag itself.
-  return { ...replica, getSnapshot: () => view(snapshot), apply: (event: CursorConversationEvent) => view(replica.apply(event)) };
+  return replica;
 }
 
 export function emptyCursorSnapshot(agentId: string, sessionId: string): CursorConversationSnapshot {

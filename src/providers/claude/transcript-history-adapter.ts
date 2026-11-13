@@ -1,7 +1,7 @@
 import type { Dirent } from 'node:fs';
 import { getSessionMessages } from '@anthropic-ai/claude-agent-sdk';
 import { readClaudeArchive, readRecentClaudeTranscript, type ClaudeTranscriptSlice } from './recent-history';
-import { createClaudeHistorySource, type ClaudeHistorySource, type ClaudeTurnRange } from './history-source';
+import { createClaudeHistorySource, type ClaudeHistorySource } from './history-source';
 import { access, readFile, readdir, realpath, stat } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -81,7 +81,7 @@ export async function loadClaudeTranscriptHistory(
     if (!isPathInside(path.join(project, sessionId, 'subagents'), child)) throw new Error('Claude subagent transcript is outside its session.');
     const content = await readFile(child, 'utf8');
     return { providerSession: agent.providerSession,
-      messages: claudeTranscriptToMessages(content, agent.id, `${sessionId}-${options.subagentId}`, undefined, undefined, true, undefined, undefined, undefined, options.toolOptions),
+      messages: claudeTranscriptToMessages(content, agent.id, `${sessionId}-${options.subagentId}`, undefined, undefined, true, undefined, undefined, options.toolOptions),
     };
   }
 
@@ -130,10 +130,9 @@ async function decodeClaudeHistory(agent: Agent, sessionId: string, transcriptPa
   const subagentEvents = claudeSubagentHistoryEvents(content, agent.id, agent.providerSession.conversationId);
   const taskPlan = new ClaudeTaskPlan();
   const turns: ClaudeConversationTurn[] = [];
-  const ranges = new Map<string, ClaudeTurnRange>();
-  const messages = claudeTranscriptToMessages(content, agent.id, sessionId, turnBoundaries, nativeMessageTurnIds, false, taskPlan, turns, ranges, toolOptions);
-  const source = await createClaudeHistorySource(transcriptPath, content, ranges,
-    text => claudeTranscriptToMessages(text, agent.id, sessionId, undefined, undefined, undefined, undefined, undefined, undefined, toolOptions), snapshot);
+  const messages = claudeTranscriptToMessages(content, agent.id, sessionId, turnBoundaries, nativeMessageTurnIds, false, taskPlan, turns, toolOptions);
+  const source = await createClaudeHistorySource(transcriptPath, content,
+    text => claudeTranscriptToMessages(text, agent.id, sessionId, undefined, undefined, undefined, undefined, undefined, toolOptions), snapshot);
   return {
     providerSession: {
       ...session,
@@ -278,7 +277,7 @@ export async function listClaudeTranscriptSummaries(
   return summaries;
 }
 
-export function claudeTranscriptToMessages(content: string, agentId: string, sessionId: string, turnBoundaries?: Record<string, string>, nativeMessageTurnIds?: Record<string, string>, includeSidechain = false, taskPlan?: ClaudeTaskPlan, turns?: ClaudeConversationTurn[], ranges?: Map<string, ClaudeTurnRange>, toolOptions?: ClaudeToolPartOptions): Message[] {
+export function claudeTranscriptToMessages(content: string, agentId: string, sessionId: string, turnBoundaries?: Record<string, string>, nativeMessageTurnIds?: Record<string, string>, includeSidechain = false, taskPlan?: ClaudeTaskPlan, turns?: ClaudeConversationTurn[], toolOptions?: ClaudeToolPartOptions): Message[] {
   const messages: Message[] = [];
   let currentTurnId: string | null = null;
   let currentTurnCreatedAt: string | null = null;
@@ -288,14 +287,7 @@ export function claudeTranscriptToMessages(content: string, agentId: string, ses
   const turnsById = new Map<string, ClaudeConversationTurn>();
   const assistantParts: MessagePart[] = [];
   const pendingTools = new Set<string>();
-  let byteOffset = 0; let lineStart = 0; let lineEnd = 0;
-  const rememberRange = () => {
-    if (!ranges || !currentTurnId) return;
-    const previous = ranges.get(currentTurnId);
-    ranges.set(currentTurnId, { start: previous?.start ?? lineStart, end: lineEnd });
-  };
   const rememberBoundary = (entry: TranscriptLine) => {
-    rememberRange();
     if (!currentTurnId || !entry.uuid) return;
     if (nativeMessageTurnIds) nativeMessageTurnIds[entry.uuid] = currentTurnId;
     if (!turnBoundaries) return;
@@ -324,9 +316,7 @@ export function claudeTranscriptToMessages(content: string, agentId: string, ses
     assistantSegments.set(currentTurnId, segmentIndex + 1);
   };
 
-  const contentBytes = ranges ? Buffer.byteLength(content) : 0;
   for (const line of content.split('\n')) {
-    if (ranges) { lineStart = byteOffset; byteOffset += Buffer.byteLength(line) + 1; lineEnd = Math.min(byteOffset, contentBytes); }
     const entry = parseClaudeSdkMessage(line) as TranscriptLine | null;
     if (!entry || entry.isSidechain && !includeSidechain) {
       continue;
@@ -358,7 +348,6 @@ export function claudeTranscriptToMessages(content: string, agentId: string, ses
 
       flushAssistantMessage();
       currentTurnId = claudeTurnId(entry, sessionId, messages.length);
-      rememberRange();
       if (nativeMessageTurnIds && entry.uuid) nativeMessageTurnIds[entry.uuid] = currentTurnId;
       currentTurnCreatedAt = timestampToIso(entry.timestamp);
       const existingTurn = turnsById.get(currentTurnId);
@@ -414,7 +403,6 @@ export function claudeTranscriptToMessages(content: string, agentId: string, ses
     if (entry.type === 'attachment' && currentTurnId && turnBoundaries?.[currentTurnId]) rememberBoundary(entry);
 
     if (entry.type === 'system' && entry.subtype === 'compact_boundary') {
-      rememberRange();
       flushAssistantMessage();
       const turnId = `claude-compact-${entry.uuid ?? messages.length}`;
       messages.push({

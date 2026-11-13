@@ -6,8 +6,6 @@ import type { PromptPart } from '../../core/prompt-content';
 import { defaultRuntimeDirectory } from '../../runtime/paths';
 export type AntigravityHostOptions<Context extends ProviderContext = ProviderContext> = {
   stateDirectory?: () => string;
-  /** The app's bookkeeping tool calls, which do not count as work when tagging work phases. */
-  isBookkeepingTool?: import('../../conversations/work-phases').WorkPhaseRules['isBookkeepingTool'];
   home?: () => string;
   resolveRuntime?: typeof resolveAcpRuntime;
   runtimeOptions?: () => Partial<Parameters<typeof AcpRuntime.open>[0]>;
@@ -400,7 +398,7 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
   }
 
   private async openSession(options: Parameters<typeof AcpSession.open>[0]): Promise<AcpSession> {
-    try { return await AcpSession.open({ ...options, isBookkeepingTool: this.options.isBookkeepingTool, home: options.home ?? this.options.home?.(), client: this.options.client, runtimeOptions: { ...this.nativeRuntimeOptions(), ...options.runtimeOptions } }); }
+    try { return await AcpSession.open({ ...options, home: options.home ?? this.options.home?.(), client: this.options.client, runtimeOptions: { ...this.nativeRuntimeOptions(), ...options.runtimeOptions } }); }
     catch (error) { if (error instanceof NativeLoginRequired) this.authState(false); throw error; }
   }
   private nativeRuntimeOptions(): Partial<Parameters<typeof AcpRuntime.open>[0]> {

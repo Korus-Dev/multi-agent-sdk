@@ -3,6 +3,7 @@ import { harnessForHost } from '../../src/internal';
 import type { ProviderContext } from '../../src/context';
 import type { ProviderDriver, ProviderEvent } from '../../src/driver';
 import type { HarnessEvent } from '../../src';
+import { emptyCursorSnapshot } from '../../src/conversations/cursor-conversation-replica';
 
 function fixture() {
   let deliver!: (event: ProviderEvent) => void;
@@ -21,7 +22,7 @@ it('hands listeners neutral events only: notices with the session they belong to
   const { harness, deliver } = fixture();
   const session = harness.open({ id: 'chat', folder: '/work' });
   const events: HarnessEvent[] = []; harness.onEvent(event => events.push(event));
-  const frame = { type: 'cursor.conversationSnapshotChanged', provider: 'cursor', agentId: 'chat', payload: { revision: 1, snapshot: {} } } as unknown as ProviderEvent;
+  const frame = { type: 'cursor.conversationSnapshotChanged', provider: 'cursor', agentId: 'chat', payload: { revision: 1, snapshot: emptyCursorSnapshot('chat', 'session') } } as unknown as ProviderEvent;
   deliver(frame);
   const models = { type: 'models.changed', provider: 'cursor', agentId: 'chat', payload: { models: [] } } as unknown as ProviderEvent;
   deliver(models);
