@@ -53,7 +53,7 @@ export class ClaudeHistoryWindow {
     if (this.pendingArchive) return this.pendingArchive;
     const source = this.source;
     const pending = (async () => {
-      const archive = await source.loadEarlier!();
+      const archive = await source.loadEarlier!(forContinuation);
       const original = this.messages.filter(message => this.initialIds.has(message.id));
       const split = archive.messages.length - original.length;
       if (split < 0 || archive.messages.slice(split).some((message, index) => message.id !== original[index]!.id)) {

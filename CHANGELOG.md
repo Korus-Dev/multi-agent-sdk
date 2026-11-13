@@ -2,7 +2,9 @@
 
 ## Unreleased
 
+- The earlier part of a Claude conversation opened from the end of its transcript is read a step at a time: scrolling up widens the window to the next size (5 MiB, then 50 MiB) and only then reads the whole transcript, where it used to read all of it on the first scroll up. A prompt sent before the earlier part is loaded still reads all of it, so the task plan and goal are complete before work starts. On a 180 MB transcript the first scroll up takes about 85 ms instead of 2.6 s, and paging back to the start takes 4 s instead of 15 s.
 - The conversation replica no longer copies every message it holds when a page of older history is prepended (or a turn of it is updated). Each page used to cost more than the one before.
+- A Claude conversation opens from the end of its transcript: the SDK reads the last 1 MiB, widens to 5 MiB and then 50 MiB only while that holds fewer than ten complete messages, and decodes just that window. The turn the window may have cut in half is left out, and the earlier part is read when it is asked for, as before. Opening a 180 MB transcript takes about 70 ms instead of 2.5 s. A transcript that cannot be opened this way, or whose last turn is larger than the window, is read whole. The Agent SDK's `getSessionMessages` is no longer called to find the window, so it works with an isolated Claude home too.
 - Sending to a session restored from saved data (or bound to a stored conversation with `syncSession`) reads that conversation first, on every harness: `sendPrompt`, `run`, `steerPrompt` and `continueInterruptedTurn` all do it once, before anything is sent. A Claude conversation that another agent messaged before the app opened it now shows its earlier history with the new turn, where it showed only the new turn. If the conversation cannot be read, the prompt is rejected with that error and nothing is sent.
 
 ## 0.27.1 (2026-11-12)

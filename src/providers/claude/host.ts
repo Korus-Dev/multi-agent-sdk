@@ -865,8 +865,8 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
         const restore = async (messages: Message[]) => { await restorePromptContent(home, sessionId, messages); return messages; };
         const restoredSource = (original: import('./history-source').ClaudeHistorySource): import('./history-source').ClaudeHistorySource => ({
           ...original, readAll: async () => restore(await original.readAll()),
-          ...(original.loadEarlier ? { loadEarlier: async () => {
-            const archive = await original.loadEarlier!();
+          ...(original.loadEarlier ? { loadEarlier: async (complete?: boolean) => {
+            const archive = await original.loadEarlier!(complete);
             return { ...archive, messages: await restore(archive.messages), source: restoredSource(archive.source) };
           } } : {}),
         });

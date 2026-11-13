@@ -1,6 +1,5 @@
 import type { Dirent } from 'node:fs';
-import { getSessionMessages } from '@anthropic-ai/claude-agent-sdk';
-import { readClaudeArchive, readRecentClaudeTranscript, type ClaudeTranscriptSlice } from './recent-history';
+import { claudeRecentWindows, readClaudeTranscriptWindow, widenClaudeTranscriptSlice, type ClaudeTranscriptSlice } from './recent-history';
 import { createClaudeHistorySource, type ClaudeHistorySource } from './history-source';
 import { access, readFile, readdir, realpath, stat } from 'node:fs/promises';
 import os from 'node:os';
@@ -31,7 +30,8 @@ export type ClaudeTranscriptHistoryOptions = {
   projectsRoot?: string;
   subagentId?: string;
   recent?: boolean;
-  readSessionMessages?: typeof getSessionMessages;
+  /** Sizes, in bytes, of the windows a recent read tries from the end of the transcript, smallest first. */
+  recentWindows?: readonly number[];
 };
 
 export type ClaudeTranscriptSettings = {
@@ -86,38 +86,71 @@ export async function loadClaudeTranscriptHistory(
   }
 
   if (options.recent) {
-    // The SDK uses the process-wide Claude home. An injected home must never fall
-    // through to another user's history; callers using an isolated home supply its reader.
-    const canReadSdk = options.readSessionMessages || projectsRoot === path.join(claudeConfigDirectory(), 'projects');
-    const recent = canReadSdk ? await (async () => {
-      try {
-        const messages = await (options.readSessionMessages ?? getSessionMessages)(sessionId, {
-          dir: agent.providerSession!.kind === 'claude' ? agent.providerSession!.transcriptFolder ?? claudeWorkingDirectory(agent) : agent.folder ?? undefined,
-          includeSystemMessages: true,
-        });
-        if (messages.some(message => message.session_id !== sessionId)) return null;
-        return await readRecentClaudeTranscript(transcriptPath, messages);
-      } catch { return null; } // Unsupported/empty SDK history retains the exhaustive native fallback.
-    })() : null;
-    if (recent && recent.offset > 0) {
-      const history = await decodeClaudeHistory(agent, sessionId, transcriptPath, recent.content, recent, options.toolOptions);
-      let pending: Promise<ClaudeTranscriptHistory> | undefined;
-      const archive = () => pending ??= readClaudeArchive(transcriptPath, recent)
-        .then(content => decodeClaudeHistory(agent, sessionId, transcriptPath, content, { ...recent, offset: 0 }, options.toolOptions))
-        .catch(error => { pending = undefined; throw error; });
-      history.source = { ...history.source!,
-        readAll: async () => (await archive()).messages,
-        loadEarlier: async () => {
-          const full = await archive();
-          return { messages: full.messages, turns: full.turns ?? [], source: full.source!,
-            taskPlan: full.taskPlan, goal: full.goal, subagentEvents: full.subagentEvents };
-        },
-      };
-      return history;
-    }
-    if (recent) return decodeClaudeHistory(agent, sessionId, transcriptPath, recent.content, recent, options.toolOptions);
+    const recent = await openFromTheEnd(agent, sessionId, transcriptPath, options);
+    if (recent) return recent;
   }
   return decodeClaudeHistory(agent, sessionId, transcriptPath, await readFile(transcriptPath, 'utf8'), undefined, options.toolOptions);
+}
+
+// A window is enough once it holds this many messages; a wider one is read only when it holds fewer.
+const enoughRecentMessages = 10;
+
+/**
+ * Opens a conversation from the end of its transcript: the last window of the file, widened only while it holds too few
+ * messages. Whatever it cannot vouch for returns null, and the caller reads the whole transcript.
+ */
+async function openFromTheEnd(agent: Agent, sessionId: string, transcriptPath: string, options: ClaudeTranscriptHistoryOptions): Promise<ClaudeTranscriptHistory | null> {
+  const windows = options.recentWindows ?? claudeRecentWindows;
+  try {
+    for (const [index, window] of windows.entries()) {
+      const slice = await readClaudeTranscriptWindow(transcriptPath, window);
+      const history = await decodeClaudeHistory(agent, sessionId, transcriptPath, slice.content, slice, options.toolOptions);
+      if (slice.offset === 0) return history; // the whole transcript fit in the window
+      const whole = withoutCutTurn(history);
+      if (whole.messages.length >= enoughRecentMessages || index === windows.length - 1 && whole.messages.length > 0) return withEarlierHistory(whole, agent, sessionId, transcriptPath, slice, window, options);
+    }
+  } catch { /* A transcript that cannot be read from the end is read whole. */ }
+  return null;
+}
+
+/**
+ * A window that does not begin the file starts somewhere inside a turn, and the decoder cannot tell that turn's first
+ * line from a steering message or from the answer that precedes it. So the window keeps the turns that begin after the
+ * first one a prompt starts in it; the earlier part completes the rest.
+ */
+function withoutCutTurn(history: ClaudeTranscriptHistory): ClaudeTranscriptHistory {
+  const starts = history.messages.flatMap((message, index) => message.role === 'user' && message.kind !== 'steer' ? [index] : []);
+  const messages = starts[1] === undefined ? [] : history.messages.slice(starts[1]);
+  const kept = new Set(messages.map(message => message.turnId));
+  return { ...history, messages, ...(history.turns ? { turns: history.turns.filter(turn => kept.has(turn.id)) } : {}) };
+}
+
+/**
+ * The earlier part of the transcript is read only when it is asked for, one step wider each time: the next window of the
+ * ladder, and the whole transcript after the last. A caller that needs the complete conversation reads all of it at once.
+ */
+function withEarlierHistory(history: ClaudeTranscriptHistory, agent: Agent, sessionId: string, transcriptPath: string, slice: ClaudeTranscriptSlice, used: number, options: ClaudeTranscriptHistoryOptions): ClaudeTranscriptHistory {
+  const windows = options.recentWindows ?? claudeRecentWindows;
+  const decode = async (wider: ClaudeTranscriptSlice) => decodeClaudeHistory(agent, sessionId, transcriptPath, wider.content, wider, options.toolOptions);
+  const earlier = (wider: ClaudeTranscriptHistory) => ({ messages: wider.messages, turns: wider.turns ?? [], source: wider.source!,
+    taskPlan: wider.taskPlan, goal: wider.goal, subagentEvents: wider.subagentEvents });
+  let pending: Promise<ClaudeTranscriptHistory> | undefined;
+  const whole = () => pending ??= widenClaudeTranscriptSlice(transcriptPath, slice, Infinity).then(decode)
+    .catch(error => { pending = undefined; throw error; });
+  history.source = { ...history.source!,
+    readAll: async () => (await whole()).messages,
+    loadEarlier: async (complete = false) => {
+      for (const window of complete ? [] : windows.filter(candidate => candidate > used)) {
+        const wider = await widenClaudeTranscriptSlice(transcriptPath, slice, window);
+        const decoded = await decode(wider);
+        if (wider.offset === 0) return earlier(decoded);
+        const kept = withoutCutTurn(decoded);
+        if (kept.messages.length > history.messages.length) return earlier(withEarlierHistory(kept, agent, sessionId, transcriptPath, wider, window, options));
+      }
+      return earlier(await whole());
+    },
+  };
+  return history;
 }
 
 async function decodeClaudeHistory(agent: Agent, sessionId: string, transcriptPath: string, content: string, snapshot?: ClaudeTranscriptSlice, toolOptions?: ClaudeToolPartOptions): Promise<ClaudeTranscriptHistory> {

@@ -10,7 +10,8 @@ export type ClaudeHistoryState = { taskPlan?: ClaudeTaskPlan; goal?: ThreadGoal 
 export type ClaudeHistorySource = {
   readAll(): Promise<Message[]>;
   isCurrent(): Promise<boolean>;
-  loadEarlier?(): Promise<ClaudeHistoryState & { messages: Message[]; turns: ClaudeConversationTurn[]; source: ClaudeHistorySource }>;
+  /** The earlier part of the transcript: one step wider, or all of it when `complete` is set. */
+  loadEarlier?(complete?: boolean): Promise<ClaudeHistoryState & { messages: Message[]; turns: ClaudeConversationTurn[]; source: ClaudeHistorySource }>;
 };
 
 type IndexedRange = { start: number; end: number; hash: string };

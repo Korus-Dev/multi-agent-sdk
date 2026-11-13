@@ -26,23 +26,13 @@ describe('Claude history paging', () => {
 
 
 
-  it.each(['unavailable', 'empty', 'foreign', 'missing-anchor', 'short'] as const)('keeps native history available when the SDK chain is %s', async scenario => {
-    const home = await mkdtemp(path.join(os.tmpdir(), 'claude-dual-fallback-'));
+  it('keeps native history complete when a conversation opens from the end of its transcript', async () => {
+    const home = await mkdtemp(path.join(os.tmpdir(), 'claude-recent-open-'));
     await mkdir(path.join(home, '-synthetic'));
     const content = transcript(3, 'Readable work');
     await writeFile(path.join(home, '-synthetic', `${session.conversationId}.jsonl`), content);
-    const readSessionMessages = vi.fn(async () => {
-      if (scenario === 'unavailable') throw new Error('SDK history unavailable');
-      if (scenario === 'empty') return [];
-      return content.split('\n').map(line => {
-        const row = JSON.parse(line);
-        return { type: row.type, uuid: scenario === 'missing-anchor' ? `missing-${row.uuid}` : row.uuid,
-          session_id: scenario === 'foreign' ? 'other-session' : session.conversationId, message: row.message,
-          parent_tool_use_id: null, parent_agent_id: null };
-      });
-    });
     const driver = new ClaudeHost({ startTurn: vi.fn(), close: async () => {} },
-      (owner, options) => loadClaudeTranscriptHistory(owner, { ...options, projectsRoot: home, readSessionMessages }), { homeDir: home });
+      (owner, options) => loadClaudeTranscriptHistory(owner, { ...options, projectsRoot: home }), { homeDir: home });
     let replica!: ClaudeConversationReplica;
     driver.onEvent(frame => {
       if (frame.type === 'claude.conversationSnapshotChanged') replica = createClaudeConversationReplica(frame.payload.snapshot);
@@ -50,7 +40,6 @@ describe('Claude history paging', () => {
     });
     try {
       await driver.resumeConversation(agent, { ref: { provider: 'claude', folder: agent.folder, conversationId: session.conversationId }, storageState: 'active' });
-      expect(readSessionMessages).toHaveBeenCalledOnce();
       expect(replica.getSnapshot().historyState.hasOlder).toBe(false);
       expect(JSON.stringify(replica.getSnapshot())).toContain('Readable work');
       expect(await driver.readConversationMessages({ provider: 'claude', folder: agent.folder, conversationId: session.conversationId }, agent.id))
@@ -63,17 +52,13 @@ describe('Claude history paging', () => {
     await mkdir(path.join(home, '-synthetic'));
     const file = path.join(home, '-synthetic', `${session.conversationId}.jsonl`);
     const content = transcript(60, 'Older tool output'); await writeFile(file, content);
-    const readSessionMessages = async () => content.split('\n').slice(-6).map(line => {
-      const row = JSON.parse(line);
-      return { type: row.type, uuid: row.uuid, session_id: session.conversationId, message: row.message, parent_tool_use_id: null, parent_agent_id: null };
-    });
     let unblock!: () => void;
     const gate = new Promise<void>(resolve => { unblock = resolve; });
     let entered!: () => void;
     const entering = new Promise<void>(resolve => { entered = resolve; });
     const startTurn = vi.fn();
     const driver = new ClaudeHost({ startTurn, close: async () => {} }, async (owner, options) => {
-      const history = await loadClaudeTranscriptHistory(owner, { ...options, projectsRoot: home, readSessionMessages });
+      const history = await loadClaudeTranscriptHistory(owner, { ...options, projectsRoot: home, recentWindows: [4096] });
       if (history?.source?.loadEarlier) {
         const load = history.source.loadEarlier;
         history.source.loadEarlier = async () => { entered(); await gate; return load(); };
@@ -131,11 +116,7 @@ describe('Claude history paging', () => {
     const home = await mkdtemp(path.join(os.tmpdir(), 'claude-long-turn-'));
     const project = path.join(home, '-synthetic'); await mkdir(project);
     const file = path.join(project, `${session.conversationId}.jsonl`); await writeFile(file, source);
-    const readSessionMessages = async () => source.split('\n').map(line => {
-      const row = JSON.parse(line);
-      return { type: row.type, uuid: row.uuid, session_id: session.conversationId, message: row.message, parent_tool_use_id: null, parent_agent_id: null };
-    });
-    const driver = new ClaudeHost({ startTurn: vi.fn(), close: async () => {} }, owner => loadClaudeTranscriptHistory(owner, { projectsRoot: home, recent, readSessionMessages }), { homeDir: home });
+    const driver = new ClaudeHost({ startTurn: vi.fn(), close: async () => {} }, owner => loadClaudeTranscriptHistory(owner, { projectsRoot: home, recent, recentWindows: [8192] }), { homeDir: home });
     let replica!: ClaudeConversationReplica;
     driver.onEvent(frame => {
       if (frame.type === 'claude.conversationSnapshotChanged') replica = createClaudeConversationReplica(frame.payload.snapshot);
