@@ -24,6 +24,10 @@ type Binding = {
   changedSelection?: NonNullable<import('./contracts/index').SendPromptOptions['selection']>;
   /** The app cleared the session's conversation; the next prompt must start a new one. */
   cleared?: boolean;
+  /** The session is bound to a stored conversation the SDK has not read yet; sending to it reads it first. */
+  unread?: boolean;
+  /** The read a send is waiting for, shared by prompts sent while it runs. */
+  reading?: Promise<void>;
   parent?: Session;
   operation?: 'executing' | 'disposing' | 'releasing' | 'hydrating';
   nativeDisposed?: boolean;
@@ -154,6 +158,12 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
     binding.context.providerSession = structuredClone(data);
     const selection = this.selectionFromSession(data, previous, binding.state.selection, preserveRuntimeSelection);
     if (selection) { binding.state.selection = selection; this.changed(session); }
+  }
+  /** Sending to a stored conversation continues it, so the session must show its history and not only the new turn. */
+  private async readFirst(session: Session): Promise<void> {
+    const binding = this.get(session);
+    if (binding.kind !== 'main' || !binding.unread || !binding.context.providerSession || !this.native.loadConversation) return;
+    await (binding.reading ??= this.loadConversation(session).then(() => undefined).finally(() => { binding.reading = undefined; }));
   }
   private admitted(session: Session, result: SendResult): Admission {
     this.adoptSession(session, result.providerSession, true);
@@ -346,6 +356,7 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
     return { ...admission, ...(result.cleared === undefined ? {} : { cleared: result.cleared }) };
   }
   async steerPrompt(session: Session, prompt: string, options?: Parameters<Harness['steerPrompt']>[2]) {
+    await this.readFirst(session);
     return this.admitted(session, await (this.native.steerPrompt?.(this.interactive(session).context, prompt, options) ?? unavailable('Steering')));
   }
   async deleteTurn(session: Session, turnId: string) { return this.turnAction(session, await (this.native.deleteTurn?.(this.main(session).context, turnId) ?? unavailable('Turn deletion'))); }
@@ -362,6 +373,7 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
     return this.native.preparePromptOptions ? this.native.preparePromptOptions(this.main(session).context, options) : options;
   }
   async continueInterruptedTurn(session: Session, safetyReview?: Parameters<Harness['continueInterruptedTurn']>[1]) {
+    await this.readFirst(session);
     return this.turnAction(session, await (this.native.continueInterruptedTurn?.(this.main(session).context, safetyReview) ?? unavailable('Interrupted turn continuation')));
   }
   async reconcileConversations(sessions: Session[]) { await this.native.reconcileConversations?.(sessions.map(session => this.main(session).context)); }
@@ -410,7 +422,7 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
     if (parent) this.main(parent);
     const session = this.open({ ...context, defaults: context.defaults ?? saved.defaults });
     const binding = this.get(session); binding.context.providerSession = data as ProviderSessionData;
-    if (parent) { binding.kind = 'scope'; binding.parent = parent; }
+    if (parent) { binding.kind = 'scope'; binding.parent = parent; } else binding.unread = true;
     return session;
   }
   getRefData(ref: ConversationRef) { return structuredClone({ provider: this.provider, data: this.nativeRef(ref) }); }
@@ -490,6 +502,7 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
   }
   private async submitPrompt(session: Session, prompt: string, options?: Parameters<Harness['sendPrompt']>[2]) {
     const b = this.main(session);
+    await this.readFirst(session);
     if (b.cleared) {
       b.cleared = false;
       // Still cleared when the prompt is sent: this prompt starts a new conversation.
@@ -517,7 +530,12 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
     const b = this.get(session);
     if (state.data) this.validate({ provider: this.provider, data: state.data }, 'session');
     if (state.data !== undefined) b.cleared = state.data === null && (b.cleared || Boolean(b.context.providerSession));
-    if (state.data !== undefined) b.context.providerSession = state.data ?? undefined;
+    if (state.data !== undefined) {
+      const previous = b.context.providerSession;
+      b.context.providerSession = state.data ?? undefined;
+      if (state.data === null) b.unread = false;
+      else if (state.data.conversationId !== previous?.conversationId) b.unread = true;
+    }
     if (state.folder !== undefined) b.context.folder = state.folder;
     if (state.name !== undefined) b.context.name = state.name;
     // Re-stating what is stored changes nothing for a conversation in progress, so no selection travels with the next prompt.
@@ -534,6 +552,7 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
     if (!load) throw new Error('Conversation loading is unavailable.');
     return this.hydrate(session, async binding => {
       const result = await load(binding.context);
+      binding.unread = false;
       if (result) this.adoptSession(session, result);
       return result !== null;
     });
@@ -554,6 +573,7 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
     const ref = this.nativeRef(target.ref, 'Conversation reference does not belong to this driver.');
     if (!this.native.resumeConversation) throw new Error('Conversation resume is unavailable.');
     const result = await this.native.resumeConversation(this.main(session).context, { ...target, ref });
+    this.get(session).unread = false;
     this.adoptSession(session, result.providerSession);
   }
   openScope(parent: Session, input: { cwd: string }) { this.main(parent); return this.newScope(parent, input.cwd); }

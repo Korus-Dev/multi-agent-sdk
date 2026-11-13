@@ -20,7 +20,7 @@ const restored = nextHarness.restoreSession({ id: 'main', folder: projectFolder 
 await nextHarness.loadConversation(restored);
 ```
 
-Restoration binds identity. Loading reads the provider's current state. The SDK does not serialize your application, choose a JSON format, or retain durable attachment bytes. Restoration data includes provider IDs and paths: store it privately and associate it with the provider home it came from.
+Restoration binds identity. Loading reads the provider's current state. Sending to a restored session loads its conversation first, so a prompt, a steer or a continue never leaves a session that shows only the new turn: it shows the history as well. A conversation the app binds with `syncSession` is read the same way, and a failed read rejects the prompt before anything is sent. The SDK does not serialize your application, choose a JSON format, or retain durable attachment bytes. Restoration data includes provider IDs and paths: store it privately and associate it with the provider home it came from.
 
 ### One name for the conversation
 
