@@ -2,6 +2,8 @@
 
 `readSession(session)` returns the session's current state: messages, turns, pending requests, title, plan, goal and settings, in the same shape for every provider. Subscribe with `onEvent` to keep a view up to date. The function it returns removes the listener.
 
+A message is a list of parts in the order they were written: text, tool calls, questions, media and reasoning. A `reasoning` part holds text the agent wrote as thinking, such as Codex's reasoning summaries or the narration Claude writes in a thinking block. Show it inline with the parts around it. Thinking an agent keeps hidden has no text and produces no part. A reasoning part grows as it streams, and a patch carries only the text that was added.
+
 | Event | Use |
 | --- | --- |
 | `session.changed` | Render the session from its full state. |
