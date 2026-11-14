@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.27.3 (2026-11-13)
 
 - `createHarness` takes `isAppPlugin(pluginId)`, so an app can offer a plugin of its own in the composer. A plugin mention it names is not sent to Codex as one of Codex's plugins; the mention still reaches the model through the prompt text, and its chip stays in the stored message and when the conversation is read again. Claude, Cursor and Antigravity send no plugin mentions natively, so nothing changes for them. Listing Codex's own plugins is unchanged.
 
