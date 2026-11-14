@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `createHarness` takes `isAppPlugin(pluginId)`, so an app can offer a plugin of its own in the composer. A plugin mention it names is not sent to Codex as one of Codex's plugins; the mention still reaches the model through the prompt text, and its chip stays in the stored message and when the conversation is read again. Claude, Cursor and Antigravity send no plugin mentions natively, so nothing changes for them. Listing Codex's own plugins is unchanged.
+
 ## 0.27.2 (2026-11-13)
 
 - Claude thinking that carries text is shown as a `reasoning` part, in order with the text and tool calls around it, both when a conversation is loaded from its transcript and while a turn runs (a new `reasoning.delta` event streams it in). Claude often writes the narration the person reads as thinking, so a paragraph, or the question a follow-up answers, no longer goes missing. Thinking that Claude keeps hidden has no text and is still left out.

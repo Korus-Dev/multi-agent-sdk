@@ -60,6 +60,7 @@ export class CodexHarness extends ProviderHarness<'codex'> {
         ...(conversationConfig ? { conversationConfig: (native: ProviderContext, scope?: HarnessPromptScope) => conversationConfig(context(native), scope?.mcpServers?.[0]?.url ? { mcpServerUrl: scope.mcpServers[0].url } : undefined) } : {}),
         host: {
           ...(options.onDiagnostic ? { onDiagnostic: options.onDiagnostic } : {}),
+          ...(options.isAppPlugin ? { isAppPlugin: options.isAppPlugin } : {}),
           ...(options.codex?.onRequestSettled ? { onRequestSettled: info => options.codex!.onRequestSettled!(info) } : {}),
           ...(options.codex?.defaultModel ? { conversationDefaults: options.codex.defaultModel } : {}),
           ...(options.codex?.readOnly ? { permissionMode: 'read-only' as const, approvalMode: 'never' as const } : {}),

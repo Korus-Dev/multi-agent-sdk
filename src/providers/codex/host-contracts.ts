@@ -170,6 +170,8 @@ export type CodexAppServerTransportOptions =
   | CodexAppServerUnixSocketTransportOptions;
 
 export type CodexHostOptions = {
+  /** Whether a plugin mention names a plugin the app provides itself; such a mention is not sent to Codex as a plugin. */
+  isAppPlugin?: (pluginId: string) => boolean;
   /** Read original tool images from local provider-owned history. Defaults to false. */
   originalHistoryImages?: boolean;
   /** Read verified local provider history to recover exact per-turn usage, including compaction. */

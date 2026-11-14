@@ -71,8 +71,9 @@ export function promptSkillInputsFromContent(content: readonly PromptPart[] = []
     ? [{ name: part.value, path: part.id }] : []);
 }
 
-export function promptMentionInputs(content: readonly PromptPart[] = []): Extract<v2.UserInput, { type: 'mention' }>[] {
-  return content.flatMap(part => part.type === 'mention' && (part.kind === 'file' || part.kind === 'plugin')
+/** The mentions Codex receives as inputs of their own: files, and the plugins Codex knows (not the app's own). */
+export function promptMentionInputs(content: readonly PromptPart[] = [], isAppPlugin?: (pluginId: string) => boolean): Extract<v2.UserInput, { type: 'mention' }>[] {
+  return content.flatMap(part => part.type === 'mention' && (part.kind === 'file' || part.kind === 'plugin' && !isAppPlugin?.(part.id))
     ? [{ type: 'mention' as const, name: part.label, path: part.kind === 'plugin' ? `plugin://${part.id}` : part.id }] : []);
 }
 

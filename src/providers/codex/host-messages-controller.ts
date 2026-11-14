@@ -36,6 +36,7 @@ import { turnSettings } from './host-settings';
 import type { ThreadRuntimePatch, ThreadRuntimeState } from './host-runtime';
 
 export type CodexHostMessagesDependencies = {
+  isAppPlugin?: (pluginId: string) => boolean;
   clearGoalForThread(threadId: string): Promise<void>;
   compactForThread(threadId: string): Promise<void>;
   createConversation(): Promise<void>;
@@ -270,7 +271,7 @@ export class CodexHostMessagesController {
         input: [
           { type: 'text', text: promptContentDispatchText(content ?? [], text), text_elements: [] },
           ...attachments.map(attachmentInput),
-          ...promptMentionInputs(content),
+          ...promptMentionInputs(content, this.host.isAppPlugin),
           ...skillInputs.map((skill) => ({ type: 'skill' as const, name: skill.name, path: skill.path })),
         ],
         ...turnSettings(this.host.snapshotForRuntime(runtime), normalizedOptions),
@@ -371,7 +372,7 @@ export class CodexHostMessagesController {
         input: [
           { type: 'text', text: promptContentDispatchText(content ?? [], text), text_elements: [] },
           ...attachments.map(attachmentInput),
-          ...promptMentionInputs(content),
+          ...promptMentionInputs(content, this.host.isAppPlugin),
           ...skillInputs.map(skill => ({ type: 'skill' as const, name: skill.name, path: skill.path })),
         ],
       });

@@ -30,3 +30,9 @@ it('configures a CPA conversation and a separate scoped tool set through the rea
     expect((lastRequest(transport, 'thread/resume') as import('@korus-dev/codex-sdk').RpcRequest).params).toMatchObject({ developerInstructions: 'Use only verified tax rules.', config: { 'mcp_servers.tax_rules': expect.objectContaining({ url: 'http://127.0.0.1:1234/tax' }) } });
   } finally { await driver.close(); }
 });
+
+it('hands the app\'s plugin rule to the Codex host', async () => {
+  const { harnesses } = await import('../../../src/harnesses');
+  const isAppPlugin = (id: string) => id === 'korus-computer-use';
+  expect(harnesses.codex.mapOptions({ client: { name: 'x' }, isAppPlugin }).codex?.host?.isAppPlugin).toBe(isAppPlugin);
+});

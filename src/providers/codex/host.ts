@@ -273,6 +273,7 @@ export class CodexHost {
       sendMessageToThread: (threadId, prompt, options) => this.messagesController.sendToThread(threadId, prompt, options),
     });
     this.messagesController = new CodexHostMessagesController(this.client, {
+      ...(this.options.isAppPlugin ? { isAppPlugin: this.options.isAppPlugin } : {}),
       loadSkillsForThread: async threadId => {
         const runtime = this.requireRuntime(threadId);
         await this.catalog.listSkills({ ...(runtime.cwd ? { cwd: runtime.cwd } : {}) });

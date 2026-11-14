@@ -30,6 +30,12 @@ export type HarnessOptions = {
   instructions?: (context: HarnessContext, options: { planMode: boolean }) => string | undefined;
   mcpServers?: (context: HarnessContext) => readonly HarnessMcpEndpoint[];
   formatPrompt?: (prompt: string, content: readonly PromptPart[] | undefined) => string;
+  /**
+   * Whether a plugin mention names a plugin the app provides itself, such as one it adds to its own suggestions. The
+   * harness knows nothing of that plugin, so its mention is never sent as one of the harness's own plugins: it reaches
+   * the model through the prompt text, which `formatPrompt` shapes, and stays in the stored message.
+   */
+  isAppPlugin?: (pluginId: string) => boolean;
   /** The app's own MCP server. Its tools run without a permission prompt. */
   trustedMcpServerName?: string;
   log?: HarnessLog;

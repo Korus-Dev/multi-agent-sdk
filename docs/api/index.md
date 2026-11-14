@@ -48,7 +48,7 @@ The caller supplies cache identity, eviction policy and cleanup callbacks.
 
 `createHarness(provider, options): Harness`
 
-Providers are `codex`, `claude`, `cursor`, and `antigravity`. `options.client.name` is required. Optional fields include `home`, `stateDirectory`, context-dependent `instructions` and `mcpServers`, `formatPrompt`, and named provider options. Native provider configuration remains in those named options rather than becoming generic policy.
+Providers are `codex`, `claude`, `cursor`, and `antigravity`. `options.client.name` is required. Optional fields include `home`, `stateDirectory`, context-dependent `instructions` and `mcpServers`, `formatPrompt`, `isAppPlugin`, and named provider options. `isAppPlugin(id)` says which plugin mentions name a plugin the app provides itself: such a mention is never sent to the harness as one of its own plugins, and reaches the model through the prompt text. Native provider configuration remains in those named options rather than becoming generic policy.
 
 Each provider runs the CLI installed on the machine. To use another executable, name it in that provider's options: `cursor.command`, `antigravity.command`, or `claude.launch`.
 
