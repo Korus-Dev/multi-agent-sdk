@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ClaudeSdkMessage } from '../../../src/providers/claude/protocol';
+import type { ClaudePermissionRequest, ClaudeTurnTransport } from '../../../src/providers/claude/transport';
 import { harnessForHost } from '../../../src/internal';
 import { ClaudeHost } from '../../../src/providers/claude/host';
 import { claudeTranscriptToMessages } from '../../../src/providers/claude/transcript-history-adapter';
@@ -41,6 +42,28 @@ describe('Claude questions the person answered', () => {
       send({ type: 'user', message: { content: [result] }, tool_use_result: toolUseResult });
       const tool = harness.readSession(opened).messages.flatMap(message => message.parts).find(part => part.type === 'tool');
       expect(tool?.type === 'tool' && tool.output).toStrictEqual({ answers });
+    } finally { await harness.close(); }
+  });
+
+  it('shows the answers on the question card once the person has answered, and ends its call', async () => {
+    let raise!: (request: ClaudePermissionRequest) => void;
+    let emit!: (message: ClaudeSdkMessage) => void;
+    const transport: ClaudeTurnTransport = {
+      startTurn: (_params, onMessage, onPermissionRequest) => { emit = onMessage; raise = onPermissionRequest!; return { done: new Promise(() => {}), interrupt: async () => {} }; },
+      respondToPermissionRequest: async () => {}, close: async () => {},
+    };
+    const host = new ClaudeHost(transport, async () => ({ providerSession: session, messages: [] }));
+    const harness = harnessForHost('claude', host);
+    const opened = harness.restoreSession({ id: 'agent', folder: '/synthetic' }, { provider: 'claude', data: session, role: 'main' });
+    await harness.sendPrompt(opened, 'Go');
+    try {
+      emit({ type: 'system', subtype: 'init', session_id: session.conversationId } as ClaudeSdkMessage);
+      raise({ kind: 'ask_user', id: 'request-1', toolName: 'AskUserQuestion', input: { questions }, allowConversation: false, allowAlways: false,
+        questions: questions.map(question => ({ id: question.question, header: question.header, question: question.question, isOther: true, isSecret: false, multiSelect: question.multiSelect, options: question.options })) });
+      const card = () => harness.readSession(opened).messages.flatMap(message => message.parts).find(part => part.type === 'tool' && part.id === 'request-1');
+      expect(card()).toMatchObject({ status: 'running' });
+      await harness.respondToRequest(opened, { id: 'request-1', outcome: { kind: 'answered', answers } });
+      expect(card()).toMatchObject({ status: 'completed', output: { answers } });
     } finally { await harness.close(); }
   });
 });

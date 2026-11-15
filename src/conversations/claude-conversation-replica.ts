@@ -31,6 +31,14 @@ export function createClaudeConversationReplica(
         for (const message of next.messages) for (const part of message.parts) {
           if (part.type === 'tool' && part.id === `approval-${event.payload.id}` && part.status === 'running') part.status = 'completed';
         }
+        // A question the person answered keeps their answers on its card, which shows them again when it is shown later.
+        if (event.payload.answers) for (const message of next.messages) for (const part of message.parts) {
+          if (part.type === 'tool' && part.id === event.payload.id && part.title === 'ask_user_question') {
+            part.status = 'completed';
+            part.output = { answers: event.payload.answers };
+            if (part.statusText) try { part.statusText = JSON.stringify({ ...JSON.parse(part.statusText), phase: 'completed' }); } catch { /* A status text that is not JSON stays as it is. */ }
+          }
+        }
         snapshot = next;
         return snapshot;
       }

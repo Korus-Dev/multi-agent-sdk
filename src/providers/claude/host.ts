@@ -582,7 +582,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
       providerSessionId: owner.sessionId ?? undefined,
       turnId: owner.turnId,
       type: 'clientRequest.resolved',
-      payload: { id: response.id },
+      payload: { id: response.id, ...(response.outcome.kind === 'answered' ? { answers: response.outcome.answers } : {}) },
     }, response.outcome);
     this.resumeStatusAfterRequest(owner);
   }

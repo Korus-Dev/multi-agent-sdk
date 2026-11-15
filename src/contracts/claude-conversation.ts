@@ -139,7 +139,8 @@ export type ClaudeConversationEvent =
     }
   | ClaudeConversationEventBase & {
       type: 'clientRequest.resolved';
-      payload: Pick<ClientRequest, 'id'>;
+      /** `answers` is what the person answered, for a question. */
+      payload: Pick<ClientRequest, 'id'> & { answers?: import('./conversation').AskUserAnswers };
     }
   | ClaudeConversationEventBase & {
       type: 'error';
