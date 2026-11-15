@@ -273,14 +273,28 @@ describe('Cursor ACP host transport boundary', () => {
       expect(tool.body).toContain('before'); expect(tool.body).toContain('after'); expect(tool.body).toContain('RESOURCE_MARKER');
       expect(parts.filter(part=>part.type==='media').map(part=>part.type==='media' && part.media.url)).toStrictEqual(['data:image/png;base64,iVBORw0KGgo=','data:image/png;base64,iVBORw0KGgo=']);
       expect(parts).toContainEqual({type:'text',text:'Rich output complete'});
-      const mcp = parts.find(part=>part.type==='tool' && part.title==='korus: send-message');
-      expect(mcp).toMatchObject({kind:'mcp',input:{to:'other-agent',message:'Hello'},output:{recipientName:'Other Agent'},metadata:{server:'korus',tool:'send-message',cursorMcpInput:{providerIdentifier:'korus',toolName:'send-message',args:{to:'other-agent',message:'Hello'}}}});
+      const mcp = parts.find(part=>part.type==='tool' && part.title==='notes: add');
+      expect(mcp).toMatchObject({kind:'mcp',input:{text:'Buy milk'},output:{saved:true},metadata:{server:'notes',tool:'add',cursorMcpInput:{providerIdentifier:'notes',toolName:'add',args:{text:'Buy milk'}}}});
       expect(mcp?.type==='tool' && mcp.metadata?.displayTitle).toBeUndefined();
     };
     verify(await snapshot());
     await host.close(); host=createBackendDriver('cursor'); events=[]; host.onEvent(event=>events.push(event));
     await host.loadConversation!({...agent,providerSession:first.providerSession});
     verify(await snapshot());
+  });
+  it('titles an MCP call from what the tool was given and returned, live and when the conversation is read back', async () => {
+    const present = vi.fn((call: { server: string; tool: string; input: unknown; result?: unknown; state: string }) => call.state === 'running' ? `Adding ${(call.input as { text: string }).text}` : `Added (${JSON.stringify(call.result)})`);
+    await host.close();
+    host = new CursorHost({ stateDirectory: () => root, sessionOptions: { client: { name: 'cpa-workbench', metadataDirectory: 'korus-sessions' }, presentToolCall: present } }); events = []; host.onEvent(event => events.push(event));
+    const first = await host.sendPrompt(agent,'rich-output'); await vi.waitFor(()=>expect(completions()).toHaveLength(1));
+    const title = (state: CursorConversationSnapshot) => state.messages.flatMap(message=>message.parts).find(part=>part.type==='tool' && part.kind==='mcp');
+    const titleOf = (state: CursorConversationSnapshot) => { const part = title(state); return part?.type==='tool' ? part.metadata?.displayTitle : undefined; };
+    expect(titleOf(await snapshot())).toBe('Added ({"saved":true})');
+    expect(present).toHaveBeenCalledWith({server:'notes',tool:'add',input:{text:'Buy milk'},state:'running'});
+    expect(present).toHaveBeenCalledWith({server:'notes',tool:'add',input:{text:'Buy milk'},result:{saved:true},state:'completed'});
+    await host.close(); host = new CursorHost({ stateDirectory: () => root, sessionOptions: { client: { name: 'cpa-workbench', metadataDirectory: 'korus-sessions' }, presentToolCall: present } }); events = []; host.onEvent(event => events.push(event));
+    await host.loadConversation!({...agent,providerSession:first.providerSession});
+    expect(titleOf(await snapshot())).toBe('Added ({"saved":true})');
   });
   it.each([false,true])('observes a validated workspace image without claiming generated success (notification=%s)', async notification => {
     const image=path.join(root,'observed.png'); await writeFile(image,Buffer.from(observedPng,'base64'));

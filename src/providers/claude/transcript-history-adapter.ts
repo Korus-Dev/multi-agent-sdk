@@ -7,7 +7,7 @@ import path from 'node:path';
 import type { Agent, ProviderSessionData, ClaudeConversationTurn, ConversationSummary, Message, MessagePart, ToolPart, ThreadGoal } from '../../contracts/index';
 import { claudeWorkingDirectory } from './working-directory';
 import { claudeConfigDirectory } from './config-directory';
-import { claudeToolPart, completedClaudeToolPart, type ClaudeToolPartOptions } from './claude-tool-part-adapter';
+import { claudeToolOutput, claudeToolPart, completedClaudeToolPart, type ClaudeToolPartOptions } from './claude-tool-part-adapter';
 import { claudeToolResultText } from './claude-tool-result';
 import { claudeMessageContentBlocks, claudeThinkingText, parseClaudeSdkMessage, type ClaudeSdkContentBlock, type ClaudeSdkMessage } from './protocol';
 import { claudeSubagentHistoryEvents } from './claude-subagents';
@@ -360,7 +360,7 @@ export function claudeTranscriptToMessages(content: string, agentId: string, ses
       if (toolResults.length > 0) {
         for (const toolResult of toolResults) {
           pendingTools.delete(toolResult.tool_use_id);
-          const completed = applyToolResult(assistantParts, toolResult);
+          const completed = applyToolResult(assistantParts, toolResult, toolOptions, entry.toolUseResult ?? entry.tool_use_result);
           if (completed && currentTurnId) taskPlan?.apply(completed,
             entry.toolUseResult ?? entry.tool_use_result ?? toolResult.content,
             sessionId, currentTurnId, timestampToIso(entry.timestamp));
@@ -604,7 +604,7 @@ function messageText(message: ClaudeSdkMessage): string {
     .trim();
 }
 
-function applyToolResult(parts: MessagePart[], block: Extract<ClaudeSdkContentBlock, { type: 'tool_result' }>): ToolPart | undefined {
+function applyToolResult(parts: MessagePart[], block: Extract<ClaudeSdkContentBlock, { type: 'tool_result' }>, toolOptions?: ClaudeToolPartOptions, toolUseResult?: unknown): ToolPart | undefined {
   const toolPart = parts.find((part): part is ToolPart => part.type === 'tool' && part.id === block.tool_use_id);
   if (!toolPart) {
     return;
@@ -615,8 +615,9 @@ function applyToolResult(parts: MessagePart[], block: Extract<ClaudeSdkContentBl
     completedClaudeToolPart(
       toolPart,
       block.is_error ? 'failed' : 'completed',
-      block.content,
+      claudeToolOutput(toolPart, block.content, toolUseResult),
       claudeToolResultText(block.content),
+      toolOptions,
     ),
   );
   return toolPart;

@@ -2,6 +2,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { Message, MessagePart, ToolPart } from '../../contracts/index';
 import type { CursorConversationEvent } from '../../contracts/cursor-conversation';
+import type { McpToolCall } from '../../options';
 import { createCursorConversationReplica, emptyCursorSnapshot } from '../../conversations/cursor-conversation-replica';
 import { cursorContent, cursorToolContent } from './content';
 import { record } from '../../acp/acp-connection';
@@ -16,7 +17,7 @@ export class CursorTranscript {
   private replayUser: Record<string, unknown>[] = [];
   private readonly toolBodies = new Map<string,string>();
   private denied = new Set<string>();
-  constructor(private readonly agentId: string, private readonly sessionId: string, private readonly changed: (event: CursorConversationEvent) => void, private readonly display: (text: string) => { text: string; parts: MessagePart[]; metadata?: Message['metadata'] } = text => ({ text, parts: [] }), private readonly cwd?: string) {
+  constructor(private readonly agentId: string, private readonly sessionId: string, private readonly changed: (event: CursorConversationEvent) => void, private readonly display: (text: string) => { text: string; parts: MessagePart[]; metadata?: Message['metadata'] } = text => ({ text, parts: [] }), private readonly cwd?: string, private readonly presentToolCall?: (call: McpToolCall) => string | undefined) {
     this.replica = createCursorConversationReplica(emptyCursorSnapshot(agentId, sessionId));
   }
   private event(change: Change, turnId = this.replica.getSnapshot().activeTurnId!): void {
@@ -187,6 +188,10 @@ export class CursorTranscript {
     }
     part.metadata = { ...part.metadata, ...(this.cwd ? {cwd:this.cwd} : {}) };
     if (part.kind === 'fileChange' || part.kind === 'mcp') delete part.metadata.displayTitle; else part.metadata.displayTitle = part.title;
+    if (part.kind === 'mcp' && this.presentToolCall && typeof part.metadata.server === 'string' && typeof part.metadata.tool === 'string') {
+      const title = this.presentToolCall({ server: part.metadata.server, tool: part.metadata.tool, input: part.input, ...(part.output === undefined ? {} : { result: part.output }), state: part.status });
+      if (typeof title === 'string' && title) part.metadata.displayTitle = title;
+    }
     if (part.kind === 'fileChange' && Array.isArray(part.metadata.changes)) {
       const changes = part.metadata.changes.filter((change): change is Record<string,unknown> => record(change) && typeof change.path === 'string');
       const action = changes.every(change=>change.kind==='add') ? 'create' : changes.every(change=>change.kind==='delete') ? 'delete' : 'edit';

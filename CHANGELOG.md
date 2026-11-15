@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.27.4 (2026-11-15)
+
+- A Claude question the person answered keeps their answers on its tool call (`output.answers`, keyed by question), live and when the conversation is read from its transcript. Before, an answered question showed no answers once its card was shown again.
+- `createHarness` takes `presentToolCall({ server, tool, input, result, state })`, so an app can title its own MCP tool calls. It is asked when a call starts and again when it ends, with the input and result as the harness reported them, and a string it returns becomes the call's `metadata.displayTitle`. Returning nothing leaves the call as before. Claude, Codex and Cursor apply it; Antigravity shows no MCP calls. On a Codex conversation read back from history, tool payloads are not part of the read, so the hook is not asked.
+- Codex tool previews no longer keep input and output fields that belong to app tools (computer use, worktrees, agent messaging). Use `presentToolCall` to present those calls.
+
 ## 0.27.3 (2026-11-13)
 
 - `createHarness` takes `isAppPlugin(pluginId)`, so an app can offer a plugin of its own in the composer. A plugin mention it names is not sent to Codex as one of Codex's plugins; the mention still reaches the model through the prompt text, and its chip stays in the stored message and when the conversation is read again. Claude, Cursor and Antigravity send no plugin mentions natively, so nothing changes for them. Listing Codex's own plugins is unchanged.

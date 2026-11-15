@@ -49,6 +49,7 @@ export class ClaudeHarness extends SessionHarness<'claude'> {
           ...(log ? { log: (level, component, message, details) => log(level, component, message, details) } : {}),
         },
         host: {
+          ...(options.presentToolCall ? { toolOptions: { presentToolCall: options.presentToolCall } } : {}),
           ...(log ? { log: (level, component, message, details) => log(level, component, message, details) } : {}),
         },
       },

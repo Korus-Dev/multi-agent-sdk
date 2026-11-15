@@ -6,5 +6,5 @@ import { harnesses } from './harnesses';
 export function createHarness<P extends HarnessProvider>(provider: P, options: HarnessOptionsFor<P>): Harness<P> {
   const type = harnesses[provider];
   if (!type) throw new Error(`Unsupported harness: ${provider}`);
-  return new type(type.createHost(type.mapOptions(options))) as Harness<P>;
+  return new type(type.createHost(type.mapOptions(options)), { presentToolCall: options.presentToolCall }) as Harness<P>;
 }

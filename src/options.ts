@@ -20,6 +20,16 @@ export type HarnessConversationConfig = {
   developerInstructions?: string;
 };
 
+/** An MCP tool call, as the app is asked to title it. */
+export type McpToolCall = {
+  server: string;
+  tool: string;
+  input: unknown;
+  /** What the tool returned. Absent while the call is running. */
+  result?: unknown;
+  state: 'running' | 'completed' | 'failed';
+};
+
 export type HarnessOptions = {
   /** Identity the provider sees. `title` is the display name; `entrypoint` and `clientApp` label embedded Claude sessions. */
   client: { name: string; title?: string; version?: string; metadataDirectory?: string; temporaryDirectory?: string; entrypoint?: string; clientApp?: string };
@@ -36,6 +46,13 @@ export type HarnessOptions = {
    * the model through the prompt text, which `formatPrompt` shapes, and stays in the stored message.
    */
   isAppPlugin?: (pluginId: string) => boolean;
+  /**
+   * Titles an MCP tool call the way the app wants it shown. It is asked when the call starts and again when it ends, with
+   * what the tool was called with and returned as the harness reported it, and a string it returns becomes the call's
+   * `metadata.displayTitle`. Returning nothing leaves the call as the harness described it. Only MCP tools are asked about.
+   * The hook belongs to the host app and sees the call unfiltered.
+   */
+  presentToolCall?: (call: McpToolCall) => string | undefined;
   /** The app's own MCP server. Its tools run without a permission prompt. */
   trustedMcpServerName?: string;
   log?: HarnessLog;

@@ -4,6 +4,7 @@ import type { ToolPart, ToolPartUpdate } from '../../contracts/index';
 import { classifyShellCommand, type ClassifiedShellCommand } from './claude-command-classifier';
 import { claudeToolSemantics } from './claude-tool-semantics';
 import { claudeConfigDirectory } from './config-directory';
+import type { McpToolCall } from '../../options';
 import type { ClaudeSdkContentBlock } from './protocol';
 
 type ClaudeToolUseBlock = Extract<ClaudeSdkContentBlock, { type: 'tool_use' }>;
@@ -19,6 +20,8 @@ export type ClaudeToolPartOptions = {
   /** Skill folders searched in order; defaults to the project's and the user's Claude skills. */
   skillRoots?: string[];
   status?: ClaudeToolStatus;
+  /** Titles an MCP tool call; see `HarnessOptions.presentToolCall`. */
+  presentToolCall?: (call: McpToolCall) => string | undefined;
 };
 
 export function claudeToolPart(
@@ -200,7 +203,7 @@ export function claudeToolPart(
 
   const mcp = claudeMcpToolName(block.name);
   if (mcp) {
-    return toolPart(block, {
+    return withPresentedTitle(toolPart(block, {
       kind: 'mcp',
       title: `${mcp.server}.${mcp.tool}`,
       status,
@@ -210,7 +213,7 @@ export function claudeToolPart(
         server: mcp.server,
         tool: mcp.tool,
       },
-    });
+    }), block.input, undefined, options);
   }
 
   return toolPart(block, {
@@ -303,19 +306,47 @@ export function claudeToolPartInputUpdate(toolPart: ToolPart): ToolPartUpdate {
   };
 }
 
+/**
+ * What a finished tool call returned. A question the person answered returns their answers keyed by question, which is
+ * what shows them again later; any other call returns what the tool wrote.
+ */
+export function claudeToolOutput(toolPart: ToolPart, content: unknown, toolUseResult?: unknown): unknown {
+  if (toolPart.metadata?.claudeToolName !== 'AskUserQuestion') return content;
+  const given = recordValue(recordValue(toolUseResult)?.answers);
+  if (!given) return content;
+  const asked = recordValue(toolPart.input)?.questions;
+  const multiple = new Set((Array.isArray(asked) ? asked : []).flatMap(question => recordValue(question)?.multiSelect === true ? [stringValue(recordValue(question)?.question)] : []));
+  const answers: Record<string, { answers: string[] }> = {};
+  for (const [question, answer] of Object.entries(given)) {
+    if (typeof answer !== 'string') return content;
+    answers[question] = { answers: multiple.has(question) ? answer.split(', ') : [answer] };
+  }
+  return { answers };
+}
+
 export function completedClaudeToolPart(
   toolPart: ToolPart,
   status: Extract<ClaudeToolStatus, 'completed' | 'failed'>,
   output: unknown,
   body: string,
+  options: ClaudeToolPartOptions = {},
 ): ToolPart {
-  return {
+  return withPresentedTitle({
     ...toolPart,
     status,
     ...(toolPart.statusText ? { statusText: statusTextWithPhase(toolPart.statusText, status) } : {}),
     output,
     body,
-  };
+  }, toolPart.input, output, options);
+}
+
+/** An MCP call the app titles itself carries that title; any other call is returned as it is. */
+function withPresentedTitle(part: ToolPart, input: unknown, result: unknown, options: ClaudeToolPartOptions): ToolPart {
+  const server = part.metadata?.server;
+  const tool = part.metadata?.tool;
+  if (part.kind !== 'mcp' || !options.presentToolCall || typeof server !== 'string' || typeof tool !== 'string') return part;
+  const title = options.presentToolCall({ server, tool, input, ...(result === undefined ? {} : { result }), state: part.status });
+  return typeof title === 'string' && title ? { ...part, metadata: { ...part.metadata, displayTitle: title } } : part;
 }
 
 export function claudeToolFileActivity(toolPart: ToolPart): ClaudeToolFileActivity | null {

@@ -4,6 +4,7 @@ import type { ProviderDriver, ProviderEvent } from '../../driver';
 import type { HarnessPromptScope } from '../../generation';
 import type { HarnessCapabilities, Turn } from '../../consumer-types';
 import type { HarnessConversationConfig, HarnessOptions } from '../../options';
+import type { HarnessSettings } from '../../harnesses';
 import { ProviderHarness } from '../../harness';
 import { codexHarnessCapabilities } from '../../capabilities';
 import { harnessContext, mcpEndpoints, providerHome, sharedProviderOptions, type SharedProviderOptions } from '../../harness-options';
@@ -36,7 +37,7 @@ export class CodexHarness extends ProviderHarness<'codex'> {
   /** A fresh session record for a conversation id. */
   static sessionData(id: string): ProviderSessionData { return { kind: 'codex', conversationId: id }; }
 
-  constructor(native: ProviderDriver<ProviderContext, ProviderEvent>) { super('codex', native); }
+  constructor(native: ProviderDriver<ProviderContext, ProviderEvent>, private readonly settings: HarnessSettings = {}) { super('codex', native); }
 
   /** A ChatGPT sign-in is a subscription; an API key is billed per use; Bedrock is a cloud account. */
   protected override accountOf(native: import('../../contracts/authentication').ProviderAuthentication) {
@@ -134,7 +135,7 @@ export class CodexHarness extends ProviderHarness<'codex'> {
       apply: (replica, event) => replica.apply(event),
       state: (replica, event) => {
         const s = replica.getSnapshot();
-        return { messages: conversationMessages(s.messages, event.agentId!), busy: s.busy, activeTurnId: s.activeTurnId, turns: s.turns satisfies Turn[], answeredClientRequestIds: s.answeredClientRequestIds, historyLoading: s.historyLoading, historyState: s.historyState,
+        return { messages: conversationMessages(s.messages, event.agentId!, false, false, this.settings.presentToolCall), busy: s.busy, activeTurnId: s.activeTurnId, turns: s.turns satisfies Turn[], answeredClientRequestIds: s.answeredClientRequestIds, historyLoading: s.historyLoading, historyState: s.historyState,
           requests: [...s.approvals.map(approvalAgentRequest), ...s.clientRequests.map(request => requestFromClientRequest(request, { conversationId: s.activeConversationId, turnId: request.turnId ?? undefined }))],
           selection: { model: s.models.find(model => model.id === s.selectedModelId)?.model ?? s.selectedModelId, reasoningEffort: s.selectedReasoningEffort, serviceTier: s.selectedServiceTier },
           permission: s.approvalPreset, planMode: s.planMode,

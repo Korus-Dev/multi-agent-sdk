@@ -58,6 +58,6 @@ export type {
 } from './generation';
 export type {
   HarnessConversationConfig, HarnessLaunch, HarnessLog, HarnessLogLevel, HarnessOptions, HarnessOptionsFor, HarnessRequestRecord,
-  SharedHarnessOptions
+  McpToolCall, SharedHarnessOptions
 } from './options';
 export type { PermissionFor } from './contracts/permissions';

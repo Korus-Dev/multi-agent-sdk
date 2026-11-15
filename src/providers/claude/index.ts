@@ -10,7 +10,7 @@ export { getLocalClaudeAuthentication, logoutLocalClaude, type ClaudeAuthenticat
 export { resolveClaudeLaunch, resolveClaudeExecutable } from './claude-command';
 export { ClaudeModelObserver } from './claude-model-observer';
 export { ClaudeTaskPlan } from './claude-task-plan';
-export { claudeToolPart, claudeToolPartInputUpdate, completedClaudeToolPart, claudeToolFileActivity, claudeMcpToolName, type ClaudeToolPartOptions, type ClaudeToolFileActivity } from './claude-tool-part-adapter';
+export { claudeToolPart, claudeToolPartInputUpdate, completedClaudeToolPart, claudeToolOutput, claudeToolFileActivity, claudeMcpToolName, type ClaudeToolPartOptions, type ClaudeToolFileActivity } from './claude-tool-part-adapter';
 export { claudeToolSemantics, type ClaudeToolSemantics } from './claude-tool-semantics';
 export { claudeConfigDirectory, claudeConfigDirectoryOverride } from './config-directory';
 export { claudeModelOptions, claudeModelOptionsFromSdk } from './models';

@@ -85,6 +85,7 @@ import {
   claudeToolPart,
   claudeToolPartInputUpdate,
   completedClaudeToolPart,
+  claudeToolOutput,
   type ClaudeToolFileActivity,
 } from './claude-tool-part-adapter';
 import {
@@ -1316,8 +1317,9 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
       const existingToolPart = activeTurn.toolPartsById.get(block.tool_use_id);
       const status = block.is_error ? 'failed' : 'completed';
       const body = claudeToolResultText(block.content);
+      const toolOutput = existingToolPart ? claudeToolOutput(existingToolPart, block.content, message.type === 'user' ? message.tool_use_result : undefined) : block.content;
       const completedToolPart = existingToolPart
-        ? completedClaudeToolPart(existingToolPart, status, block.content, body)
+        ? completedClaudeToolPart(existingToolPart, status, toolOutput, body, this.driverOptions.toolOptions)
         : null;
       if (completedToolPart) {
         activeTurn.toolPartsById.set(completedToolPart.id, completedToolPart);
@@ -1332,7 +1334,8 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
           itemId: block.tool_use_id,
           status,
           ...(completedToolPart?.statusText ? { statusText: completedToolPart.statusText } : {}),
-          output: block.content,
+          ...(typeof completedToolPart?.metadata?.displayTitle === 'string' ? { metadata: { displayTitle: completedToolPart.metadata.displayTitle } } : {}),
+          output: toolOutput,
           body,
         },
       });

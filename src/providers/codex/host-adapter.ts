@@ -4,6 +4,7 @@ import type { StartCodexRealtimeOptions } from '../../core/codex-conversation-ty
 import type { CodexRealtimeSession } from './host-contracts';
 import { notifyListeners } from '@korus-dev/codex-sdk';
 import type { HarnessDiagnostic } from '../../diagnostics';
+import type { McpToolCall } from '../../options';
 import { CodexImageGeneration } from './image-generation';
 import { promptContentDispatchText } from '../../core/prompt-content';
 import type { HarnessPromptScope } from '../../driver';
@@ -1972,6 +1973,7 @@ export function conversationMessages(
   agentId: string,
   completeStreaming = false,
   omitToolPayloads = false,
+  presentToolCall?: (call: McpToolCall) => string | undefined,
 ): Message[] {
   return messages.map((message) => ({
     id: message.id,
@@ -1984,7 +1986,7 @@ export function conversationMessages(
       ...(message.metadata.promptContent === undefined ? {} : { promptContent: normalizePromptContent(message.metadata.promptContent as never) }),
       ...(message.metadata.asyncQuestionAnswers === undefined ? {} : { asyncQuestionAnswers: structuredClone(message.metadata.asyncQuestionAnswers as Record<string, { answers: string[] }>) }),
     } }),
-    parts: messageParts(message.parts, omitToolPayloads),
+    parts: messageParts(message.parts, omitToolPayloads, presentToolCall),
     createdAt: message.createdAt ?? new Date(0).toISOString(),
   }));
 }
@@ -2001,7 +2003,7 @@ const MAX_TOOL_LABEL_BYTES = 4 * 1024;
 const MAX_TOOL_METADATA_BYTES = 32 * 1024;
 const MAX_TOOL_STATUS_BYTES = 64 * 1024;
 
-function messageParts(parts: readonly ConversationMessagePart[], omitToolPayloads = false): MessagePart[] {
+function messageParts(parts: readonly ConversationMessagePart[], omitToolPayloads = false, presentToolCall?: (call: McpToolCall) => string | undefined): MessagePart[] {
   const generatedImagePaths = new Map<string, string>();
   for (const part of parts) {
     if (part.type !== 'tool') continue;
@@ -2012,7 +2014,7 @@ function messageParts(parts: readonly ConversationMessagePart[], omitToolPayload
   }
 
   return parts.map((part) => {
-    const rendered = messagePart(part, omitToolPayloads);
+    const rendered = messagePart(part, omitToolPayloads, presentToolCall);
     if (
       rendered.type === 'media' &&
       rendered.itemId &&
@@ -2030,8 +2032,8 @@ function messageParts(parts: readonly ConversationMessagePart[], omitToolPayload
   });
 }
 
-function messagePart(part: ConversationMessagePart, omitToolPayloads = false): MessagePart {
-  if (part.type === 'tool') return toolPartProjection(part, omitToolPayloads);
+function messagePart(part: ConversationMessagePart, omitToolPayloads = false, presentToolCall?: (call: McpToolCall) => string | undefined): MessagePart {
+  if (part.type === 'tool') return toolPartProjection(part, omitToolPayloads, presentToolCall);
   if (part.type === 'attachment') return { type: 'attachment', attachment: { ...part.attachment } };
   if (part.type === 'question') {
     const request = requestFromClientRequest(part.request, { conversationId: part.request.conversationId ?? '' }) as Extract<AgentRequest, { kind: 'question' }>;
@@ -2062,8 +2064,9 @@ function providerSkillSummary(skill: Skill): ProviderSkillSummary {
   };
 }
 
-function toolPartProjection(part: ConversationMessageToolPart, omitPayloads = false): ToolPart {
+function toolPartProjection(part: ConversationMessageToolPart, omitPayloads = false, presentToolCall?: (call: McpToolCall) => string | undefined): ToolPart {
   const metadata = omitPayloads ? undefined : boundedToolMetadata(part.metadata);
+  const title = omitPayloads ? undefined : presentedTitle(part, presentToolCall);
   const input = omitPayloads ? undefined : toolInputProjection(part.input);
   const output = omitPayloads ? undefined : toolOutputProjection(part.output);
   return {
@@ -2075,8 +2078,17 @@ function toolPartProjection(part: ConversationMessageToolPart, omitPayloads = fa
     ...(part.statusText ? { statusText: boundedToolStatus(part.statusText, part.status) } : {}),
     ...(input !== undefined ? { input } : {}),
     ...(output !== undefined ? { output } : {}),
-    ...(metadata ? { metadata } : {}),
+    ...(metadata || title ? { metadata: { ...metadata, ...(title ? { displayTitle: title } : {}) } } : {}),
   };
+}
+
+/** What the app calls an MCP call, asked from the call as Codex reported it rather than from the projection shown. */
+function presentedTitle(part: ConversationMessageToolPart, presentToolCall?: (call: McpToolCall) => string | undefined): string | undefined {
+  const server = part.metadata?.server;
+  const tool = part.metadata?.tool;
+  if (part.kind !== 'mcp' || !presentToolCall || typeof server !== 'string' || typeof tool !== 'string') return undefined;
+  const title = presentToolCall({ server, tool, input: part.input, ...(part.output === undefined ? {} : { result: part.output }), state: part.status });
+  return typeof title === 'string' && title ? title : undefined;
 }
 
 function boundedToolLabel(value: string): string {
@@ -2091,14 +2103,13 @@ function boundedToolStatus(value: string, fallback: ConversationMessageToolPart[
 }
 
 const toolInputPresentationKeys = new Set([
-  'app', 'appName', 'branchName', 'bundleIdentifier', 'changes', 'command', 'commandActions',
-  'cwd', 'destinationPath', 'direction', 'displayId', 'element_index', 'key', 'kind', 'name', 'path', 'phase', 'pid',
-  'query', 'repoPath', 'rootElementIndex', 'scope', 'title', 'to', 'type', 'url', 'x', 'y',
+  'changes', 'command', 'commandActions', 'cwd', 'destinationPath', 'kind', 'name', 'path', 'phase',
+  'query', 'scope', 'title', 'to', 'type', 'url',
 ]);
 
 const toolOutputPresentationKeys = new Set([
-  'agentName', 'answers', 'app', 'apps', 'externalUrl', 'kind', 'localizedName', 'name', 'path', 'phase', 'prompt',
-  'outcome', 'queued', 'recipientName', 'result', 'structuredContent', 'success', 'url',
+  'answers', 'externalUrl', 'kind', 'name', 'path', 'phase', 'prompt',
+  'outcome', 'result', 'structuredContent', 'success', 'url',
 ]);
 
 function toolInputProjection(value: unknown): unknown {

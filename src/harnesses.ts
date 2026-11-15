@@ -1,7 +1,7 @@
 import type { HarnessProvider, ProviderCapabilities, ProviderSessionData } from './contracts';
 import type { ProviderContext } from './context';
 import type { ProviderDriver, ProviderEvent } from './driver';
-import type { HarnessOptions } from './options';
+import type { HarnessOptions, McpToolCall } from './options';
 import type { ProviderHarness } from './harness';
 import type { SharedProviderOptions } from './harness-options';
 import { CodexHarness, type CodexProviderOptions } from './providers/codex/harness';
@@ -13,10 +13,13 @@ import { AntigravityHarness, type AntigravityProviderOptions } from './providers
 export type ProviderOptions<Context extends ProviderContext = ProviderContext> = SharedProviderOptions<Context>
   & CodexProviderOptions<Context> & ClaudeProviderOptions<Context> & CursorProviderOptions<Context> & AntigravityProviderOptions<Context>;
 
+/** App choices a harness applies itself, as it projects what its runtime reports. */
+export type HarnessSettings = { presentToolCall?: (call: McpToolCall) => string | undefined };
+
 /** What the registry needs from a harness class. */
 export type HarnessClass = {
   readonly capabilities: ProviderCapabilities;
-  new (native: ProviderDriver<ProviderContext, ProviderEvent>): ProviderHarness;
+  new (native: ProviderDriver<ProviderContext, ProviderEvent>, settings?: HarnessSettings): ProviderHarness;
   mapOptions(options: HarnessOptions): ProviderOptions;
   createHost<Context extends ProviderContext = ProviderContext>(options: ProviderOptions<Context>): ProviderDriver<Context, ProviderEvent>;
   sessionData(id: string, folder: string | null): ProviderSessionData;
