@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.28.2 (2026-11-15)
 
 - A run goes on when a steer replaces its turn. Cursor steers by interrupting the turn and sending the instruction as a new one; the run used to end with the interrupted turn. It now follows the replacement: `result` is the new turn's, or rejects with the error when the new turn is refused (an invalid model, for instance). This holds for a steer sent through the run or on the session. The interrupted turn's `turn.completed` is among the run's events.
 
