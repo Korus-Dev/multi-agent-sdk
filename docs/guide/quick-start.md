@@ -16,7 +16,7 @@ console.log(result.status, result.error, result.messages);
 await harness.close();
 ```
 
-`open` creates a local binding; it does not execute a model turn. `run` sends the prompt and follows its turn: `run.events` yields that session's events for the turn and ends when the turn does, and `run.result` resolves with the turn's status (`completed`, `failed` or `interrupted`), its error and its messages. A turn the provider retries keeps the run going. `run.result` rejects when the prompt is not accepted, when the session needs recovery, or when the session is released or the harness closed first. `run.steer` and `run.interrupt` act on the run's own turn, and reject once the run has ended or while its turn has not started.
+`open` creates a local binding; it does not execute a model turn. `run` sends the prompt and follows its turn: `run.events` yields that session's events for the turn and ends when the turn does, and `run.result` resolves with the turn's status (`completed`, `failed` or `interrupted`), its error and its messages. A turn the provider retries keeps the run going, and so does a steer that replaces it: a harness that steers by interrupting the turn and sending the instruction as a new one is followed onto the new turn. `run.result` rejects when the prompt is not accepted, when the session needs recovery, or when the session is released or the harness closed first. `run.steer` and `run.interrupt` act on the run's own turn, and reject once the run has ended or while its turn has not started.
 
 `sendPrompt` remains for apps that follow sessions through `onEvent` themselves: it resolves on admission and does **not** wait for completion.
 

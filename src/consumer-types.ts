@@ -68,7 +68,11 @@ export type Run = {
   readonly events: AsyncIterable<RunEvent>;
   /** Settles when the turn finishes. Rejects when the prompt is not admitted, the session needs recovery, or it is released or the harness closed first. */
   readonly result: Promise<RunResult>;
-  /** Steers the run's turn. A provider that steers by interrupting and resending ends the run with the interrupted turn. */
+  /**
+   * Steers the run's turn. A harness that steers by interrupting the turn and sending the instruction as a new one does not
+   * end the run: it goes on with that turn, and `result` is the new turn's, or the error when the new turn is refused.
+   * The interrupted turn's `turn.completed` is among the events.
+   */
   steer(prompt: string): Promise<Admission>;
   interrupt(): Promise<Admission>;
 };

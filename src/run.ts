@@ -8,6 +8,8 @@ export type RunSource = {
   /** The session's current state; undefined once it is gone. */
   state(): SessionState | undefined;
   steer(prompt: string): Promise<Admission>;
+  /** The admission of the steer that replaces a turn, when the harness steered it by interrupting it and sending the instruction as a new turn. */
+  replacement?(turnId: string): Promise<Admission> | undefined;
   /** Takes a turn that started for this run. False when the turn is another run's: an earlier one still waiting, or one that already has it. */
   claim(turnId: string, named: boolean): boolean;
   interrupt(turnId: string | undefined): Promise<Admission>;
@@ -58,9 +60,23 @@ export function startRun(source: RunSource, onEnd: () => void): { run: Run; aban
     else if (event.type === 'turn.completed' && !event.willRetry) {
       const messages = source.state()?.messages ?? [];
       const own = messages.filter(message => message.turnId === event.turnId);
-      end({ result: { session, turnId: event.turnId, status: event.status, error: event.error,
+      const finish = () => end({ result: { session, turnId: event.turnId, status: event.status, error: event.error,
         messages: own.length ? own : messages.filter(message => !earlier.has(message.id)) } });
+      const next = event.status === 'interrupted' ? source.replacement?.(event.turnId) : undefined;
+      if (next) follow(next, finish); else finish();
     }
+  };
+  // The turn was interrupted to send a steer as a new one: the run goes on with that turn, as a prompt just sent, and
+  // ends with the steer's error when it is refused.
+  const follow = (next: Promise<Admission>, finish: () => void) => {
+    admitted = false; turnId = undefined;
+    next.then(value => {
+      if (ended) return;
+      // A replacement the provider does not name cannot be followed: the run ends with the turn it was following.
+      if (!value.turnId) return finish();
+      admitted = true; turnId = value.turnId; source.claim(turnId, true);
+      for (const event of held.splice(0)) if (!ended) accept(event);
+    }, (error: unknown) => end({ error: asError(error) }));
   };
   const off = source.subscribe(event => {
     // Full states are left to readSession: a run nobody reads would otherwise hold one per change.

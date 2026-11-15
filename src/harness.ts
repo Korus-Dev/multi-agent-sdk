@@ -54,6 +54,8 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
   private readonly listeners = new Set<(event: HarnessEvent) => void>();
   /** How to end each session's unfinished runs when the session or the harness goes away. */
   private readonly runs = new Map<Session, Set<(reason: string) => void>>();
+  /** The steer in flight for a session and the turn it was sent to. A harness that steers by interrupting that turn replaces it. */
+  private readonly steers = new Map<Session, { turnId: string | null; admission: Promise<Admission> }>();
   /**
    * Prompts a session accepted without naming a turn, in the order they were sent. Each takes one turn as turns start:
    * a run takes its own, and a prompt sent without a run takes its turn out of a later run's reach.
@@ -357,7 +359,10 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
   }
   async steerPrompt(session: Session, prompt: string, options?: Parameters<Harness['steerPrompt']>[2]) {
     await this.readFirst(session);
-    return this.admitted(session, await (this.native.steerPrompt?.(this.interactive(session).context, prompt, options) ?? unavailable('Steering')));
+    const turnId = this.get(session).state.activeTurnId;
+    const admission = (async () => this.admitted(session, await (this.native.steerPrompt?.(this.interactive(session).context, prompt, options) ?? unavailable('Steering'))))();
+    this.steers.set(session, { turnId, admission });
+    try { return await admission; } finally { if (this.steers.get(session)?.admission === admission) this.steers.delete(session); }
   }
   async deleteTurn(session: Session, turnId: string) { return this.turnAction(session, await (this.native.deleteTurn?.(this.main(session).context, turnId) ?? unavailable('Turn deletion'))); }
   async editTurn(session: Session, turnId: string, content: string, options?: Parameters<Harness['editTurn']>[3]) {
@@ -469,6 +474,7 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
       admit: () => this.submitPrompt(session, prompt, options),
       state: () => this.bindings.has(session) ? this.readSession(session) : undefined,
       steer: next => this.steerPrompt(session, next),
+      replacement: turnId => { const steer = this.steers.get(session); return steer && steer.turnId === turnId ? steer.admission : undefined; },
       interrupt: turnId => this.interrupt(session, turnId),
       claim: (turnId, named) => {
         if (named) { leave(); turns.taken.add(turnId); return true; }

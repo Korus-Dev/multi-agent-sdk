@@ -202,4 +202,76 @@ describe('run', () => {
     expect(script.calls('steerPrompt')).toHaveLength(0);
     expect(script.calls('interrupt')).toHaveLength(0);
   });
+
+  // Some harnesses steer by interrupting the turn and sending the instruction as a new one. The work the run follows
+  // goes on in the replacement turn, so the run ends with that turn, and with the error when the replacement is refused.
+  describe('when a steer replaces its turn', () => {
+    const steering = () => {
+      const fixture = cursor();
+      const next = deferred<{ providerSession: unknown; turnId: string }>();
+      fixture.script.on('steerPrompt', () => next.promise);
+      const state = () => fixture.harness.getSessionData(fixture.session).data;
+      return { ...fixture, next, replace: (turnId: string) => next.resolve({ providerSession: state(), turnId }) };
+    };
+    // The native steer is under way once its call was made; the interrupted turn's end comes after.
+    const underway = () => new Promise<void>(resolve => setTimeout(resolve, 0));
+    const settled = (run: Run) => { let done = false; void run.result.then(() => { done = true; }, () => { done = true; }); return () => done; };
+
+    it('ends with the replacement turn, not the interrupted one', async () => {
+      const { harness, session, started, said, completed, replace } = steering();
+      const run = harness.run(session, 'Review this');
+      const reading = drain(run);
+      await run.admission;
+      started('turn-1');
+      const steered = run.steer('Focus on the tests.');
+      await underway();
+      completed('turn-1', 'interrupted');
+      const ended = settled(run);
+      await Promise.resolve();
+      expect(ended()).toBe(false);
+      replace('turn-2');
+      await steered;
+      started('turn-2'); said('turn-2', 'm2', 'Reviewed.'); completed('turn-2');
+      const result = await run.result;
+      expect(result).toMatchObject({ session, turnId: 'turn-2', status: 'completed', error: null });
+      expect(result.messages.map(message => message.id)).toEqual(['m2']);
+      expect(turnEvents(await reading).at(-1)).toEqual(['turn.completed', 'turn-2']);
+    });
+
+    it('follows a steer sent on the session, not only one sent through the run', async () => {
+      const { harness, session, started, completed, replace } = steering();
+      const run = harness.run(session, 'Review this');
+      await run.admission;
+      started('turn-1');
+      const steered = harness.steerPrompt(session, 'Focus on the tests.');
+      await underway();
+      completed('turn-1', 'interrupted');
+      replace('turn-2');
+      await steered;
+      started('turn-2'); completed('turn-2');
+      expect(await run.result).toMatchObject({ turnId: 'turn-2', status: 'completed' });
+    });
+
+    it('rejects with the error when the replacement is refused', async () => {
+      const { harness, session, started, completed, next } = steering();
+      const run = harness.run(session, 'Review this');
+      await run.admission;
+      started('turn-1');
+      const steered = run.steer('Use another model.');
+      await underway();
+      completed('turn-1', 'interrupted');
+      next.reject(new Error('Unknown model'));
+      await expect(steered).rejects.toThrow('Unknown model');
+      await expect(run.result).rejects.toThrow('Unknown model');
+    });
+
+    it('ends an interrupted turn as interrupted when nothing replaces it', async () => {
+      const { harness, session, started, completed } = steering();
+      const run = harness.run(session, 'Review this');
+      await run.admission;
+      started('turn-1');
+      completed('turn-1', 'interrupted');
+      expect(await run.result).toMatchObject({ turnId: 'turn-1', status: 'interrupted' });
+    });
+  });
 });
