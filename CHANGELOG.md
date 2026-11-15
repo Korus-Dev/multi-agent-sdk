@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.28.0 (2026-11-15)
+
+- A Claude conversation shows what the agent says when it wakes itself, for instance when a background job it started finishes after its turn ended. That answer is a turn of its own: it starts, streams into the conversation and ends like any other, with no prompt from the app. Before, it was dropped until the conversation was read again from its transcript.
+
 ## 0.27.4 (2026-11-15)
 
 - A Claude question the person answered keeps their answers on its tool call (`output.answers`, keyed by question), live and when the conversation is read from its transcript. Before, an answered question showed no answers once its card was shown again.

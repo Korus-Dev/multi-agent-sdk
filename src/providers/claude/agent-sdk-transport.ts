@@ -29,6 +29,7 @@ import {
   type ClaudeContextUsageParams,
   type ClaudeModelDiscoveryParams,
   type ClaudeTurnHandle,
+  type ClaudeTurnCallbacks,
   type ClaudeTurnParams,
   type ClaudeTurnTransport,
 } from './transport';
@@ -86,6 +87,8 @@ type ClaudeSdkSession = {
   input: AsyncPushQueue<SDKUserMessage>;
   query: ClaudeQueryRuntime;
   activeTurn: ActiveTransportTurn | null;
+  /** What an interrupted or unobserved turn says is dropped up to its result, so it does not start a turn of its own. */
+  draining?: boolean;
   onSubagentMessage: (message: ClaudeSdkMessage) => void;
   model: string | null;
   effort: ClaudeTurnParams['effort'];
@@ -123,6 +126,7 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
   private readonly createSessionId: () => string;
   private readonly deleteStoredSession: typeof deleteClaudeSession;
   private closing = false;
+  private selfStarted: ((sessionId: string, handle: ClaudeTurnHandle) => ClaudeTurnCallbacks | null) | null = null;
 
   constructor(private readonly options: ClaudeAgentSdkTransportOptions = {}) {
     this.createQuery = options.createQuery ?? ((input) => query(input));
@@ -170,6 +174,7 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
         throw new Error('Claude session already has an active turn.');
       }
       existingSession.activeTurn = activeTurn;
+      existingSession.draining = false;
       existingSession.lastRequestOwner = activeTurn.requestUsage;
       existingSession.onSubagentMessage = onMessage;
     }
@@ -208,9 +213,53 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
         await session.query.interrupt();
         if (session.activeTurn !== activeTurn) return;
         this.resolveTurn(session);
+        session.draining = true;
         this.denyPendingPermissions(session, 'Claude turn was interrupted.');
       },
     };
+  }
+
+  onSelfStartedTurn(listener: (sessionId: string, handle: ClaudeTurnHandle) => ClaudeTurnCallbacks | null): void {
+    this.selfStarted = listener;
+  }
+
+  /** The agent speaks with no turn running: a woken agent starts a turn of its own, which the listener may take. */
+  private startSelfStartedTurn(session: ClaudeSdkSession): void {
+    const turn = createActiveTurn(() => undefined);
+    session.activeTurn = turn;
+    session.lastRequestOwner = turn.requestUsage;
+    const handle: ClaudeTurnHandle = {
+      done: turn.done,
+      steer: async (prompt, attachments, messageId) => {
+        const message = await claudeUserMessage(prompt, attachments);
+        if (session.closed || session.activeTurn !== turn || turn.settled) return false;
+        message.uuid = messageId ?? randomUUID();
+        turn.pendingInputs.add(message.uuid);
+        turn.steered = true;
+        session.input.push(message);
+        return true;
+      },
+      interrupt: async () => {
+        if (session.activeTurn !== turn || turn.settled) return;
+        if (turn.steered) { this.resolveTurn(session); await this.closeSession(session.sessionId); return; }
+        await session.query.interrupt();
+        if (session.activeTurn !== turn) return;
+        this.resolveTurn(session);
+        session.draining = true;
+        this.denyPendingPermissions(session, 'Claude turn was interrupted.');
+      },
+    };
+    const callbacks = this.selfStarted?.(session.sessionId, handle) ?? null;
+    if (!callbacks) {
+      this.resolveTurn(session);
+      session.draining = true;
+      return;
+    }
+    turn.onMessage = callbacks.onMessage;
+    if (callbacks.onPermissionRequest) turn.onPermissionRequest = callbacks.onPermissionRequest;
+    if (callbacks.onPermissionCancelled) turn.onPermissionCancelled = callbacks.onPermissionCancelled;
+    turn.requestUsage.emit = callbacks.onRequestUsage ?? (() => undefined);
+    session.onSubagentMessage = callbacks.onMessage;
   }
 
   async respondToPermissionRequest(requestId: string, response: ClaudePermissionResponse, ownerId?: string): Promise<void> {
@@ -480,6 +529,8 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
       for await (const sdkMessage of session.query) {
         const message = sdkMessage as ClaudeSdkMessage;
         this.rekeySessionFromMessage(session, message);
+        if (message.type === 'result' && !session.activeTurn) session.draining = false;
+        else if (!session.activeTurn && !session.draining && !session.closed && this.selfStarted && speaksForTheSession(message)) this.startSelfStartedTurn(session);
         const activeTurn = session.activeTurn;
         if (activeTurn?.initialInputId) {
           if (message.type === 'user' && message.uuid === activeTurn.initialInputId) {
@@ -662,6 +713,11 @@ export class ClaudeAgentSdkTransport implements ClaudeTurnTransport {
       this.sessions.delete(session.sessionId);
     }
   }
+}
+
+/** Whether a message is the agent itself speaking, rather than a subagent or the session reporting. */
+function speaksForTheSession(message: ClaudeSdkMessage): boolean {
+  return (message.type === 'assistant' || message.type === 'stream_event') && typeof (message as Record<string, unknown>).parent_tool_use_id !== 'string';
 }
 
 function createActiveTurn(

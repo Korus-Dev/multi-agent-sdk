@@ -79,7 +79,21 @@ export type ClaudePermissionResponse = {
   cancelled?: boolean;
 };
 
+/** What follows a turn the transport reports: its messages, and the requests it raises. */
+export type ClaudeTurnCallbacks = {
+  onMessage: (message: ClaudeSdkMessage) => void;
+  onPermissionRequest?: (request: ClaudePermissionRequest) => void;
+  onPermissionCancelled?: (requestId: string) => void;
+  onRequestUsage?: (usage: import('./request-usage').ClaudeRequestUsage | null) => void;
+};
+
 export type ClaudeTurnTransport = {
+  /**
+   * Claude can start a turn without a prompt: a background job it started finishes and wakes it. The listener is told
+   * which session it is, with the turn's handle, and takes the turn by returning the callbacks that follow it; returning
+   * null leaves the turn unobserved.
+   */
+  onSelfStartedTurn?(listener: (sessionId: string, handle: ClaudeTurnHandle) => ClaudeTurnCallbacks | null): void;
   generateText?(input: import('../../generation').HarnessTextGenerationInput, selection?: Pick<ClaudeTurnParams, 'model' | 'effort'>): Promise<import('../../generation').HarnessTextGenerationResult>;
   startTurn(
     params: ClaudeTurnParams,

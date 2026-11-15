@@ -72,6 +72,7 @@ import {
   type ClaudeTurnHandle,
   type ClaudeTurnParams,
   type ClaudeTurnTransport,
+  type ClaudeTurnCallbacks,
 } from './transport';
 import { ClaudeProviderCatalog } from './claude-provider-catalog';
 import { listClaudeTranscriptSummaries, loadClaudeTranscriptHistory, type ClaudeTranscriptHistory } from './transcript-history-adapter';
@@ -177,6 +178,8 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
     credits: null, individualLimit: null, planType: null, rateLimitReachedType: null,
   };
   private readonly activeTurnsByAgentId = new Map<string, ActiveClaudeTurn>();
+  /** The turn each conversation last ran, which a turn Claude starts on its own continues from. */
+  private readonly lastTurnsByAgentId = new Map<string, ActiveClaudeTurn>();
   private readonly forkingAgentIds = new Set<string>();
   private readonly turnBoundariesByAgentId = new Map<string, Map<string, string>>();
   private readonly goalsByAgentId = new Map<string, ThreadGoal>();
@@ -209,6 +212,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
       homeDir: driverOptions.homeDir,
       emit: (event) => this.emit(event),
     });
+    transport.onSelfStartedTurn?.((sessionId, handle) => this.takeSelfStartedTurn(sessionId, handle));
   }
 
   getRuntimeStatus(): ProviderRuntimeStatus {
@@ -427,34 +431,8 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
         : defaults;
       if (messageId) turnParams.messageId = messageId;
       if (waitForInputReplay) turnParams.waitForInputReplay = true;
-      const handle = this.transport.startTurn(
-        turnParams,
-        (message) => {
-          if (activeTurn) {
-            this.handleSdkMessage(activeTurn, message);
-          }
-        },
-        (request) => {
-          if (activeTurn) {
-            this.emitPermissionRequest(activeTurn, request);
-          }
-        },
-        (requestId) => {
-          if (activeTurn) this.cancelPermissionRequest(activeTurn, requestId);
-        },
-        (usage) => {
-          if (!activeTurn?.sessionId || !activeTurn.observedAt) return;
-          if (usage === null) {
-            const wasComplete = activeTurn.requestCoverage === 'complete';
-            activeTurn.requestCoverage = 'partial';
-            if (wasComplete) this.emitUsage(activeTurn, 'usage');
-            return;
-          }
-          const observation: RequestObservation = { ...usage, provider: 'claude', agentId: activeTurn.agentId,
-            sessionId: activeTurn.sessionId, turnId: activeTurn.turnId };
-          for (const listener of this.requestUsageListeners) { try { listener(observation); } catch { /* Numeric evidence must not change execution. */ } }
-        },
-      );
+      const callbacks = this.turnCallbacks(() => activeTurn);
+      const handle = this.transport.startTurn(turnParams, callbacks.onMessage, callbacks.onPermissionRequest, callbacks.onPermissionCancelled, callbacks.onRequestUsage);
       activeTurn = {
         agentId: agent.id,
         cwd: folder,
@@ -494,6 +472,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
         error: null,
       };
       this.activeTurnsByAgentId.set(agent.id, activeTurn);
+      this.lastTurnsByAgentId.set(agent.id, activeTurn);
       if (existingSessionId) {
         this.resolveTurnStart(activeTurn, existingSessionId);
       }
@@ -619,6 +598,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
     this.conversationReplicasByAgentId.delete(agentId);
     this.taskPlansByAgentId.delete(agentId);
     this.conversationRevisionsByAgentId.delete(agentId);
+    this.lastTurnsByAgentId.delete(agentId);
     const sessionId = this.liveSessionIdsByAgentId.get(agentId);
     this.contextUsageSessionIdsByAgentId.delete(agentId);
     if (!sessionId) return;
@@ -958,6 +938,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
       interrupts.push(activeTurn.handle.interrupt());
     }
     this.activeTurnsByAgentId.clear();
+    this.lastTurnsByAgentId.clear();
     this.conversationReplicasByAgentId.clear();
     this.taskPlansByAgentId.clear();
     this.historyWindows.clear();
@@ -1656,6 +1637,66 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
         markdown: normalizedMarkdown,
       },
     });
+  }
+
+  /** What follows a turn the transport runs: its messages and requests reach the turn `getTurn` names. */
+  private turnCallbacks(getTurn: () => ActiveClaudeTurn | null): Required<ClaudeTurnCallbacks> {
+    return {
+      onMessage: (message) => {
+        const activeTurn = getTurn();
+        if (activeTurn) this.handleSdkMessage(activeTurn, message);
+      },
+      onPermissionRequest: (request) => {
+        const activeTurn = getTurn();
+        if (activeTurn) this.emitPermissionRequest(activeTurn, request);
+      },
+      onPermissionCancelled: (requestId) => {
+        const activeTurn = getTurn();
+        if (activeTurn) this.cancelPermissionRequest(activeTurn, requestId);
+      },
+      onRequestUsage: (usage) => {
+        const activeTurn = getTurn();
+        if (!activeTurn?.sessionId || !activeTurn.observedAt) return;
+        if (usage === null) {
+          const wasComplete = activeTurn.requestCoverage === 'complete';
+          activeTurn.requestCoverage = 'partial';
+          if (wasComplete) this.emitUsage(activeTurn, 'usage');
+          return;
+        }
+        const observation: RequestObservation = { ...usage, provider: 'claude', agentId: activeTurn.agentId,
+          sessionId: activeTurn.sessionId, turnId: activeTurn.turnId };
+        for (const listener of this.requestUsageListeners) { try { listener(observation); } catch { /* Numeric evidence must not change execution. */ } }
+      },
+    };
+  }
+
+  /**
+   * Claude woke itself, for instance when a background job finished, and answers without a prompt. The answer is a turn of
+   * the conversation that last ran in this session: it starts, shows what is said, and ends like any other.
+   */
+  private takeSelfStartedTurn(sessionId: string, handle: ClaudeTurnHandle): ClaudeTurnCallbacks | null {
+    const agentId = [...this.liveSessionIdsByAgentId].find(([, id]) => id === sessionId)?.[0];
+    const previous = agentId === undefined ? undefined : this.lastTurnsByAgentId.get(agentId);
+    if (agentId === undefined || !previous || previous.sessionId !== sessionId || this.activeTurnsByAgentId.has(agentId) || !this.conversationReplicasByAgentId.has(agentId)) return null;
+    const turnId = this.nextTurnId();
+    const activeTurn: ActiveClaudeTurn = {
+      agentId, cwd: previous.cwd, turnId, sessionId,
+      ...(previous.transcriptFolder ? { transcriptFolder: previous.transcriptFolder } : {}),
+      model: previous.model, reasoningEffort: previous.reasoningEffort, serviceTier: previous.serviceTier,
+      handle, planMode: false, completed: false, interrupted: false,
+      streamedText: '', streamedThinking: '', reasoningItems: 0, streamedToolsByIndex: new Map(), toolPartsById: new Map(), fileActivitiesById: new Map(),
+      completedPlanMarkdown: null, compactionStarted: false, compactionCompleted: false,
+      resolveStart: () => undefined, rejectStart: () => undefined, startResolved: true, announcedSessionId: sessionId,
+      error: null,
+    };
+    this.activeTurnsByAgentId.set(agentId, activeTurn);
+    this.lastTurnsByAgentId.set(agentId, activeTurn);
+    this.emitConversation({ agentId, provider: this.provider, providerSessionId: sessionId, turnId, type: 'turn.started', payload: { turn: { id: turnId, provider: this.provider } } });
+    this.emit({ agentId, type: 'agent.statusChanged', payload: { type: 'working' } });
+    void handle.done
+      .then(() => this.finishProcess(activeTurn))
+      .catch((error: unknown) => this.failProcess(activeTurn, error));
+    return this.turnCallbacks(() => activeTurn);
   }
 
   private resolveTurnStart(activeTurn: ActiveClaudeTurn, sessionId: string): void {
