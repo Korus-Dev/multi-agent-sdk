@@ -1,5 +1,6 @@
 import type { ClaudeHistorySource, ClaudeHistoryState } from './history-source';
 import { createHash } from 'node:crypto';
+import { imageDimensions } from '../codex/conversation-content-transport';
 import type { ClaudeConversationTurn, Message, MessagePart } from '../../contracts/index';
 import type { ConversationContentChunk, ConversationContentInput } from '../../contracts/conversation';
 
@@ -20,6 +21,8 @@ export class ClaudeHistoryWindow {
   private before: number;
   private readonly content = new Map<string, Buffer>();
   private readonly contentByMessage = new Map<string, string>();
+  /** The image bytes each message refers to by `conversation-image:` URL, until a read of it is no longer possible. */
+  private readonly imagesByMessage = new Map<string, Set<string>>();
 
   private readonly messages: Message[];
   private readonly initialIds: Set<string>;
@@ -134,9 +137,20 @@ export class ClaudeHistoryWindow {
   project(message: Message): Message {
     let parts = message.parts;
     let cut = false;
+    const stored = new Set<string>();
+    // An image too big to travel inline becomes a `conversation-image:` URL the session can read. A new conversation has no
+    // session id yet: what fits a row is shown as it was sent, and a bigger image is named `pending` until the id is known,
+    // when the message is projected again with the real one.
+    const keepInline = this.sessionId === null && size(message.parts) <= messageBytes;
+    const reference = keepInline ? null : (dataUrl: string) => {
+      const contentId = createHash('sha256').update(dataUrl).digest('hex');
+      this.content.set(contentId, Buffer.from(dataUrl));
+      stored.add(contentId);
+      return `conversation-image:${encodeURIComponent(this.sessionId ?? 'pending')}:${contentId}`;
+    };
     for (const limit of partTiers) {
-      parts = message.parts.map((part) => shrinkPart(part, limit));
-      cut = parts.some((part, index) => part !== message.parts[index]);
+      parts = message.parts.map((part) => shrinkPart(part, limit, reference));
+      cut = parts.some((part, index) => part !== message.parts[index] && !isImageReference(part));
       if (size(parts) <= messageBytes) break;
     }
     if (size(parts) > messageBytes) {
@@ -146,10 +160,11 @@ export class ClaudeHistoryWindow {
       parts = [...fit, { type: 'status', text: 'More rows are not shown here' }];
       cut = true;
     }
+    this.keepImages(message.id, new Set(parts.flatMap(part => { const id = imageContentId(part); return id ? [id] : []; })), stored);
     if (!cut) {
       const previous = this.contentByMessage.get(message.id);
       if (previous && !message.deferredContent) { this.content.delete(previous); this.contentByMessage.delete(message.id); }
-      return message;
+      return parts.every((part, index) => part === message.parts[index]) ? message : { ...message, parts };
     }
     const bytes = Buffer.from(JSON.stringify(message));
     const contentId = createHash('sha256').update(bytes).digest('hex');
@@ -158,6 +173,16 @@ export class ClaudeHistoryWindow {
     this.contentByMessage.set(message.id, contentId);
     this.content.set(contentId, bytes);
     return { ...message, parts, deferredContent: { contentId, byteLength: bytes.length } };
+  }
+
+  /** A message keeps the bytes of the images it refers to now, and none it referred to before or tried and left out, unless another message refers to them. */
+  private keepImages(messageId: string, referenced: Set<string>, stored: Set<string>): void {
+    const before = this.imagesByMessage.get(messageId) ?? new Set<string>();
+    if (referenced.size) this.imagesByMessage.set(messageId, referenced); else this.imagesByMessage.delete(messageId);
+    for (const contentId of new Set([...stored, ...before])) {
+      if (referenced.has(contentId) || [...this.imagesByMessage.values()].some(held => held.has(contentId))) continue;
+      this.content.delete(contentId);
+    }
   }
 
   read(input: ConversationContentInput): ConversationContentChunk {
@@ -169,9 +194,30 @@ export class ClaudeHistoryWindow {
   }
 }
 
+const imageDataUrl = /^data:image\/[a-z0-9.+-]+;base64,[a-z\d+/]+=*$/i;
+const imageReference = /^conversation-image:[^:]+:([a-f0-9]{64})$/;
+function imageUrlOf(part: Extract<MessagePart, { type: 'attachment' | 'media' }>): string | undefined { return part.type === 'attachment' ? part.attachment.url : part.media.url; }
+function isImageDataUrl(url: string | undefined): url is string { return typeof url === 'string' && imageDataUrl.test(url); }
+/** The content a part of this kind refers to by `conversation-image:` URL. */
+function imageContentId(part: MessagePart): string | undefined {
+  return part.type === 'attachment' || part.type === 'media' ? imageReference.exec(imageUrlOf(part) ?? '')?.[1] : undefined;
+}
+function isImageReference(part: MessagePart): boolean { return imageContentId(part) !== undefined; }
+
+/** The image part with its bytes moved out of the message: its URL names them, and its size is kept so it is laid out as an image. */
+function referencedImage(part: Extract<MessagePart, { type: 'attachment' | 'media' }>, reference: (dataUrl: string) => string): MessagePart {
+  const dataUrl = imageUrlOf(part)!;
+  const dimensions = imageDimensions(dataUrl);
+  const url = reference(dataUrl);
+  const mimeType = dataUrl.slice(5, dataUrl.indexOf(';'));
+  if (part.type === 'attachment') return { ...part, attachment: { ...part.attachment, url, mimeType: part.attachment.mimeType ?? mimeType, ...(part.attachment.width === undefined ? dimensions : {}) } };
+  return { ...part, media: { ...part.media, url, mimeType: part.media.mimeType ?? mimeType, ...(part.media.width === undefined ? dimensions : {}) } };
+}
+
 /** One part cut to a preview when it is larger than `limit`; every smaller part is returned as it is. */
-function shrinkPart(part: MessagePart, limit: number): MessagePart {
+function shrinkPart(part: MessagePart, limit: number, reference: ((dataUrl: string) => string) | null): MessagePart {
   if (size(part) <= limit) return part;
+  if ((part.type === 'attachment' || part.type === 'media') && isImageDataUrl(imageUrlOf(part))) return reference ? referencedImage(part, reference) : part;
   const head = (text: string, keep: number) => `${text.slice(0, keep)}\n… ${(text.length - keep).toLocaleString('en-US')} more characters not shown`;
   if (part.type === 'tool') {
     const full = part.body ?? (part.output === undefined ? '' : typeof part.output === 'string' ? part.output : JSON.stringify(part.output));

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- A screenshot in a Claude message that is too big to travel inline stays an image attachment instead of turning into a "Content available on demand" placeholder. It is named by a `conversation-image:<session>:<hash>` URL, as Codex names its images, with its width and height, and `readConversationContent` returns it in chunks that form its data URL. A message whose only large parts are such images no longer carries `deferredContent`. In a new conversation, which has no session id yet, the image is shown as it was sent until the id is known, then named by URL.
+
 ## 0.28.2 (2026-11-15)
 
 - A run goes on when a steer replaces its turn. Cursor steers by interrupting the turn and sending the instruction as a new one; the run used to end with the interrupted turn. It now follows the replacement: `result` is the new turn's, or rejects with the error when the new turn is refused (an invalid model, for instance). This holds for a steer sent through the run or on the session. The interrupted turn's `turn.completed` is among the run's events.

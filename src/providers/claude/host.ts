@@ -1912,7 +1912,7 @@ export class ClaudeHost<Context extends Agent = Agent> implements ProviderDriver
       if (message && window) {
         const wasDeferred = window.isDeferred(message.id);
         const projected = window.project(message);
-        if (projected.deferredContent || wasDeferred) publishedEvent = { ...event, providerSessionId: snapshot.sessionId ?? undefined,
+        if (projected !== message || wasDeferred) publishedEvent = { ...event, providerSessionId: snapshot.sessionId ?? undefined,
           type: input.type === 'message.userSubmitted' ? 'message.userSubmitted' : 'message.replaced', payload: { message: projected } };
       }
     }
