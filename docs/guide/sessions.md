@@ -64,7 +64,7 @@ A long conversation opens from its most recent turns, and `historyState.hasOlder
 
 ## Settings and lifecycle
 
-`SessionState.selection` and `permission` report the model, reasoning effort, speed and permission the conversation runs with. A loaded conversation keeps its own settings unless you choose others.
+`SessionState.selection` and `permission` report the model, reasoning effort, speed and permission the conversation runs with. A loaded conversation keeps its own settings unless you choose others. `listModels` returns each model with the speeds it offers (`serviceTiers`, such as Fast or Ultrafast) and its default, and a speed is chosen with `updateDefaults(session, { serviceTier })`; a speed the model does not offer is refused.
 
 Saved model settings (the `defaults` stored with the session data) apply once, when the conversation is opened. While it stays open, only an explicit selection on a prompt, or `updateDefaults`, changes them. A different Claude model does not inherit a stale reasoning effort.
 
