@@ -3,6 +3,7 @@ import { validateMcpPolicy } from '../../mcp-policy';
 import type { ProviderContext, ProviderDriver, ProviderEvent, HarnessPromptScope, ProviderScopedPromptInput, ProviderScopedPromptResult } from '../../driver';
 import type { HarnessTextGenerationInput } from '../../generation';
 import type { PromptPart } from '../../core/prompt-content';
+import type { HarnessOptions } from '../../options';
 import { defaultRuntimeDirectory } from '../../runtime/paths';
 export type AntigravityHostOptions<Context extends ProviderContext = ProviderContext> = {
   stateDirectory?: () => string;
@@ -12,6 +13,7 @@ export type AntigravityHostOptions<Context extends ProviderContext = ProviderCon
   client?: { name: string; title?: string; version?: string; temporaryDirectory?: string; metadataDirectory?: string; trustedMcpServerName?: string };
   instructions?: (context: Context, options: { planMode: boolean }) => string | undefined;
   formatPrompt?: (prompt: string, content: readonly PromptPart[] | undefined) => string;
+  presentToolCall?: HarnessOptions['presentToolCall'];
   mcpServers?: (context: Context) => unknown[];
 };
 const sameScope = (left?: HarnessPromptScope, right?: HarnessPromptScope) => JSON.stringify(left) === JSON.stringify(right);
@@ -398,7 +400,7 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
   }
 
   private async openSession(options: Parameters<typeof AcpSession.open>[0]): Promise<AcpSession> {
-    try { return await AcpSession.open({ ...options, home: options.home ?? this.options.home?.(), client: this.options.client, runtimeOptions: { ...this.nativeRuntimeOptions(), ...options.runtimeOptions } }); }
+    try { return await AcpSession.open({ ...options, home: options.home ?? this.options.home?.(), client: this.options.client, presentToolCall: this.options.presentToolCall, runtimeOptions: { ...this.nativeRuntimeOptions(), ...options.runtimeOptions } }); }
     catch (error) { if (error instanceof NativeLoginRequired) this.authState(false); throw error; }
   }
   private nativeRuntimeOptions(): Partial<Parameters<typeof AcpRuntime.open>[0]> {

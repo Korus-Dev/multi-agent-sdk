@@ -13,12 +13,14 @@ import { AcpPromptJournal } from './prompt-journal';
 import { acpConsumption, selectedModel } from './consumption';
 import type { MessagePart } from '../../contracts/index';
 import type { ExecutionObservation } from '../../contracts/usage';
+import type { HarnessOptions } from '../../options';
 
 type SessionOptions = {
   client?: { metadataDirectory?: string; trustedMcpServerName?: string };
   runtimeOptions?: Partial<Parameters<typeof AcpRuntime.open>[0]>;
   agentId: string; cwd: string; home?: string; sessionId?: string;
   mcpServers: unknown[];
+  presentToolCall?: HarnessOptions['presentToolCall'];
   tools?: boolean;
   promptTimeoutMs?: number | null;
   utilityMcpTools?: readonly {server: string; tools: readonly string[]}[];
@@ -47,7 +49,10 @@ export class AcpSession {
   private planMarkdown?: string;
   private turnStartedAt = 0;
   private currentMode?: string;
-  private constructor(private readonly options: SessionOptions) {}
+  private readonly registeredServers: readonly string[];
+  private constructor(private readonly options: SessionOptions) {
+    this.registeredServers = options.mcpServers.flatMap(server => record(server) && typeof server.name === 'string' ? [server.name] : []);
+  }
 
   static async open(options: SessionOptions): Promise<AcpSession> {
     const session = new AcpSession(options);
@@ -76,7 +81,7 @@ export class AcpSession {
           options.changed(event);
           if (event.type === 'request.created' || event.type === 'request.resolved') options.requestChanged?.(event);
         }
-      }, text => session.journal.display(text));
+      }, text => session.journal.display(text), options.presentToolCall, session.registeredServers);
       for (const params of session.initialization) session.update(params);
       session.initialization = [];
       session.transcript.finish('completed');

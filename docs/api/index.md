@@ -50,6 +50,8 @@ The caller supplies cache identity, eviction policy and cleanup callbacks.
 
 Providers are `codex`, `claude`, `cursor`, and `antigravity`. `options.client.name` is required. Optional fields include `home`, `stateDirectory`, context-dependent `instructions` and `mcpServers`, `formatPrompt`, `isAppPlugin`, `presentToolCall`, and named provider options. `isAppPlugin(id)` says which plugin mentions name a plugin the app provides itself: such a mention is never sent to the harness as one of its own plugins, and reaches the model through the prompt text. `presentToolCall({ server, tool, input, result, state })` lets the app title its own MCP tool calls: it is asked when a call starts and when it ends, with the input and result as the harness reported them, and a string it returns becomes the call's `metadata.displayTitle`. Native provider configuration remains in those named options rather than becoming generic policy.
 
+Antigravity uses `presentToolCall` when its updates identify the MCP server and tool. The hook receives the reported tool arguments when available.
+
 Each provider runs the CLI installed on the machine. To use another executable, name it in that provider's options: `cursor.command`, `antigravity.command`, or `claude.launch`.
 
 ## Harness operations

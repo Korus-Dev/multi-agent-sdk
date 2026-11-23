@@ -3,10 +3,122 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { expect, it } from 'vitest';
 import { createProviderHost } from '../../../src/harnesses';
+import { createHarness, type Harness, type HarnessEvent, type McpToolCall } from '../../../src';
 import { AntigravityHost } from '../../../src/providers/antigravity/host';
 import { antigravityModels } from '../../../src/providers/antigravity/catalog';
 import type { ProviderContext, ProviderDriver, ProviderEvent } from '../../../src/driver';
 import { writeAntigravityRuntimeFixture } from './session-fixture';
+
+it('projects native tool titles and presents identified MCP calls through the public harness', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'antigravity-tool-reporting-'));
+  const command = 'git log -n 30 --format="%h %ai %s" --stat';
+  const file = '../../provider-home/tool-schema.json';
+  const result = { count: 2 };
+  const semanticCalls = [
+    { name: 'search_directory', kind: 'search', title: 'Search fixtures', action: 'search', target: 'retry', rawInput: { Query: 'retry' } },
+    { name: 'list_directory', kind: 'other', title: 'List fixtures', action: 'list', target: 'fixtures', rawInput: { Path: 'fixtures' } },
+    { name: 'create_file', kind: 'edit', title: 'Run create_file', action: 'create', target: '/fixtures/new.ts', locations: [{ path: '/fixtures/new.ts' }] },
+    { name: 'edit_file', kind: 'edit', title: 'Run edit_file', action: 'edit', target: '/fixtures/report.md', locations: [{ path: '/fixtures/report.md' }] },
+    { name: 'delete_file', kind: 'delete', title: 'Delete fixtures/old.ts', action: 'delete', target: 'fixtures/old.ts' },
+    { name: 'move_file', kind: 'move', title: 'Run move_file', action: 'move', target: 'old.ts → new.ts', rawInput: { Source: 'old.ts', Destination: 'new.ts' } },
+    { name: 'search_web', kind: 'search', title: 'Search the web', action: 'search', target: 'retry', rawInput: { Query: 'retry' }, projectedKind: 'webSearch' },
+    { name: 'read_url_content', kind: 'fetch', title: 'Run read_url_content', action: 'fetch', target: 'https://example.invalid', rawInput: { Url: 'https://example.invalid' } },
+    { name: 'manage_subagents', kind: 'other', title: 'Run manage_subagents', action: 'manage_agents' },
+    { name: 'send_message', kind: 'other', title: 'Run send_message', action: 'message', rawInput: { Recipient: 'agent-id', Message: 'Hi' } },
+    { name: 'thinking', kind: 'think', title: 'Thinking', action: 'think' },
+    { name: 'change_mode', kind: 'switch_mode', title: 'Switch to Plan', action: 'switch_mode', target: 'Plan' },
+  ];
+  const updates = [
+    { sessionUpdate: 'tool_call', toolCallId: 'shell', title: command, kind: 'execute', status: 'pending', rawInput: { CommandLine: command } },
+    { sessionUpdate: 'tool_call_update', toolCallId: 'shell', status: 'completed', rawInput: null },
+    { sessionUpdate: 'tool_call', toolCallId: 'search', title: 'Search **/*.ts for ToolPart', kind: 'search', status: 'completed' },
+    { sessionUpdate: 'tool_call', toolCallId: 'show', title: 'git show HEAD:src/tool.ts', kind: 'execute', status: 'completed' },
+    { sessionUpdate: 'tool_call', toolCallId: 'read', title: `File ${file}`, kind: 'other', status: 'in_progress' },
+    { sessionUpdate: 'tool_call_update', toolCallId: 'read', kind: 'other', status: 'completed' },
+    { sessionUpdate: 'tool_call', toolCallId: 'mcp', title: 'Run mcp workspace inspect', kind: 'other', status: 'pending',
+      _meta: { is_mcp_tool_call: true, mcp: { server: 'workspace', tool: 'inspect' } }, rawInput: { arguments: { path: 'src/tool.ts' } } },
+    { sessionUpdate: 'tool_call_update', toolCallId: 'mcp', kind: 'other', status: 'completed', rawInput: null, rawOutput: result },
+    { sessionUpdate: 'tool_call', toolCallId: 'direct', title: 'Run mcp_workspace_set-status', kind: 'other', status: 'in_progress',
+      rawInput: { toolSummary: 'Set activity status' } },
+    { sessionUpdate: 'tool_call_update', toolCallId: 'direct', status: 'completed',
+      content: [{ type: 'content', content: { type: 'text', text: 'Status updated' } }] },
+    { sessionUpdate: 'tool_call', toolCallId: 'fallback', title: 'Run mcp_cache_refresh-all', kind: 'execute', status: 'in_progress',
+      name: 'mcp_cache_refresh-all' },
+    { sessionUpdate: 'tool_call_update', toolCallId: 'fallback', status: 'completed' },
+    { sessionUpdate: 'tool_call', toolCallId: 'unresolved-mcp', name: 'mcp_profile_lookup', title: 'Run mcp_profile_lookup', kind: 'other', status: 'in_progress' },
+    { sessionUpdate: 'tool_call_update', toolCallId: 'unresolved-mcp', title: 'Run mcp_profile_lookup', kind: 'other', status: 'failed' },
+    ...semanticCalls.flatMap(({ action, target, projectedKind, ...call }) => [
+      { ...call, sessionUpdate: 'tool_call', toolCallId: call.name, status: 'in_progress' },
+      { sessionUpdate: 'tool_call_update', toolCallId: call.name, kind: call.kind, status: 'failed' },
+    ]),
+  ];
+  const calls: McpToolCall[] = [];
+  const presentToolCall = (call: McpToolCall) => {
+    calls.push(call);
+    if (call.tool === 'set-status') return call.state === 'completed' ? 'Set activity status' : 'Setting activity status';
+    if (call.server !== 'workspace') return undefined;
+    return call.state === 'completed' ? 'Inspected tool.ts' : 'Inspecting tool.ts';
+  };
+  let harness: Harness | undefined;
+  try {
+    await writeAntigravityRuntimeFixture(root);
+    await writeFile(path.join(root, 'usage-fixture.json'), JSON.stringify({
+      configuration: { models: { currentModelId: 'fixture-model', availableModels: [{ modelId: 'fixture-model', name: 'Fixture model' }] } },
+      updates, completion: { stopReason: 'end_turn' }, lateUpdate: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: '' } },
+    }));
+    harness = createHarness('antigravity', { client: { name: 'tool-reporting' }, presentToolCall,
+      mcpServers: () => [{ name: 'workspace', url: 'http://127.0.0.1:1/mcp' }, { name: 'cache', url: 'http://127.0.0.1:2/mcp' }],
+      home: path.join(root, 'home'), antigravity: { command: path.join(root, 'runtime') } });
+    const session = harness.open({ id: 'tool-reporting', folder: root });
+    const activity: HarnessEvent[] = [];
+    harness.onEvent(event => activity.push(event));
+    const run = harness.run(session, 'usage-fixture:tools');
+    const { messages } = await run.result;
+    const tools = messages.flatMap(message => message.parts).filter(part => part.type === 'tool');
+    expect(tools.slice(0, 7)).toMatchObject([
+      { id: 'shell', kind: 'command', title: command, status: 'completed', input: { CommandLine: command } },
+      { id: 'search', kind: 'search', status: 'completed' },
+      { id: 'show', kind: 'command', status: 'completed' },
+      { id: 'read', kind: 'read', status: 'completed', input: { path: file } },
+      { id: 'mcp', kind: 'mcp', status: 'completed', metadata: { server: 'workspace', tool: 'inspect', displayTitle: 'Inspected tool.ts' } },
+      { id: 'direct', kind: 'mcp', status: 'completed', metadata: { server: 'workspace', tool: 'set-status', displayTitle: 'Set activity status' } },
+      { id: 'fallback', kind: 'mcp', title: 'cache.refresh-all', status: 'completed', metadata: { server: 'cache', tool: 'refresh-all' } },
+    ]);
+    expect(tools.find(tool => tool.id === 'fallback')?.metadata?.displayTitle).toBeUndefined();
+    const unresolved = tools.find(tool => tool.id === 'unresolved-mcp');
+    expect(unresolved).toMatchObject({ kind: 'mcp', status: 'failed', title: 'profile_lookup' });
+    expect(unresolved?.metadata?.displayTitle).toBeUndefined();
+    expect(unresolved?.metadata?.server).toBeUndefined();
+    expect(JSON.parse(unresolved!.statusText!)).toMatchObject({ action: 'mcp', phase: 'failed' });
+    const liveParts = activity.filter(event => event.type === 'session.changed')
+      .flatMap(event => event.state.messages.flatMap(message => message.parts));
+    for (const { name, action, target, projectedKind = undefined } of semanticCalls) {
+      const tool = tools.find(part => part.id === name)!;
+      expect(tool.metadata?.displayTitle).toBeUndefined();
+      expect(JSON.parse(tool.statusText!)).toMatchObject({ action, phase: 'failed', ...(target ? { params: { target } } : {}) });
+      if (projectedKind) expect(tool.kind).toBe(projectedKind);
+      expect(liveParts.some(part => part.type === 'tool' && part.id === name && part.status === 'running'
+        && part.statusText && JSON.parse(part.statusText).action === action)).toBe(true);
+    }
+    for (const [id, action, target] of [['shell', 'run', command], ['show', 'run', 'git show HEAD:src/tool.ts'], ['read', 'read', file]]) {
+      const tool = tools.find(part => part.id === id)!;
+      expect(tool.metadata?.displayTitle).toBeUndefined();
+      expect(JSON.parse(tool.statusText!)).toMatchObject({ action, phase: 'completed', params: { target } });
+      if (id === 'show') continue;
+      expect(liveParts.some(part => part.type === 'tool' && part.id === id && part.status === 'running'
+        && part.statusText && JSON.parse(part.statusText).phase === 'running')).toBe(true);
+    }
+    expect(calls).toEqual([
+      { server: 'workspace', tool: 'inspect', input: { path: 'src/tool.ts' }, state: 'running' },
+      { server: 'workspace', tool: 'inspect', input: { path: 'src/tool.ts' }, state: 'completed', result },
+      { server: 'workspace', tool: 'set-status', input: { toolSummary: 'Set activity status' }, state: 'running' },
+      { server: 'workspace', tool: 'set-status', input: { toolSummary: 'Set activity status' }, state: 'completed', result: 'Status updated' },
+      { server: 'cache', tool: 'refresh-all', input: undefined, state: 'running' },
+      { server: 'cache', tool: 'refresh-all', input: undefined, state: 'completed' },
+    ]);
+    expect(activity).toContainEqual(expect.objectContaining({ type: 'tool.updated', tool: { id: 'mcp', kind: 'mcp', status: 'completed' } }));
+  } finally { await harness?.close(); await rm(root, { recursive: true, force: true }); }
+});
 
 it('runs a caller-owned Antigravity client and selects utility models without product tiers', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'harness-antigravity-cpa-'));

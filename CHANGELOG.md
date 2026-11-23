@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Antigravity tool rows preserve punctuation in native titles and commands. Identified MCP calls use the app's existing `presentToolCall` hook, and partial tool updates preserve earlier arguments and results.
+
 ## 0.28.3 (2026-11-17)
 
 - A screenshot in a Claude message that is too big to travel inline stays an image attachment instead of turning into a "Content available on demand" placeholder. It is named by a `conversation-image:<session>:<hash>` URL, as Codex names its images, with its width and height, and `readConversationContent` returns it in chunks that form its data URL. A message whose only large parts are such images no longer carries `deferredContent`. In a new conversation, which has no session id yet, the image is shown as it was sent until the id is known, then named by URL.

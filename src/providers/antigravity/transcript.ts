@@ -3,6 +3,9 @@ import type { Message, MessagePart, ToolPart } from '../../contracts/index';
 import type { AntigravityConversationEvent } from '../../contracts/antigravity-conversation';
 import { createAntigravityConversationReplica, emptyAntigravitySnapshot } from '../../conversations/antigravity-conversation-replica';
 import { record } from '../../acp/acp-connection';
+import type { HarnessOptions } from '../../options';
+import { directMcpToolName, mcpToolIdentity } from './mcp-tool';
+import { projectNativeToolStatus } from './tool-status';
 
 type Change = AntigravityConversationEvent extends infer Event ? Event extends AntigravityConversationEvent ? Omit<Event, 'agentId' | 'sessionId' | 'turnId' | 'occurredAt'> : never : never;
 
@@ -14,7 +17,9 @@ export class AcpTranscript {
   private replaying = false;
 
   constructor(readonly agentId: string, readonly sessionId: string, private readonly changed: (event: AntigravityConversationEvent) => void,
-    private readonly displayUser: (text: string) => { text: string; parts: MessagePart[]; metadata?: Message['metadata'] } = text => ({ text, parts: [] }),) {
+    private readonly displayUser: (text: string) => { text: string; parts: MessagePart[]; metadata?: Message['metadata'] } = text => ({ text, parts: [] }),
+    private readonly presentToolCall?: HarnessOptions['presentToolCall'],
+    private readonly registeredServers: readonly string[] = []) {
     this.replica = createAntigravityConversationReplica(emptyAntigravitySnapshot(agentId, sessionId));
   }
 
@@ -87,17 +92,58 @@ export class AcpTranscript {
     const previous = message.parts.find((part): part is ToolPart => part.type === 'tool' && part.id === update.toolCallId);
     const part: ToolPart = previous ?? { type: 'tool', id: update.toolCallId, kind: 'tool', title: 'Antigravity tool', status: 'running' };
     if (typeof update.title === 'string') part.title = update.title;
-    if (typeof update.kind === 'string') part.kind = update.kind;
+    if (typeof update.kind === 'string') part.kind = update.kind === 'execute' ? 'command' : update.kind;
     if (typeof update.status === 'string') part.status = update.status === 'failed' ? 'failed' : update.status === 'completed' ? 'completed' : 'running';
-    if ('rawInput' in update) part.input = update.rawInput;
-    if ('rawOutput' in update) { part.output = update.rawOutput; part.body = typeof update.rawOutput === 'string' ? update.rawOutput : JSON.stringify(update.rawOutput); }
+    if (update.rawInput != null) part.input = update.rawInput;
+    if (update.rawOutput != null) { part.output = update.rawOutput; part.body = typeof update.rawOutput === 'string' ? update.rawOutput : JSON.stringify(update.rawOutput); }
     if (Array.isArray(update.content)) {
       const text = update.content.map(item => record(item) && item.type === 'content' && record(item.content) && typeof item.content.text === 'string' ? item.content.text : '').filter(Boolean).join('\n');
       if (text) part.body = text;
     }
+    this.presentTool(part, update);
     if (!previous) message.parts.push(part);
     if (this.message?.id === message.id) this.message = message;
     this.event({ type: 'message.upsert', payload: { message } });
+  }
+
+  private presentTool(part: ToolPart, update: Record<string, unknown>): void {
+    const metadata = part.metadata ??= {};
+    const mcp = mcpToolIdentity(update, this.registeredServers);
+    if (mcp) {
+      metadata.server = mcp.server;
+      metadata.tool = mcp.tool;
+    }
+    delete metadata.displayTitle;
+    delete part.statusText;
+    if (typeof metadata.server === 'string' && typeof metadata.tool === 'string') {
+      part.kind = 'mcp';
+      part.title = `${metadata.server}.${metadata.tool}`;
+      let input = part.input;
+      if (record(input)) {
+        if ('arguments' in input) input = input.arguments;
+        else if (input.ServerName === metadata.server && input.ToolName === metadata.tool && 'Arguments' in input) input = input.Arguments;
+      }
+      const result = part.output ?? part.body;
+      const title = this.presentToolCall?.({ server: metadata.server, tool: metadata.tool, input,
+        ...(result === undefined ? {} : { result }), state: part.status });
+      if (title) metadata.displayTitle = title;
+      return;
+    }
+    const priorMcpName = metadata.unresolvedMcpName;
+    const unresolvedMcpName = directMcpToolName(update) ?? (typeof priorMcpName === 'string' ? directMcpToolName({
+      ...update, kind: update.kind ?? 'other', title: update.title ?? `Run ${priorMcpName}`, name: update.name ?? priorMcpName,
+    }) : undefined);
+    if (typeof unresolvedMcpName === 'string') {
+      metadata.unresolvedMcpName = unresolvedMcpName;
+      part.kind = 'mcp';
+      part.title = unresolvedMcpName.slice('mcp_'.length);
+      part.statusText = JSON.stringify({ source: 'antigravity', action: 'mcp', phase: part.status });
+      return;
+    }
+    delete metadata.unresolvedMcpName;
+    const status = projectNativeToolStatus(part, update);
+    if (status) part.statusText = status;
+    else metadata.displayTitle = part.title;
   }
 
   private current(role: 'user' | 'assistant'): Message {
