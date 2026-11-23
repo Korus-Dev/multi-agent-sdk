@@ -272,8 +272,8 @@ export class AcpSession {
       if (!this.active) throw new Error('Antigravity permission request has no active turn.');
       if (this.interrupted) return { outcome: { outcome: 'cancelled' } };
       const name = this.options.client?.trustedMcpServerName;
-      const trustedMcpServerName = name && this.options.mcpServers.filter(server => record(server) && server.name === name).length === 1 ? name : undefined;
-      const pending = permissionRequest(params, trustedMcpServerName);
+      const trustedServer = name && this.registeredServers.filter(server => server === name).length === 1 ? name : undefined;
+      const pending = permissionRequest(params, trustedServer, this.registeredServers);
       if (pending.automaticResponse) return pending.automaticResponse;
       return new Promise(resolve => {
         this.pending.set(pending.request.id, { ...pending, resolve });

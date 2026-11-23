@@ -47,7 +47,7 @@ const harness = createHarness('codex', {
 });
 ```
 
-Tool availability and approval policy are separate. Omitted `approval`, or `inherit`, uses native policy. `auto` explicitly trusts the selected tools and is supported only by Codex and Claude. Antigravity runs the tools of connected MCP servers without asking in every permission mode, so connect only servers you trust there. `required: true` enforces startup connection only on Codex. Unsupported policy requests reject. `required: false` remains optional and is a no-op on providers without startup enforcement.
+Tool availability and approval policy are separate. Omitted `approval`, or `inherit`, uses native policy. Endpoint `auto` explicitly trusts the selected tools and is supported by Codex and Claude. Antigravity and Cursor automatically answer each identified call to the host's registered `trustedMcpServerName`. Reserve this name for the host's server. Antigravity also recognizes direct ACP MCP calls when their name matches only that session registration. Each approval applies to the current call. Unidentified calls keep the native approval prompt. `required: true` enforces startup connection on Codex. Unsupported policy requests reject. `required: false` remains optional and is a no-op on providers without startup enforcement.
 
 ## Scoped work and generation
 

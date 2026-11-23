@@ -85,6 +85,7 @@ rl.on('line',line=>{
  else if(v.method==='session/load') {
    sessionId=v.params.sessionId;
    mcpServers=v.params.mcpServers;
+   fs.writeFileSync(require('node:path').join(process.cwd(),'fixture-session.json'),JSON.stringify(v.params));
    for(const item of usageFixture()?.updates??[]) update(item);
    const saved=require('node:path').join(home,sessionId+'.jsonl');
    if(fs.existsSync(saved)) {
@@ -259,14 +260,61 @@ describe('Antigravity native session', () => {
   // coverage reason or turn timing lost through persistence and usage/get.
 
 
-  const mcpPermission = (tool: string) => ({
+  const registeredMcpName = async () => {
+    const { mcpServers: [server] } = JSON.parse(await readFile(path.join(root, 'fixture-session.json'), 'utf8'));
+    return server?.name as string | undefined;
+  };
+
+  const mcpPermission = (tool: string, server = product.mcpServerName) => ({
     toolCall: { toolCallId: 'native-mcp-call', title: `${product.mcpServerName}_${tool}`, kind: 'other', rawInput: { arguments: {} },
-      _meta: { is_mcp_tool_call: true, mcp: { server: product.mcpServerName, tool } } },
+      _meta: { is_mcp_tool_call: true, mcp: { server, tool } } },
     options: [
       { optionId: 'native-always-17', name: 'Allow Always', kind: 'allow_always' },
       { optionId: 'native-once-42', name: 'Allow', kind: 'allow_once' },
       { optionId: 'native-deny-9', name: 'Deny', kind: 'reject_once' },
     ],
+  });
+
+  it('answers every direct app MCP request before publishing an approval card', async () => {
+    const { session, changed } = await open(undefined, { mcpServers: [sessionMcpServer('http://127.0.0.1:1/mcp')] });
+    expect(await registeredMcpName()).toBe(product.mcpServerName);
+    for (const [tool, kind] of [['set-status', 'other'], ['finish_turn', 'execute'], ['report_finding', 'other'], ['set-status', 'other']] as const) {
+      const permission = mcpPermission(tool);
+      const turn = session.prompt(`permission-fixture:${JSON.stringify({ ...permission, toolCall: {
+        toolCallId: `call-${tool}`, title: `Run mcp_${product.mcpServerName}_${tool}`, kind, rawInput: { toolSummary: 'MCP tool call' },
+      } })}`);
+      await vi.waitFor(() => {
+        expect(session.snapshot.clientRequests).toEqual([]);
+        expect(session.snapshot.turns.at(-1)?.status).toBe('completed');
+      });
+      await turn.completion;
+      const response = JSON.parse(await readFile(path.join(root, 'permission-response.json'), 'utf8'));
+      expect(response.result).toStrictEqual({ outcome: { outcome: 'selected', optionId: 'native-once-42' } });
+    }
+    expect(changed.mock.calls.map(([event]) => event.type)).not.toContain('request.created');
+  });
+
+  it('uses the native dispatcher target rather than names inside its tool arguments', async () => {
+    const { session, changed } = await open(undefined, { mcpServers: [sessionMcpServer('http://127.0.0.1:1/mcp')] });
+    const server = await registeredMcpName();
+    const permission = mcpPermission('set-status');
+    const prompt = (target: string | undefined) => session.prompt(`permission-fixture:${JSON.stringify({ ...permission, toolCall: {
+      toolCallId: 'call-dispatch', title: 'MCP Tool set-status', name: 'call_mcp_tool', kind: 'execute',
+      rawInput: { ServerName: target, ToolName: 'set-status', Arguments: { ServerName: server } },
+    } })}`);
+    const allowed = prompt(server);
+    await vi.waitFor(() => expect(session.snapshot.turns.at(-1)?.status).toBe('completed'));
+    await allowed.completion;
+    expect(changed.mock.calls.map(([event]) => event.type)).not.toContain('request.created');
+    expect(JSON.parse(await readFile(path.join(root, 'permission-response.json'), 'utf8')).result)
+      .toStrictEqual({ outcome: { outcome: 'selected', optionId: 'native-once-42' } });
+
+    const other = prompt('third-party');
+    await vi.waitFor(() => expect(session.snapshot.clientRequests).toHaveLength(1));
+    session.respond({ id: session.snapshot.clientRequests[0]!.id, outcome: { kind: 'decision', decision: 'deny' } });
+    await other.completion;
+    expect(JSON.parse(await readFile(path.join(root, 'permission-response.json'), 'utf8')).result)
+      .toStrictEqual({ outcome: { outcome: 'selected', optionId: 'native-deny-9' } });
   });
 
   it.each([
@@ -276,7 +324,7 @@ describe('Antigravity native session', () => {
   ])('pre-authorizes the supplied Korus server in $mode for $tool (session $sessionId)', async ({ sessionId, mode, tool }) => {
     const { session, changed } = await open(sessionId, { mcpServers: [sessionMcpServer('http://127.0.0.1:1/mcp?agentId=agent')] });
     await session.setMode(mode);
-    await session.prompt(`permission-fixture:${JSON.stringify(mcpPermission(tool))}`).completion;
+    await session.prompt(`permission-fixture:${JSON.stringify(mcpPermission(tool, await registeredMcpName()))}`).completion;
     const response = JSON.parse(await readFile(path.join(root, 'permission-response.json'), 'utf8'));
     expect(response.result).toStrictEqual({ outcome: { outcome: 'selected', optionId: 'native-once-42' } });
     expect(session.snapshot.clientRequests).toEqual([]);
@@ -289,6 +337,8 @@ describe('Antigravity native session', () => {
     { boundary: 'Korus not supplied to the session', registered: false },
     { boundary: 'other MCP server', meta: { is_mcp_tool_call: true, mcp: { server: 'github', tool: 'set_status' } } },
     { boundary: 'title or arguments impersonating Korus', meta: undefined },
+    { boundary: 'direct request with an ambiguous MCP name', meta: undefined, directPublicName: true, competingServer: `${product.mcpServerName}_set` },
+    { boundary: 'shell command with a matching MCP title', meta: undefined, directPublicName: true, kind: 'execute', command: 'echo command' },
     { boundary: 'missing native MCP marker', meta: { mcp: { server: product.mcpServerName, tool: 'set_status' } } },
     { boundary: 'missing tool identity', meta: { is_mcp_tool_call: true, mcp: { server: product.mcpServerName } } },
     { boundary: 'command approval', kind: 'execute' },
@@ -296,9 +346,12 @@ describe('Antigravity native session', () => {
     { boundary: 'native question', toolCallId: 'interaction_choice' },
     { boundary: 'no native allow-once choice', alwaysOnly: true },
   ])('keeps $boundary interactive', async scenario => {
-    const { session, changed } = await open(undefined, { mcpServers: scenario.registered === false ? [] : [sessionMcpServer('http://127.0.0.1:1/mcp')] });
-    const permission = mcpPermission('set_status');
+    const mcpServers = scenario.registered === false ? [] : [sessionMcpServer('http://127.0.0.1:1/mcp')];
+    if (scenario.competingServer) mcpServers.push(nativeSessionMcpServer('http://127.0.0.1:2/mcp', scenario.competingServer));
+    const { session, changed } = await open(undefined, { mcpServers });
+    const permission = mcpPermission('set_status', await registeredMcpName());
     const toolCall = { ...permission.toolCall, ...('meta' in scenario ? { _meta: scenario.meta } : {}),
+      ...(scenario.directPublicName ? { title: `Run mcp_${product.mcpServerName}_set_status`, rawInput: { toolSummary: 'MCP tool call', CommandLine: scenario.command } } : {}),
       ...(scenario.kind ? { kind: scenario.kind } : {}), ...(scenario.toolCallId ? { toolCallId: scenario.toolCallId } : {}) };
     const turn = session.prompt(`permission-fixture:${JSON.stringify({ ...permission, toolCall,
       ...(scenario.alwaysOnly ? { options: [permission.options[0]] } : {}) })}`);
@@ -325,7 +378,7 @@ describe('Antigravity native session', () => {
 
   it('does not authorize a Korus MCP request arriving after cancellation', async () => {
     const { session, changed } = await open(undefined, { mcpServers: [sessionMcpServer('http://127.0.0.1:1/mcp')] });
-    const turn = session.prompt(`cancel-permission-fixture:${JSON.stringify(mcpPermission('finish_turn'))}`);
+    const turn = session.prompt(`cancel-permission-fixture:${JSON.stringify(mcpPermission('finish_turn', await registeredMcpName()))}`);
     await vi.waitFor(async () => expect(await readFile(path.join(root, 'cancel-permission-ready'), 'utf8')).toBe(''));
     await session.interrupt(turn.turnId);
     expect(JSON.parse(await readFile(path.join(root, 'permission-response.json'), 'utf8')).result).toStrictEqual({ outcome: { outcome: 'cancelled' } });

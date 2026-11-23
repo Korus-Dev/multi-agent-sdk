@@ -2,9 +2,11 @@ import { randomUUID } from 'node:crypto';
 import type { AgentRequestResponse } from '../../conversations/agent-request';
 import type { ClientRequest } from '../../contracts/index';
 import { record } from '../../acp/acp-connection';
+import { mcpToolIdentity } from './mcp-tool';
 
 type Option = { optionId: string; name: string; kind: string };
-export function permissionRequest(params: Record<string, unknown>, trustedMcpServerName?: string) {
+
+export function permissionRequest(params: Record<string, unknown>, trustedMcpServer?: string, registeredServers: readonly string[] = []) {
   const call = params.toolCall;
   if (!record(call) || typeof call.toolCallId !== 'string' || !Array.isArray(params.options)) throw new Error('Invalid native permission request.');
   const options = params.options.filter((value): value is Option => record(value)
@@ -12,13 +14,9 @@ export function permissionRequest(params: Record<string, unknown>, trustedMcpSer
   if (options.length !== params.options.length || !options.length) throw new Error('Invalid native permission choices.');
   const id = randomUUID();
   const question = call.toolCallId.startsWith('interaction_');
-  // Trust only native MCP identity for the server supplied by this session.
-  // Titles and tool arguments are presentation data, not authorization inputs.
-  const meta = call._meta;
-  const mcp = record(meta) && meta.mcp;
-  const allow = trustedMcpServerName && !question && call.kind === 'other'
-    && record(meta) && meta.is_mcp_tool_call === true && record(mcp)
-    && mcp.server === trustedMcpServerName && typeof mcp.tool === 'string' && mcp.tool.trim()
+  const legacyMcp = record(call._meta) && call._meta.is_mcp_tool_call === true;
+  const allow = trustedMcpServer && !question && (!legacyMcp || call.kind === 'other') &&
+    mcpToolIdentity(call, registeredServers)?.server === trustedMcpServer
     ? options.find(option => option.kind === 'allow_once') : undefined;
   const title = typeof call.title === 'string' ? call.title : 'Antigravity permission';
   // A confirmation carries the id of its tool call, which is also the id of the tool part in the transcript.
