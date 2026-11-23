@@ -103,7 +103,7 @@ export const antigravityHarnessCapabilities: ProviderCapabilities = {
   remoteControl: false, attachments: true, models: true, skills: false,
   reasoningEffort: true, serviceTier: false, thinkingBudget: false,
   planMode: 'native', goals: false, steerPrompt: false, interrupt: true, history: true,
-  folderScopedConversations: true, subagentTranscripts: 'none', conversationFork: false, deleteTurn: false, editTurn: false, retryTurn: false,
+  folderScopedConversations: true, subagentTranscripts: 'inline', conversationFork: false, deleteTurn: false, editTurn: false, retryTurn: false,
   approvals: true, approvalPresets: [],
   permissionModes: permissionModes(harnessPermissionIds.antigravity),
 };

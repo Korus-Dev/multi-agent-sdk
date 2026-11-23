@@ -3,6 +3,11 @@
 ## Unreleased
 
 - Antigravity tool rows preserve punctuation in native titles and commands. Identified MCP calls use the app's existing `presentToolCall` hook, and partial tool updates preserve earlier arguments and results.
+- Antigravity shows who the parent delegated to, where a role is reported, and whether the invocation started, completed, or failed. Delegation rows are restored with the parent transcript.
+- Antigravity exposes registered workers in the parent’s subagent list and can open their read-only transcripts from a parent-scoped reference.
+- Antigravity subagents stay marked as working between tool calls and show Done when the provider records their final response.
+- Antigravity keeps confirmed subagent completion through partial transcript reads, and replayed conversation rows keep their identities when refreshed.
+- Antigravity subagent status stays current through stale checkpoints and reports persisted provider failures.
 
 ## 0.28.3 (2026-11-17)
 

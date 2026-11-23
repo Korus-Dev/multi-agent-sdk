@@ -46,11 +46,13 @@ import { antigravityModels, listAcpSessions } from './catalog';
 import { parseQuota } from './quota';
 import { acpAttachments } from './attachments';
 import { AcpPromptJournal } from './prompt-journal';
+import { AntigravitySubagentMonitor, readAntigravitySubagent } from './subagents';
 import { finalAnswerText } from '../../conversations/final-answer';
 
 export class AntigravityHost<Context extends ProviderContext = ProviderContext> implements ProviderDriver<Context, ProviderEvent> {
   readonly provider = 'antigravity' as const;
   private readonly sessions = new Map<string, AcpSession>();
+  private readonly subagents = new Map<string, { session: AcpSession; monitor: AntigravitySubagentMonitor }>();
   /** Opened conversations that already received the saved settings. */
   private readonly settled = new WeakSet<AcpSession>();
   private readonly opening = new Map<string, Promise<AcpSession>>();
@@ -281,6 +283,7 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
 
   async resumeConversation(agent: Context, target: ConversationResumeTarget) {
     if (target.ref.provider !== this.provider || target.storageState !== 'active') throw new Error('Invalid Antigravity conversation target.');
+    if (target.ref.subagentId !== undefined) throw new Error('Antigravity subagent transcripts are read-only.');
     if (target.ref.folder !== agent.folder) throw new Error('Antigravity conversation belongs to another workspace.');
     const existing = this.sessions.get(agent.id);
     if (existing?.snapshot.busy || this.opening.has(agent.id) || this.resuming.has(agent.id)) throw new Error('Finish the current Antigravity operation before resuming history.');
@@ -325,6 +328,15 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
   async readConversationMessages(ref: ProviderConversationRef, agentId: string) {
     if (ref.provider !== this.provider) throw new Error('Antigravity cannot read another provider conversation.');
     const current = this.sessions.get(agentId);
+    if (ref.subagentId !== undefined) {
+      const cwd = this.workingDirectory({ id: agentId, folder: ref.folder });
+      const home = current?.home ?? this.options.home?.() ?? this.nativeRuntimeOptions().home ?? antigravityHome();
+      const child = await readAntigravitySubagent(home, ref.conversationId, ref.subagentId);
+      if (!child) throw new Error('Antigravity subagent is not registered to this parent conversation.');
+      const replay = await this.openSession({ agentId, cwd: child.cwd ?? cwd, home, sessionId: child.id, parent: { sessionId: ref.conversationId, cwd },
+        mcpServers: [], tools: false, changed: () => {} });
+      try { return structuredClone(replay.snapshot.messages); } finally { await replay.close(); }
+    }
     if (current?.sessionId === ref.conversationId) {
       if (await realpath(current.cwd) !== await realpath(this.workingDirectory({ id: agentId, folder: ref.folder }))) throw new Error('Antigravity conversation belongs to another workspace.');
       return structuredClone(current.snapshot.messages);
@@ -334,7 +346,7 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
   }
 
   async readConversationSummary(agent: Context, ref: ProviderConversationRef): Promise<ConversationSummary | null> {
-    if (ref.provider !== this.provider || ref.folder !== agent.folder) return null;
+    if (ref.provider !== this.provider || ref.folder !== agent.folder || ref.subagentId !== undefined) return null;
     return (await this.listConversations(agent)).find(entry => entry.sessionId === ref.conversationId) ?? null;
   }
 
@@ -356,6 +368,7 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
   async releaseConversation(agentId: string): Promise<void> {
     this.generations.set(agentId, (this.generations.get(agentId) ?? 0) + 1);
     const session = this.sessions.get(agentId); this.sessions.delete(agentId);
+    this.subagents.get(agentId)?.monitor.close(); this.subagents.delete(agentId);
     this.executionScopes.delete(agentId);
     await session?.close();
   }
@@ -396,7 +409,15 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
     const cwd = this.workingDirectory(agent);
     if (!agent.folder) await mkdir(cwd, { recursive: true, mode: 0o700 });
     const mcpServers = scope ? (scope.mcpServers ?? []).map(server => sessionMcpServer(server.url, server.name, server.enabledTools ? [...server.enabledTools] : undefined)) : this.options.mcpServers?.(agent) ?? [];
-    return this.openSession({ agentId: agent.id, cwd, sessionId, mcpServers, ephemeral: Boolean(scope), changed: event => this.conversationEvent(event), usage: event => this.observeUsage(event) });
+    return this.openSession({ agentId: agent.id, cwd, sessionId, mcpServers, ephemeral: Boolean(scope),
+      changed: event => this.conversationEvent(event), usage: event => this.observeUsage(event),
+      subagentOperationChanged: operation => {
+        this.emit({ type: 'subagent.operationChanged', agentId: agent.id, provider: this.provider,
+          conversationId: operation.senderConversationId, turnId: operation.turnId, occurredAt: operation.occurredAt,
+          payload: { rootConversationId: operation.senderConversationId, operation, agentStates: {} } });
+        this.subagents.get(agent.id)?.monitor.start(true);
+      },
+    });
   }
 
   private async openSession(options: Parameters<typeof AcpSession.open>[0]): Promise<AcpSession> {
@@ -431,6 +452,29 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
   private publishSnapshot(agentId: string, session: AcpSession): void {
     this.emit({ type: 'antigravity.conversationSnapshotChanged', agentId, provider: this.provider, providerSessionId: session.sessionId, conversationId: session.sessionId,
       payload: { revision: this.nextRevision(agentId), snapshot: session.snapshot } });
+    const observer = this.subagents.get(agentId);
+    if (observer?.session === session) { observer.monitor.start(); return; }
+    observer?.monitor.close();
+    const rootConversationId = session.sessionId;
+    const monitor = new AntigravitySubagentMonitor(session.home, rootConversationId, (child, previous) => {
+      const identity = { agentId, provider: this.provider, conversationId: rootConversationId, occurredAt: new Date().toISOString() };
+      if (!previous) {
+        this.emit({ ...identity, type: 'subagent.activityChanged', payload: {
+          rootConversationId, parentConversationId: rootConversationId,
+          activity: { id: child.id, conversationId: child.id, agentPath: `${rootConversationId}/${child.id}`, kind: 'started',
+            lifecycle: 'started', occurredAt: identity.occurredAt },
+        } });
+      }
+      if (!previous || child.name !== previous.name || child.role !== previous.role) {
+        this.emit({ ...identity, type: 'subagent.identityChanged', payload: { rootConversationId, conversationId: child.id,
+          agentNickname: child.name, agentRole: child.role } });
+      }
+      if (child.status && child.status !== previous?.status) {
+        this.emit({ ...identity, type: 'subagent.statusChanged', payload: { rootConversationId, conversationId: child.id, status: child.status } });
+      }
+    });
+    this.subagents.set(agentId, { session, monitor });
+    monitor.start();
   }
   private reference(session: AcpSession): ProviderSessionData { return { kind: this.provider, conversationId: session.sessionId }; }
   private nextRevision(agentId: string): number { const revision = (this.revisions.get(agentId) ?? 0) + 1; this.revisions.set(agentId, revision); return revision; }

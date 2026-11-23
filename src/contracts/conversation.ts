@@ -52,7 +52,7 @@ export type AgentContextUsage = {
 /** A conversation an app can list, read or resume. `conversationId` names it on every harness. */
 export type ProviderConversationRef =
   | { provider: 'cursor'; folder: string | null; conversationId: string }
-  | { provider: 'antigravity'; folder: string | null; conversationId: string }
+  | { provider: 'antigravity'; folder: string | null; conversationId: string; subagentId?: string }
   | { provider: 'codex'; conversationId: string }
   | { provider: 'claude'; folder: string | null; conversationId: string; subagentId?: string };
 

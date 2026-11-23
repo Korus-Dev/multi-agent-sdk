@@ -85,6 +85,8 @@ Every session operation takes a handle owned by that harness. Every optional ope
 | `workPhases` | The harness states each text part's work phase (`commentary` or `final_answer`). Where it is absent, text carries no phase and an app groups a turn's work itself, for example by its start time and duration. |
 | `turnHistory` | Turns can arrive as summaries, and `loadTurnHistory` loads one turn's full items. |
 
+Antigravity exposes parent-side `spawnAgent` calls through `subagent.operationChanged`. It discovers child identities and statuses independently from the provider's local records. `subagentRef(parent, childId)` addresses a registered child for read-only transcript access.
+
 ## Conversation identity and account
 
 Session data and conversation references name the conversation `conversationId` on every harness; Claude session data may also carry `transcriptConversationId`. `authenticate` returns `account`, the signed-in account for every harness:

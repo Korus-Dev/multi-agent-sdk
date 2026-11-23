@@ -11,7 +11,7 @@ import { handleAcpFileRequest } from './filesystem';
 import { validateAcpSession } from './catalog';
 import { AcpPromptJournal } from './prompt-journal';
 import { acpConsumption, selectedModel } from './consumption';
-import type { MessagePart } from '../../contracts/index';
+import type { MessagePart, SubagentOperation } from '../../contracts/index';
 import type { ExecutionObservation } from '../../contracts/usage';
 import type { HarnessOptions } from '../../options';
 
@@ -19,6 +19,8 @@ type SessionOptions = {
   client?: { metadataDirectory?: string; trustedMcpServerName?: string };
   runtimeOptions?: Partial<Parameters<typeof AcpRuntime.open>[0]>;
   agentId: string; cwd: string; home?: string; sessionId?: string;
+  /** Child replay uses the registered parent as its workspace/catalog authority. */
+  parent?: { sessionId: string; cwd: string };
   mcpServers: unknown[];
   presentToolCall?: HarnessOptions['presentToolCall'];
   tools?: boolean;
@@ -27,6 +29,7 @@ type SessionOptions = {
   /** Not a user conversation: persist no prompts and hide it from history. */
   ephemeral?: boolean;
   changed(event: AntigravityConversationEvent): void;
+  subagentOperationChanged?(operation: SubagentOperation): void;
   requestChanged?(event: AntigravityConversationEvent): void;
   closed?(error: Error): void;
   usage?(event: ExecutionObservation): void;
@@ -63,7 +66,7 @@ export class AcpSession {
         onClose: error => session.closed(error),
       });
       await session.runtime.authenticate();
-      if (options.sessionId) await validateAcpSession(session.runtime.connection, options.sessionId, options.cwd);
+      if (options.sessionId) await validateAcpSession(session.runtime.connection, options.parent?.sessionId ?? options.sessionId, options.parent?.cwd ?? options.cwd);
       const result = await session.runtime.connection.request(options.sessionId ? 'session/load' : 'session/new', {
         ...(options.sessionId ? { sessionId: options.sessionId } : {}), cwd: options.cwd, mcpServers: options.mcpServers,
         // ACP 1.4.2+ writes skills/system/run-workflow/SKILL.md into the workspace unless the tool is disabled.
@@ -93,6 +96,7 @@ export class AcpSession {
   get snapshot(): AntigravityConversationSnapshot { return this.transcript.replica.getSnapshot(); }
   get configuration(): Record<string, unknown> { return this.config; }
   get sessionId(): string { return this.snapshot.sessionId; }
+  get home(): string { return this.options.home ?? this.options.runtimeOptions?.home ?? antigravityHome(); }
   get isClosed(): boolean { return this.disposed; }
   get cwd(): string { return this.options.cwd; }
   /** The mode the session is in: a permission mode, or `plan` while it plans. */
@@ -245,7 +249,8 @@ export class AcpSession {
   private update(params: unknown): void {
     if (!record(params) || params.sessionId !== this.sessionId || !record(params.update)) throw new Error('Antigravity update identity mismatch.');
     if (this.disposed) return;
-    this.transcript.update(params.update, this.loading);
+    const operation = this.transcript.update(params.update, this.loading);
+    if (operation) this.options.subagentOperationChanged?.(operation);
     if (params.update.sessionUpdate === 'config_option_update') this.config = { ...this.config, configOptions: params.update.configOptions };
     if (params.update.sessionUpdate === 'current_mode_update' && typeof params.update.currentModeId === 'string') this.currentMode = params.update.currentModeId;
   }

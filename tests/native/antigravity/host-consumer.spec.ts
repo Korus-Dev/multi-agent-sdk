@@ -120,6 +120,62 @@ it('projects native tool titles and presents identified MCP calls through the pu
   } finally { await harness?.close(); await rm(root, { recursive: true, force: true }); }
 });
 
+it('reports subagent invocations as parent operations and restores their tool rows on replay', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'antigravity-subagent-reporting-'));
+  const rawInput = { Role: 'Test investigator', TypeName: 'research', Model: 'inherit', Workspace: 'inherit', Prompt: 'Summarize the failures' };
+  const invocation = { sessionUpdate: 'tool_call', toolCallId: 'delegate-1', kind: 'other', name: 'invoke_subagent', title: 'Run invoke_subagent', rawInput };
+  const replay = { ...invocation, status: 'completed' };
+  let harness: Harness | undefined;
+  try {
+    await writeAntigravityRuntimeFixture(root);
+    const fixture = {
+      configuration: { models: { currentModelId: 'fixture-model', availableModels: [{ modelId: 'fixture-model', name: 'Fixture model' }] } },
+      updates: [
+        { ...invocation, status: 'in_progress' },
+        { sessionUpdate: 'tool_call_update', toolCallId: 'delegate-1', kind: 'other', status: 'completed' },
+        { sessionUpdate: 'tool_call_update', toolCallId: 'delegate-1', status: 'completed' },
+        { ...invocation, toolCallId: 'delegate-2', rawInput: undefined, status: 'failed' },
+        { ...invocation, toolCallId: 'unrelated', name: 'other_tool', status: 'completed' },
+      ],
+      completion: { stopReason: 'end_turn' },
+      lateUpdate: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: '' } },
+    };
+    const fixturePath = path.join(root, 'usage-fixture.json');
+    await writeFile(fixturePath, JSON.stringify(fixture));
+    harness = createHarness('antigravity', { client: { name: 'delegation-test' },
+      home: path.join(root, 'home'), antigravity: { command: path.join(root, 'runtime') } });
+    const session = harness.open({ id: 'parent', folder: root });
+    const activity: HarnessEvent[] = [];
+    harness.onEvent(event => activity.push(event));
+    const { messages, turnId } = await harness.run(session, 'usage-fixture:delegation').result;
+    const row = { id: 'delegate-1', kind: 'subagent', status: 'completed', input: rawInput,
+      metadata: { displayTitle: 'Delegated to Test investigator' } };
+    expect(messages.flatMap(message => message.parts).filter(part => part.type === 'tool')).toMatchObject([
+      row, { id: 'delegate-2', kind: 'subagent', status: 'failed', metadata: { displayTitle: 'Could not delegate to a subagent' } },
+      { id: 'unrelated', kind: 'other' },
+    ]);
+    const liveParts = activity.filter(event => event.type === 'session.changed').flatMap(event => event.state.messages.flatMap(message => message.parts));
+    expect(liveParts).toContainEqual(expect.objectContaining({ ...row, status: 'running', metadata: { displayTitle: 'Delegating to Test investigator' } }));
+    const operations = activity.filter(event => event.type === 'subagent.operationChanged');
+    expect(operations.map(event => event.payload.operation)).toMatchObject([
+      { id: 'delegate-1', kind: 'spawnAgent', lifecycle: 'started', status: 'inProgress', turnId, receiverConversationIds: [] },
+      { id: 'delegate-1', kind: 'spawnAgent', lifecycle: 'completed', status: 'completed', turnId, receiverConversationIds: [] },
+      { id: 'delegate-2', kind: 'spawnAgent', lifecycle: 'completed', status: 'failed', turnId, receiverConversationIds: [] },
+    ]);
+    expect(operations.map(event => event.payload.agentStates)).toEqual([{}, {}, {}]);
+    expect(harness.getCapabilities(session).subagentTranscripts).toBe('inline');
+    const saved = harness.getSessionData(session);
+    await harness.release(session);
+    await writeFile(fixturePath, JSON.stringify({ ...fixture, updates: [
+      { sessionUpdate: 'user_message_chunk', content: { type: 'text', text: 'Delegate an investigation.' } }, replay,
+    ] }));
+    const restored = harness.restoreSession({ id: 'parent', folder: root }, saved);
+    expect(await harness.loadConversation(restored)).toBe(true);
+    expect(harness.readSession(restored).messages.flatMap(message => message.parts)).toContainEqual(expect.objectContaining(row));
+    expect(activity.filter(event => event.type === 'subagent.operationChanged')).toHaveLength(3);
+  } finally { await harness?.close(); await rm(root, { recursive: true, force: true }); }
+});
+
 it('runs a caller-owned Antigravity client and selects utility models without product tiers', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'harness-antigravity-cpa-'));
   let host: ProviderDriver<ProviderContext, ProviderEvent> | undefined;
