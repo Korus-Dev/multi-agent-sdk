@@ -86,6 +86,8 @@ export type ProviderPlanModeSupport = 'native' | 'prompted' | 'unsupported';
 export type ProviderCapabilities = {
   /** Supplies token counters for analytics; absent retains legacy support. */
   reportsTokens?: boolean;
+  /** Reads numeric execution counters saved in the provider's conversation history. */
+  persistedUsage?: boolean;
   /** The harness supplies its own background monitor tool; absent means false. */
   nativeMonitor?: boolean;
   questions?: boolean;

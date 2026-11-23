@@ -8,6 +8,8 @@
 - Antigravity subagents stay marked as working between tool calls and show Done when the provider records their final response.
 - Antigravity keeps confirmed subagent completion through partial transcript reads, and replayed conversation rows keep their identities when refreshed.
 - Antigravity subagent status stays current through stale checkpoints and reports persisted provider failures.
+- Antigravity turn usage counts cache reads and reasoning once and retains measurements for cache-heavy turns.
+- Apps can read Antigravity's persisted token counters for historical prompts, background executions, and delegated workers.
 
 ## 0.28.3 (2026-11-17)
 

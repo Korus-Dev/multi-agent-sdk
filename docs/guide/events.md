@@ -23,6 +23,10 @@ Render tool calls from the message parts in session state. A tool part can suppl
 
 Antigravity reports parent-side delegation as a tool part with `kind: 'subagent'`. Use `subagent.operationChanged` for the invocation status and `subagent.activityChanged`, `subagent.identityChanged`, and `subagent.statusChanged` to populate the child list from provider records. Those records are also discovered when the parent is reopened. An idle checkpoint can occur while a child is working. The SDK uses the child's persisted final response, error, or interruption to report terminal status.
 
+Antigravity's prompt completion can report usage for the prompted session. Input includes cached reads in SDK observations, and output includes reasoning. Delegated workers have their own sessions and their token usage is outside the parent observation.
+
+Use `readConversationUsage(conversationId)` when `persistedUsage` is available to include delegated and background work in your app's token accounting. Repeated reads return replacement counters for each native execution, identified by its session and execution IDs.
+
 Session and provider updates such as `conversation.settingsUpdated` and `agent.conversationAttached` arrive in the same stream, in the same shape for every provider.
 
 Sending a prompt and finishing a turn are separate: `sendPrompt` resolves when the provider accepts the prompt. Follow the turn with `run`, or match `turn.completed` against the admission's `turnId`.

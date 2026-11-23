@@ -98,7 +98,7 @@ export const antigravityHarnessCapabilities: ProviderCapabilities = {
   turnContinuation: true,
   accountUsage: true,
   textGeneration: true, structuredOutput: false, scopedExecution: true,
-  reportsTokens: true, questions: true, plugins: false,
+  reportsTokens: true, persistedUsage: true, questions: true, plugins: false,
   conversationArchive: false, conversationResume: true,
   remoteControl: false, attachments: true, models: true, skills: false,
   reasoningEffort: true, serviceTier: false, thinkingBudget: false,

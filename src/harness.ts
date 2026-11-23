@@ -393,6 +393,7 @@ export abstract class ProviderHarness<P extends HarnessProvider = HarnessProvide
     const value = this.nativeRef(ref);
     return this.native.readConversationMessages?.(value, this.interactive(session).context.id, options) ?? unavailable('Conversation messages');
   }
+  async readConversationUsage(conversationId: string) { return await this.native.readConversationUsage?.(conversationId) ?? []; }
   async setConversationStorage(ref: ConversationRef, state: Parameters<Harness['setConversationStorage']>[1]) {
     const value = this.nativeRef(ref);
     await (this.native.setConversationStorage?.(value, state) ?? unavailable('Conversation storage'));

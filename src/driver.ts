@@ -109,6 +109,7 @@ export type ProviderDriver<Context = ProviderSessionContext, Event = unknown, Hi
   listSkills?(agent: Context, forceReload?: boolean): Promise<ProviderSkillSummary[]>;
   onEvent(listener: (event: Event) => void): () => void;
   onUsage?(listener: (event: import('./contracts/usage').ExecutionObservation) => void): () => void;
+  readConversationUsage?(conversationId: string): Promise<readonly import('./contracts/usage').PersistedExecutionUsage[]>;
   onRequestUsage?(listener: (event: import('./contracts/usage').RequestObservation) => void): () => void;
   close(): Promise<void>;
 };

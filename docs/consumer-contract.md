@@ -40,6 +40,8 @@ Applications switch homes by awaiting `harness.close()` and creating a fresh har
 
 Antigravity reports invocation status separately from worker status. The harness discovers registered children from its local provider records and exposes parent-scoped references through the normal `subagentRef` and `readConversationMessages` path. The harness validates the parent workspace before replaying a child's transcript. Child references are read-only.
 
+`readConversationUsage` is a read-only source of persisted execution counters for harnesses with `persistedUsage`. It includes available counters from delegated and background work. A native execution ID and an SDK prompt turn ID are different identifiers. Reconcile overlapping evidence before adding historical token counts to live observations. Persisted counters supply usage evidence without a billable request identity or served pricing tier.
+
 Codex `listConversations` starts the runtime as needed and lists normal non-archived conversations by default, including conversations other than the currently bound thread. `archived: true` explicitly requests archived conversations. `cwd` supplies an explicit workspace filter; the session's working folder does not implicitly filter the Codex catalog. `searchTerm` and `limit` apply to that selection.
 
 `readConversationMessages` reads complete Codex history, including archived chats, without resuming, selecting, unarchiving or archiving a conversation. Resuming explicitly archived chats makes them active, but never archives the previously bound chat. The consumer controls archive policy. Native compatibility callers can explicitly request the last-message subagent view; the neutral history API uses the full read-only path.

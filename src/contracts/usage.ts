@@ -6,6 +6,14 @@ export type Consumption = {
   cacheWrite: number | null;
   reasoning?: number | null;
 };
+/** Provider-owned execution counters, including background and delegated work. */
+export type PersistedExecutionUsage = {
+  sessionId: string;
+  executionId: string;
+  startedAt: number;
+  prompted: boolean;
+  tokens: Consumption;
+};
 export type ExecutionObservation = {
   agentId: string;
   sessionId: string;

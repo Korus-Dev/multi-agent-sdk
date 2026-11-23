@@ -48,7 +48,7 @@ export type { AppText, AppTextDescriptor, ApprovalPreset, HarnessProvider, Reaso
 export type { AgentStatus } from './contracts/status';
 export type { JsonValue, RequestUsage, RequestUsageField, SafetyFindings, TokenUsage, Turn, TurnError, TurnExecutionUsage, TurnStatus } from './contracts/turn';
 export type { TurnGitDiff } from './contracts/turn-diff';
-export type { ApiPricingProvider, Consumption, ExecutionObservation, ExecutionTiming, RequestCoverageReason, RequestObservation } from './contracts/usage';
+export type { ApiPricingProvider, Consumption, ExecutionObservation, ExecutionTiming, PersistedExecutionUsage, RequestCoverageReason, RequestObservation } from './contracts/usage';
 export type { AgentRequest, AgentRequestOutcome, AgentRequestResponse } from './conversations/agent-request';
 export type { RealtimeAudioChunk, RealtimeEvent, RealtimeOptions, RealtimeSession } from './contracts/realtime';
 export type { HarnessDiagnostic } from './diagnostics';

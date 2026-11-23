@@ -22,6 +22,7 @@ import { normalizePromptContent, promptContentText, promptContentDispatchText } 
 
 
 import type { ExecutionObservation } from '../../contracts/usage';
+import { readPersistedUsage, type PersistedUsageCache } from './persisted-usage';
 import { mkdir, realpath } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
@@ -65,7 +66,11 @@ export class AntigravityHost<Context extends ProviderContext = ProviderContext> 
   private quotaRead?: Promise<AccountRateLimits | null>;
   private readonly listeners = new Set<(event: ProviderEvent) => void>();
   private readonly usageListeners = new Set<(event: ExecutionObservation) => void>();
+  private readonly persistedUsage: PersistedUsageCache = new Map();
   onUsage(listener: (event: ExecutionObservation) => void) { this.usageListeners.add(listener); return () => { this.usageListeners.delete(listener); }; }
+  readConversationUsage(conversationId: string) {
+    return readPersistedUsage(this.options.home?.() ?? antigravityHome(this.options.stateDirectory?.()), conversationId, this.persistedUsage);
+  }
   private observeUsage(event: ExecutionObservation) { for (const listener of this.usageListeners) { try { listener(event); } catch { /* Observer isolation. */ } } }
   private authentication?: AcpRuntime;
   private auth?: { action: ProviderAuthenticationAction['action']; abort: AbortController; done: Promise<ProviderAuthentication> };

@@ -63,7 +63,7 @@ Each provider runs the CLI installed on the machine. To use another executable, 
 | Runtime and account | `getRuntimeStatus`, `authenticate`, `getAccountRateLimits`, `getBankedResets`, `useBankedReset`, `getCapabilities`, `getProviderCapabilities` |
 | Catalogs | `listModels`, `listSkills`, `listPlugins` |
 | Prompting | `run`, `sendPrompt`, `steerPrompt`, `interrupt`, `continueInterruptedTurn`, `respondToRequest`, `setPermission`, `handlePromptCommand`, `preparePromptOptions` |
-| History | `listConversations`, `resumeConversation`, `loadConversation`, `loadOlderHistory`, `loadTurnHistory`, `readConversationMessages`, `readConversationSummary`, `readConversationContent`, `reconcileConversations` |
+| History | `listConversations`, `resumeConversation`, `loadConversation`, `loadOlderHistory`, `loadTurnHistory`, `readConversationMessages`, `readConversationSummary`, `readConversationContent`, `readConversationUsage`, `reconcileConversations` |
 | Conversations and turns | `setConversationTitle`, `archiveConversation`, `deleteConversation`, `setConversationStorage`, `forkConversation`, `deleteTurn`, `editTurn`, `retryTurn` |
 | Goals and reviews | `setGoal`, `clearGoal`, `startReview` |
 | Scoped work and generation | `openScope`, `executeScopedPrompt`, `disposeScopedSession`, `generateText`, `generateImage` |
@@ -86,6 +86,8 @@ Every session operation takes a handle owned by that harness. Every optional ope
 | `turnHistory` | Turns can arrive as summaries, and `loadTurnHistory` loads one turn's full items. |
 
 Antigravity exposes parent-side `spawnAgent` calls through `subagent.operationChanged`. It discovers child identities and statuses independently from the provider's local records. `subagentRef(parent, childId)` addresses a registered child for read-only transcript access.
+
+When `getProviderCapabilities().persistedUsage` is true, `readConversationUsage(conversationId)` reads available `PersistedExecutionUsage` records for the root and its workers. Each record contains a native session ID and execution ID, a start time in epoch milliseconds, whether a user prompt started the execution, and normalized token counts. A later read can contain more counts for the same execution. Use the session and execution IDs together when storing the records. An empty result indicates unavailable evidence.
 
 ## Conversation identity and account
 

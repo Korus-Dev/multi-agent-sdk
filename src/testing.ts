@@ -10,7 +10,7 @@ export type ScriptedOperation =
   | 'sendPrompt' | 'steerPrompt' | 'interrupt' | 'setGoal' | 'clearGoal' | 'deleteTurn' | 'editTurn' | 'retryTurn'
   | 'continueInterruptedTurn' | 'loadConversation' | 'loadOlderHistory' | 'loadTurnHistory' | 'readConversationContent' | 'listConversations' | 'resumeConversation' | 'forkConversation' | 'readConversationMessages' | 'readConversationSummary' | 'executeScopedPrompt'
   | 'cancelScopedPrompt' | 'startReview' | 'tryHandlePromptCommand' | 'preparePromptOptions' | 'disposeScopedSession' | 'generateText' | 'generateImage' | 'setConversationTitle' | 'setPermissionMode' | 'setApprovalPreset' | 'releaseConversation' | 'archiveAgentConversation' | 'deleteAgentConversation' | 'reconcileConversations' | 'respondToAgentRequest' | 'listModels' | 'listSkills'
-  | 'listPlugins' | 'authenticate' | 'getAccountRateLimits' | 'getBankedResets' | 'useBankedReset' | 'setConversationStorage' | 'startRealtime' | 'getRemoteControlStatus' | 'enableRemoteControl' | 'disableRemoteControl' | 'startDevicePairing' | 'checkDevicePairing' | 'listPairedDevices' | 'revokePairedDevice' | 'getRuntimeStatus' | 'getCapabilities' | 'close';
+  | 'listPlugins' | 'authenticate' | 'getAccountRateLimits' | 'getBankedResets' | 'useBankedReset' | 'setConversationStorage' | 'startRealtime' | 'getRemoteControlStatus' | 'enableRemoteControl' | 'disableRemoteControl' | 'startDevicePairing' | 'checkDevicePairing' | 'listPairedDevices' | 'revokePairedDevice' | 'getRuntimeStatus' | 'getCapabilities' | 'readConversationUsage' | 'close';
 type Handler = (...args: never[]) => unknown;
 
 export type ScriptedHarnessOptions = {

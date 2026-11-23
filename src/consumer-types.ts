@@ -171,6 +171,8 @@ export type Harness<P extends HarnessProvider = HarnessProvider> = {
   deleteConversation(session: Session): Promise<void>;
   /** `view: 'last'` reads only the most recent page, which is much cheaper on long conversations. */
   readConversationMessages(session: Session, ref: ConversationRef, options?: { view?: 'full' | 'last' }): Promise<Message[]>;
+  /** Read persisted counters for the given conversation and its workers. An empty result means no evidence is available. */
+  readConversationUsage(conversationId: string): Promise<readonly import('./contracts/usage').PersistedExecutionUsage[]>;
   /** Archives (`archived`) or restores (`active`) a stored conversation by reference. No session is required. */
   setConversationStorage(ref: ConversationRef, state: import('./contracts/conversation').ConversationStorageState): Promise<void>;
   readConversationSummary(session: Session, ref: ConversationRef): Promise<ConversationSummary | null>;

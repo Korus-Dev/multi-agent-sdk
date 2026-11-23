@@ -244,13 +244,17 @@ describe('Antigravity native session', () => {
       await session.prompt('usage-fixture:tokens').completion;
       return observed.mock.calls.map(([event]) => event).find(event => event.phase === 'completed');
     };
-    // Wire input already includes cached reads; thoughts are separate from output and join it in Korus's model.
-    expect(await run({ inputTokens: 1000, outputTokens: 50, cachedReadTokens: 400, cachedWriteTokens: 0, thoughtTokens: 30, totalTokens: 1480 })).toMatchObject({
+    // Captured from agy 1.5.15 and checked against its persisted generation counters.
+    expect(await run({ inputTokens: 7516, outputTokens: 1177, cachedReadTokens: 21569, cachedWriteTokens: 0, thoughtTokens: 986, totalTokens: 30262 })).toMatchObject({
       model: 'gemini-3.8-flash',
-      tokens: { input: 1000, cacheRead: 400, cacheWrite: 0, output: 80, reasoning: 30, total: 1080 },
+      tokens: { input: 29085, cacheRead: 21569, cacheWrite: 0, output: 1177, reasoning: 986, total: 30262 },
+    });
+    expect(await run({ inputTokens: 1000, outputTokens: 50, cachedReadTokens: 400, cachedWriteTokens: 0, thoughtTokens: 30 })).toMatchObject({
+      model: 'gemini-3.8-flash',
+      tokens: { input: 1400, cacheRead: 400, cacheWrite: 0, output: 50, reasoning: 30, total: 1450 },
     });
     // Anything the pricing model cannot represent stays unmeasured rather than guessed.
-    for (const usage of [undefined, { inputTokens: -1, outputTokens: 1 }, { inputTokens: 'many' }, { inputTokens: 10, outputTokens: 1, cachedWriteTokens: 5 }, { inputTokens: 10, outputTokens: 1, cachedReadTokens: 11 }]) {
+    for (const usage of [undefined, { inputTokens: -1, outputTokens: 1 }, { inputTokens: 'many' }, { inputTokens: 10, outputTokens: 1, cachedWriteTokens: 5 }, { inputTokens: 10, outputTokens: 1, thoughtTokens: 2 }, { inputTokens: 10, outputTokens: 1, totalTokens: 12 }]) {
       expect(await run(usage)).toMatchObject({ model: 'gemini-3.8-flash', tokens: null });
     }
   });
