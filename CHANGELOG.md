@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.29.0 (2026-11-24)
 
 - Antigravity tool rows preserve punctuation in native titles and commands. Identified MCP calls use the app's existing `presentToolCall` hook, and partial tool updates preserve earlier arguments and results.
 - Antigravity shows who the parent delegated to, where a role is reported, and whether the invocation started, completed, or failed. Delegation rows are restored with the parent transcript.
